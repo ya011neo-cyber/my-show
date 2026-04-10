@@ -25,8 +25,8 @@
 
 <div id="app" onclick="handleTap(event)">
     <div class="btn-group">
-        <div class="btn" onclick="openImporter(event)">➕ 匯入/編輯</div>
-        <div id="lockBtn" class="btn" onclick="toggleLock(event)">🔓 已解鎖</div>
+        <div class="btn" onclick="openImporter(event)">➕ 匯入</div>
+        <div class="btn" onclick="editCurrentSong(event)">✏️ 編輯</div> <div id="lockBtn" class="btn" onclick="toggleLock(event)">🔓 已解鎖</div>
     </div>
     <div class="next-preview" id="nextText">Next: ---</div>
     <div class="lyrics" id="currLyrics">載入中...</div>
@@ -173,7 +173,74 @@ function saveMarkedData() {
         else { if (index < songData.length - 1) index++; else index = 0; }
         updateUI();
     }
+function editCurrentSong(e) {
+        e.stopPropagation();
+        
+        // 將現有嘅 songData 變返做文字格式
+        let textFormat = songData.map(item => {
+            if (item.f) {
+                // 如果歌詞係 "..."，代表嗰句只有應援
+                return (item.l === "..." ? "" : item.l) + ` (${item.f})`;
+            }
+            return item.l;
+        }).join('\n');
 
+        // 彈出輸入框俾你直接改
+        const newInput = prompt("編輯現有歌單：", textFormat);
+        
+        if (newInput !== null) {
+            // 直接叫返原本匯入嘅 function 嚟處理新改嘅文字
+            processInput(newInput); 
+        }
+    }
+
+    // 為了唔好重複寫 Code，我將原本 openImporter 入面處理文字嘅部分抽咗出嚟做一個 function
+    function processInput(input) {
+        let autoProcessed = [];
+        const lines = input.split('\n');
+        
+        lines.forEach(line => {
+            const regex = /([\(\（\[].*?[\)\）\]])|([^\(\（\[\)\）\]\s]+)/g;
+            let match;
+            let currentLyrics = "";
+            let currentFanchants = [];
+
+            while ((match = regex.exec(line)) !== null) {
+                const segment = match[0];
+                const isFC = segment.match(/[\(\（\[](.*?)[\)\）\]]/);
+                if (isFC) {
+                    currentFanchants.push(isFC[1]);
+                } else {
+                    if (currentFanchants.length > 0) {
+                        autoProcessed.push({ l: currentLyrics.trim() || "...", f: currentFanchants.join(' ') });
+                        currentLyrics = "";
+                        currentFanchants = [];
+                    }
+                    currentLyrics += segment + " ";
+                }
+            }
+            if (currentFanchants.length > 0) {
+                autoProcessed.push({ l: currentLyrics.trim() || "...", f: currentFanchants.join(' ') });
+            } else if (currentLyrics.trim()) {
+                autoProcessed.push({ l: currentLyrics.trim(), f: "" });
+            }
+        });
+
+        if (confirm("已更新。要進入【手動標記模式】微調嗎？")) {
+            startManualMarking(input);
+        } else {
+            songData = autoProcessed;
+            index = 0;
+            updateUI();
+        }
+    }
+
+    // 原本粒「➕ 匯入」掣都要改埋叫呢個新 function
+    function openImporter(e) {
+        e.stopPropagation();
+        const input = prompt("貼上新歌詞：");
+        if (input) processInput(input);
+    }
     function updateUI() {
         const current = songData[index];
         const next = songData[index + 1] || { l: "完畢" };
