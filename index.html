@@ -37,42 +37,65 @@
 </div>
 
 <script>
-    // 註冊 PWA
+
+// 註冊 PWA
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('sw.js');
     }
 
+    // --- 喺度改你嘅歌單 ---
     const songData = [
-        { l: "前奏中...", f: "" },
-        { l: "就這樣 靜靜看著你", f: "張天賦！" },
-        { l: "不想 讓這份愛過期", f: "" },
-        { l: "Woo~ OH~", f: "MC! MC!" }
+        { l: "--- 準備開始 ---", f: "" },
+        { l: "想見你 只想見你", f: "" },
+        { l: "未來過去 我只想見你", f: "某某某！" }, // 改名做你偶像
+        { l: "穿越了 千個萬個", f: "我愛你！" },
+        { l: "時間線裡 人海裡相依", f: "" },
+        { l: "--- 完畢 / 下一首 ---", f: "拍手！" }
     ];
+    // ----------------------
 
-    let index = -1;
+    let index = 0;
     let isLocked = false;
 
     function toggleLock(e) {
-        e.stopPropagation(); // 防止觸發換歌
+        e.stopPropagation();
         isLocked = !isLocked;
-        document.getElementById('lockBtn').innerText = isLocked ? "🔒 已鎖定" : "🔓 已解鎖";
-        document.getElementById('lockBtn').style.color = isLocked ? "red" : "white";
+        const btn = document.getElementById('lockBtn');
+        btn.innerText = isLocked ? "🔒 已鎖定" : "🔓 已解鎖";
+        btn.style.background = isLocked ? "#600" : "#222";
     }
 
-    function handleTap() {
+    function handleTap(e) {
         if (isLocked) return;
-        index++;
-        if (index >= songData.length) index = 0;
+
+        // 點擊畫面左邊 20% 區域可以返番轉頭 (驚撳錯)
+        const width = window.innerWidth;
+        if (e.clientX < width * 0.2) {
+            if (index > 0) index--;
+        } else {
+            if (index < songData.length - 1) index++;
+            else index = 0; // 播完返轉頭
+        }
         
+        updateUI();
+    }
+
+    function updateUI() {
         const current = songData[index];
-        const next = songData[index + 1] || { l: "完畢" };
+        const next = songData[index + 1] || { l: "完" };
 
         document.getElementById('currLyrics').innerText = current.l;
         document.getElementById('currFanchant').innerText = current.f;
         document.getElementById('nextText').innerText = "Next: " + next.l;
 
-        if (current.f && navigator.vibrate) navigator.vibrate(50);
+        // 如果有應援詞，震動一下提醒
+        if (current.f && navigator.vibrate) {
+            navigator.vibrate([100]);
+        }
     }
+
+    // 初始化顯示
+    updateUI();
 </script>
 </body>
 </html>
