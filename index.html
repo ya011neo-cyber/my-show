@@ -21,6 +21,14 @@
             font-size: 3.5rem; font-weight: 900; color: #00FF00; 
             text-shadow: 0 0 20px rgba(0,255,0,0.5);
         }
+        /* 喺畫面最底加條細細嘅線，幫你分左右，正式用嗰陣可以刪咗佢 */
+        #app::after {
+            content: "⬅️ 上一句 | 下一句 ➡️";
+            position: absolute;
+            bottom: 50px;
+            font-size: 0.7rem;
+            color: #222; /* 顏色好深，平時睇唔到，但幫你練習位置 */
+        }
         .lock-btn {
             position: absolute; top: 20px; right: 20px;
             padding: 10px; background: #222; border-radius: 5px; font-size: 0.8rem;
@@ -65,16 +73,25 @@
         btn.style.background = isLocked ? "#600" : "#222";
     }
 
-    function handleTap(e) {
+function handleTap(e) {
         if (isLocked) return;
 
-        // 點擊畫面左邊 20% 區域可以返番轉頭 (驚撳錯)
-        const width = window.innerWidth;
-        if (e.clientX < width * 0.2) {
-            if (index > 0) index--;
+        // 獲得點擊的位置 (clientX) 同埋螢幕總寬度 (innerWidth)
+        const clickX = e.clientX;
+        const screenWidth = window.innerWidth;
+
+        // 如果點擊位置喺左邊 30% 區域
+        if (clickX < screenWidth * 0.3) {
+            if (index > 0) {
+                index--; // 返上一句
+            }
         } else {
-            if (index < songData.length - 1) index++;
-            else index = 0; // 播完返轉頭
+            // 點擊其他地方就下一句
+            if (index < songData.length - 1) {
+                index++;
+            } else {
+                index = 0; // 播完返去第一句
+            }
         }
         
         updateUI();
