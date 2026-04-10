@@ -180,23 +180,22 @@ function saveMarkedData() {
         else { if (index < songData.length - 1) index++; else index = 0; }
         updateUI();
     }
-function editCurrentSong(e) {
+    function editCurrentSong(e) {
         e.stopPropagation();
         
-        // 將現有嘅 songData 變返做文字格式
+        // 直接將歌詞同應援詞排埋一齊，完全唔加任何額外括號或符號
         let textFormat = songData.map(item => {
             if (item.f) {
-                // 如果歌詞係 "..."，代表嗰句只有應援
-                return (item.l === "..." ? "" : item.l) + ` (${item.f})`;
+                // 如果歌詞係 "..." 代表淨應援，就只出應援詞
+                // 否則就出「歌詞 + 應援詞」
+                return (item.l === "..." ? "" : item.l + " ") + item.f;
             }
             return item.l;
         }).join('\n');
-
-        // 彈出輸入框俾你直接改
+    
         const newInput = prompt("編輯現有歌單：", textFormat);
         
         if (newInput !== null) {
-            // 直接叫返原本匯入嘅 function 嚟處理新改嘅文字
             processInput(newInput); 
         }
     }
