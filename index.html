@@ -11,13 +11,35 @@
         .next-preview { color: #444; font-size: 0.9rem; margin-bottom: 20px; }
         .lyrics { font-size: 1.4rem; color: #bbb; margin-bottom: 10px; }
         .fanchant { font-size: 3.5rem; font-weight: 900; color: #0f0; text-shadow: 0 0 15px #0f0; }
-        .btn-group { position: absolute; top: 10px; right: 10px; display: flex; gap: 5px; }
+        .btn-group { position: absolute; top: 10px; right: 10px; display: flex; gap: 5px; z-index: 100; }
         .btn { padding: 8px 12px; background: #222; border-radius: 5px; font-size: 0.7rem; border: 1px solid #444; color: #fff; }
-        #app::after { content: "⬅️ 30% 區域退後 | 前進 70% ➡️"; position: absolute; bottom: 20px; font-size: 0.6rem; color: #111; }
+        
+        /* 標記模式專用樣式 */
+        #editor-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #111; z-index: 999; padding: 20px; box-sizing: border-box; overflow-y: auto; display: none; }
+        .word-chip { display: inline-block; padding: 8px 12px; margin: 5px; border: 1px solid #444; border-radius: 4px; cursor: pointer; color: #ccc; }
+        .word-chip.is-fc { background: #0f0; color: #000; font-weight: bold; border-color: #0f0; box-shadow: 0 0 10px #0f0; }
+        .editor-footer { margin-top: 30px; padding-bottom: 50px; }
     </style>
 </head>
 <body>
+<div id="app" onclick="handleTap(event)">
+    <div class="btn-group">
+        <div class="btn" onclick="openImporter(event)">➕ 匯入/編輯</div>
+        <div id="lockBtn" class="btn" onclick="toggleLock(event)">🔓 已解鎖</div>
+    </div>
+    <div class="next-preview" id="nextText">Next: ---</div>
+    <div class="lyrics" id="currLyrics">載入中...</div>
+    <div class="fanchant" id="currFanchant"></div>
+</div>
 
+<div id="editor-overlay">
+    <h2>點擊【應援詞】使其變綠色</h2>
+    <div id="chips-container"></div>
+    <div class="editor-footer">
+        <button class="btn" style="font-size: 1.2rem; padding: 15px 30px;" onclick="saveMarkedData()">✅ 完成並生成應援</button>
+        <button class="btn" style="margin-left: 10px;" onclick="document.getElementById('editor-overlay').style.display='none'">取消</button>
+    </div>
+</div>
 <div id="app" onclick="handleTap(event)">
     <div class="btn-group">
         <div class="btn" onclick="importSongs(event)">➕ 加入新歌</div>
@@ -27,72 +49,89 @@
     <div class="lyrics" id="currLyrics">準備就緒</div>
     <div class="fanchant" id="currFanchant"></div>
 </div>
-
 <script>
     if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js'); }
 
-    // 預設歌單
-    let songData = [
-        { l: "點擊右上角「加入新歌」", f: "開始使用" },
-        { l: "格式範例：歌詞/應援詞", f: "明白！" }
-    ];
-
+    let songData = [{ l: "點擊右上角「匯入」", f: "開始" }];
     let index = 0;
     let isLocked = false;
 
-    // --- 新功能：輸入歌詞 ---
-function importSongs(e) {
+    // --- 終極匯入功能 ---
+    function openImporter(e) {
         e.stopPropagation();
-        const input = prompt("請貼上歌詞 (支援一行多個括號，會自動拆行)");
-        
-        if (input) {
-            const lines = input.split('\n');
-            let newData = [];
+        const input = prompt("【方法 1】貼上官方格式 (帶括號或斜杠)\n【方法 2】貼上圖片提取的純文字 (稍後手動標記)");
+        if (!input) return;
 
-            lines.forEach(line => {
-                // 正規表達式：搵出所有括號入面嘅內容
-                const regex = /[\(\（\[](.*?)[\)\）\]]/g;
-                let lastIndex = 0;
-                let match;
-                let foundMatch = false;
+        // 先嘗試自動識別括號
+        let autoProcessed = [];
+        const lines = input.split('\n');
+        lines.forEach(line => {
+            const regex = /[\(\（\[](.*?)[\)\）\]]/g;
+            let lastIndex = 0;
+            let match;
+            let foundMatch = false;
+            while ((match = regex.exec(line)) !== null) {
+                foundMatch = true;
+                autoProcessed.push({ l: line.substring(lastIndex, match.index).trim() || "...", f: match[1] });
+                lastIndex = regex.lastIndex;
+            }
+            if (lastIndex < line.length || !foundMatch) {
+                const rem = line.substring(lastIndex).trim();
+                if (rem) autoProcessed.push({ l: rem, f: "" });
+            }
+        });
 
-                // 循環搵出嗰一行入面所有括號
-                while ((match = regex.exec(line)) !== null) {
-                    foundMatch = true;
-                    // 攞括號之前嘅文字做歌詞
-                    const lyricsBefore = line.substring(lastIndex, match.index).trim();
-                    const fanchant = match[1];
-                    
-                    newData.push({
-                        l: lyricsBefore || "...", // 如果括號前冇字就顯示 ...
-                        f: fanchant
-                    });
-                    lastIndex = regex.lastIndex;
-                }
-
-                // 如果括號後面仲有剩餘嘅字，或者成行都冇括號
-                if (lastIndex < line.length) {
-                    const remaining = line.substring(lastIndex).trim();
-                    if (remaining) {
-                        newData.push({ l: remaining, f: "" });
-                    }
-                } else if (!foundMatch && line.trim() !== "") {
-                    newData.push({ l: line.trim(), f: "" });
-                }
-            });
-            
-            songData = newData;
+        // 彈出確認：要直接用定係入「標記模式」？
+        if (confirm("已偵測到內容。需要進入【手動標記模式】來點選應援詞嗎？\n(如果原本就有括號，按「取消」直接使用即可)")) {
+            startManualMarking(input);
+        } else {
+            songData = autoProcessed;
             index = 0;
             updateUI();
-            alert("匯入成功！已為你自動拆分多重應援。");
         }
     }
 
+    // --- 手動標記邏輯 ---
+    function startManualMarking(text) {
+        const overlay = document.getElementById('editor-overlay');
+        const container = document.getElementById('chips-container');
+        const words = text.split(/[\s\n]+/); // 拆分所有字
+        
+        container.innerHTML = words.map((w, i) => 
+            `<span onclick="this.classList.toggle('is-fc')" class="word-chip">${w}</span>`
+        ).join('');
+        
+        overlay.style.display = 'block';
+    }
+
+    function saveMarkedData() {
+        const chips = document.querySelectorAll('.word-chip');
+        let newData = [];
+        let currentL = "";
+
+        chips.forEach(chip => {
+            if (chip.classList.contains('is-fc')) {
+                newData.push({ l: currentL.trim() || "...", f: chip.innerText });
+                currentL = "";
+            } else {
+                currentL += chip.innerText + " ";
+            }
+        });
+
+        if (currentL.trim()) newData.push({ l: currentL.trim(), f: "" });
+        
+        songData = newData;
+        index = 0;
+        document.getElementById('editor-overlay').style.display = 'none';
+        updateUI();
+    }
+
+    // --- 基礎操控 ---
     function toggleLock(e) {
         e.stopPropagation();
         isLocked = !isLocked;
         const btn = document.getElementById('lockBtn');
-        btn.innerText = isLocked ? "🔒 已鎖定" : "🔓 已解鎖";
+        btn.innerText = isLocked ? "🔒 鎖定中" : "🔓 已解鎖";
         btn.style.borderColor = isLocked ? "red" : "#444";
     }
 
@@ -100,25 +139,19 @@ function importSongs(e) {
         if (isLocked) return;
         const clickX = e.clientX || (e.touches && e.touches[0].clientX);
         const screenWidth = window.innerWidth;
-
-        if (clickX < screenWidth * 0.3) {
-            if (index > 0) index--;
-        } else {
-            if (index < songData.length - 1) index++;
-            else index = 0;
-        }
+        if (clickX < screenWidth * 0.3) { if (index > 0) index--; }
+        else { if (index < songData.length - 1) index++; else index = 0; }
         updateUI();
     }
 
     function updateUI() {
         const current = songData[index];
-        const next = songData[index + 1] || { l: "完畢" };
+        const next = songData[index + 1] || { l: "完" };
         document.getElementById('currLyrics').innerText = current.l;
         document.getElementById('currFanchant').innerText = current.f;
         document.getElementById('nextText').innerText = "Next: " + next.l;
         if (current.f && navigator.vibrate) navigator.vibrate(50);
     }
-
     updateUI();
 </script>
 </body>
