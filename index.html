@@ -97,34 +97,32 @@
     }
 
 function startManualMarking(text) {
-        const overlay = document.getElementById('editor-overlay');
-        const container = document.getElementById('chips-container');
-        const lines = text.split('\n');
-        
-        // 建立一個「已標記應援詞」的清單，用嚟比對
-        const currentFanchants = songData.map(item => item.f.split(' ')).flat();
+    const overlay = document.getElementById('editor-overlay');
+    const container = document.getElementById('chips-container');
+    const lines = text.split('\n');
+    
+    // 攞返現有嘅應援詞做比對（用嚟自動油綠色）
+    const currentFanchants = songData.map(item => item.f.split(' ')).flat().filter(s => s !== "");
 
-        let html = "";
-        lines.forEach((line) => {
-            if (line.trim() === "") return;
-            html += `<div class="line-row" style="margin-bottom: 20px; border-bottom: 1px solid #222; padding-bottom: 10px;">`;
-            
-            // 處理括號，費事顯示出嚟好亂
-            const cleanLine = line.replace(/[\(\（\[].*?[\)\）\]]/g, '').trim();
-            const words = cleanLine.split(/\s+/);
-            
-            words.forEach(w => {
-                // 如果呢粒字喺現有歌單入面係應援詞，就自動加 'is-fc' class
-                const isAlreadyFC = currentFanchants.includes(w);
-                html += `<span onclick="this.classList.toggle('is-fc')" class="word-chip ${isAlreadyFC ? 'is-fc' : ''}">${w}</span>`;
-            });
-            html += `</div>`;
+    let html = "";
+    lines.forEach((line) => {
+        if (line.trim() === "") return;
+        html += `<div class="line-row" style="margin-bottom: 20px; border-bottom: 1px solid #222; padding-bottom: 10px;">`;
+        
+        // 直接用空格拆開，完全唔刪除任何符號
+        const words = line.split(/\s+/).filter(w => w !== "");
+        
+        words.forEach(w => {
+            // 只要呢粒字（連埋符號）喺舊數據出現過，就自動變綠色
+            const isAlreadyFC = currentFanchants.some(f => w.includes(f));
+            html += `<span onclick="this.classList.toggle('is-fc')" class="word-chip ${isAlreadyFC ? 'is-fc' : ''}">${w}</span>`;
         });
-        
-        container.innerHTML = html;
-        overlay.style.display = 'block';
-    }
-
+        html += `</div>`;
+    });
+    
+    container.innerHTML = html;
+    overlay.style.display = 'block';
+}
 function saveMarkedData() {
         const rows = document.querySelectorAll('.line-row');
         let newData = [];
