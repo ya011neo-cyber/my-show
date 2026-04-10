@@ -73,25 +73,21 @@
         btn.style.background = isLocked ? "#600" : "#222";
     }
 
-function handleTap(e) {
+    function handleTap(e) {
+        // 1. 防誤觸鎖定
         if (isLocked) return;
 
-        // 獲得點擊的位置 (clientX) 同埋螢幕總寬度 (innerWidth)
-        const clickX = e.clientX;
+        // 2. 獲取點擊事件
+        const event = e || window.event;
+        const clickX = event.clientX;
         const screenWidth = window.innerWidth;
 
-        // 如果點擊位置喺左邊 30% 區域
+        // 3. 判斷左定右 (30% 區域為界)
         if (clickX < screenWidth * 0.3) {
-            if (index > 0) {
-                index--; // 返上一句
-            }
+            if (index > 0) index--; // 返上一句
         } else {
-            // 點擊其他地方就下一句
-            if (index < songData.length - 1) {
-                index++;
-            } else {
-                index = 0; // 播完返去第一句
-            }
+            if (index < songData.length - 1) index++; // 下一句
+            else index = 0; // 循環
         }
         
         updateUI();
