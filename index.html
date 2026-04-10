@@ -51,28 +51,43 @@
 
     function openImporter(e) {
         e.stopPropagation();
-        const input = prompt("【方法 1】貼上官方格式 (帶括號)\n【方法 2】貼上圖片提取的純文字");
+        const input = prompt("貼上歌詞：");
         if (!input) return;
 
         let autoProcessed = [];
         const lines = input.split('\n');
+        
         lines.forEach(line => {
-            const regex = /[\(\（\[](.*?)[\)\）\]]/g;
-            let lastIndex = 0;
+            const regex = /([\(\（\[].*?[\)\）\]])|([^\(\（\[\)\）\]\s]+)/g;
             let match;
-            let foundMatch = false;
+            let currentLyrics = "";
+            let currentFanchants = [];
+
             while ((match = regex.exec(line)) !== null) {
-                foundMatch = true;
-                autoProcessed.push({ l: line.substring(lastIndex, match.index).trim() || "...", f: match[1] });
-                lastIndex = regex.lastIndex;
+                const segment = match[0];
+                const isFC = segment.match(/[\(\（\[](.*?)[\)\）\]]/);
+
+                if (isFC) {
+                    currentFanchants.push(isFC[1]);
+                } else {
+                    // 遇到歌詞，先把之前的應援打包
+                    if (currentFanchants.length > 0) {
+                        autoProcessed.push({ l: currentLyrics.trim() || "...", f: currentFanchants.join(' ') });
+                        currentLyrics = "";
+                        currentFanchants = [];
+                    }
+                    currentLyrics += segment + " ";
+                }
             }
-            if (lastIndex < line.length || !foundMatch) {
-                const rem = line.substring(lastIndex).trim();
-                if (rem) autoProcessed.push({ l: rem, f: "" });
+            // 處理句尾
+            if (currentFanchants.length > 0) {
+                autoProcessed.push({ l: currentLyrics.trim() || "...", f: currentFanchants.join(' ') });
+            } else if (currentLyrics.trim()) {
+                autoProcessed.push({ l: currentLyrics.trim(), f: "" });
             }
         });
 
-        if (confirm("已偵測到內容。要進入【手動標記模式】來點選應援詞嗎？\n(原本有括號的歌詞按「取消」即可)")) {
+        if (confirm("已偵測到內容。要進入【手動標記模式】嗎？")) {
             startManualMarking(input);
         } else {
             songData = autoProcessed;
@@ -93,15 +108,29 @@
         const chips = document.querySelectorAll('.word-chip');
         let newData = [];
         let currentL = "";
+        let pendingF = []; // 用嚟暫存連續嘅應援詞
+
         chips.forEach(chip => {
             if (chip.classList.contains('is-fc')) {
-                newData.push({ l: currentL.trim() || "...", f: chip.innerText });
-                currentL = "";
+                pendingF.push(chip.innerText);
             } else {
+                // 如果遇到普通歌詞，先將之前暫存嘅應援詞出貨
+                if (pendingF.length > 0) {
+                    newData.push({ l: currentL.trim() || "...", f: pendingF.join(' ') });
+                    currentL = "";
+                    pendingF = [];
+                }
                 currentL += chip.innerText + " ";
             }
         });
-        if (currentL.trim()) newData.push({ l: currentL.trim(), f: "" });
+
+        // 處理最後剩低嘅應援詞或歌詞
+        if (pendingF.length > 0) {
+            newData.push({ l: currentL.trim() || "...", f: pendingF.join(' ') });
+        } else if (currentL.trim()) {
+            newData.push({ l: currentL.trim(), f: "" });
+        }
+
         songData = newData;
         index = 0;
         document.getElementById('editor-overlay').style.display = 'none';
