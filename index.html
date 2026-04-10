@@ -96,18 +96,27 @@
         }
     }
 
-    function startManualMarking(text) {
+function startManualMarking(text) {
         const overlay = document.getElementById('editor-overlay');
         const container = document.getElementById('chips-container');
-        const lines = text.split('\n'); // 先按行拆分
+        const lines = text.split('\n');
         
+        // 建立一個「已標記應援詞」的清單，用嚟比對
+        const currentFanchants = songData.map(item => item.f.split(' ')).flat();
+
         let html = "";
-        lines.forEach((line, lineIdx) => {
+        lines.forEach((line) => {
             if (line.trim() === "") return;
             html += `<div class="line-row" style="margin-bottom: 20px; border-bottom: 1px solid #222; padding-bottom: 10px;">`;
-            const words = line.split(/\s+/); // 再按空格拆字
+            
+            // 處理括號，費事顯示出嚟好亂
+            const cleanLine = line.replace(/[\(\（\[].*?[\)\）\]]/g, '').trim();
+            const words = cleanLine.split(/\s+/);
+            
             words.forEach(w => {
-                html += `<span onclick="this.classList.toggle('is-fc')" class="word-chip">${w}</span>`;
+                // 如果呢粒字喺現有歌單入面係應援詞，就自動加 'is-fc' class
+                const isAlreadyFC = currentFanchants.includes(w);
+                html += `<span onclick="this.classList.toggle('is-fc')" class="word-chip ${isAlreadyFC ? 'is-fc' : ''}">${w}</span>`;
             });
             html += `</div>`;
         });
@@ -241,14 +250,28 @@ function editCurrentSong(e) {
         const input = prompt("貼上新歌詞：");
         if (input) processInput(input);
     }
+// 每次更新 UI 時順便儲存到手機
     function updateUI() {
         const current = songData[index];
         const next = songData[index + 1] || { l: "完畢" };
         document.getElementById('currLyrics').innerText = current.l;
         document.getElementById('currFanchant').innerText = current.f;
         document.getElementById('nextText').innerText = "Next: " + next.l;
+        
+        // 儲存落手機
+        localStorage.setItem('myConcertData', JSON.stringify(songData));
+        
         if (current.f && navigator.vibrate) navigator.vibrate(50);
     }
+
+    // 網頁一開嗰陣，讀取舊紀錄
+    window.onload = function() {
+        const saved = localStorage.getItem('myConcertData');
+        if (saved) {
+            songData = JSON.parse(saved);
+            updateUI();
+        }
+    };
     updateUI();
 </script>
 </body>
