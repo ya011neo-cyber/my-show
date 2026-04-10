@@ -106,7 +106,52 @@
             navigator.vibrate([100]);
         }
     }
+    function importSongs(e) {
+        e.stopPropagation();
+        const input = prompt("請貼上歌詞 (支援一行多個括號，會自動拆行)");
+        
+        if (input) {
+            const lines = input.split('\n');
+            let newData = [];
 
+            lines.forEach(line => {
+                // 正規表達式：搵出所有括號入面嘅內容
+                const regex = /[\(\（\[](.*?)[\)\）\]]/g;
+                let lastIndex = 0;
+                let match;
+                let foundMatch = false;
+
+                // 循環搵出嗰一行入面所有括號
+                while ((match = regex.exec(line)) !== null) {
+                    foundMatch = true;
+                    // 攞括號之前嘅文字做歌詞
+                    const lyricsBefore = line.substring(lastIndex, match.index).trim();
+                    const fanchant = match[1];
+                    
+                    newData.push({
+                        l: lyricsBefore || "...", // 如果括號前冇字就顯示 ...
+                        f: fanchant
+                    });
+                    lastIndex = regex.lastIndex;
+                }
+
+                // 如果括號後面仲有剩餘嘅字，或者成行都冇括號
+                if (lastIndex < line.length) {
+                    const remaining = line.substring(lastIndex).trim();
+                    if (remaining) {
+                        newData.push({ l: remaining, f: "" });
+                    }
+                } else if (!foundMatch && line.trim() !== "") {
+                    newData.push({ l: line.trim(), f: "" });
+                }
+            });
+            
+            songData = newData;
+            index = 0;
+            updateUI();
+            alert("匯入成功！已為你自動拆分多重應援。");
+        }
+    }
     // 初始化顯示
     updateUI();
 </script>
