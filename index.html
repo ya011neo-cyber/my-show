@@ -207,42 +207,19 @@ function saveMarkedData() {
         }
     }
 
-    // 為了唔好重複寫 Code，我將原本 openImporter 入面處理文字嘅部分抽咗出嚟做一個 function
     function processInput(input) {
-        let autoProcessed = [];
-        const lines = input.split('\n');
-        
-        lines.forEach(line => {
-            const regex = /([\(\（\[].*?[\)\）\]])|([^\(\（\[\)\）\]\s]+)/g;
-            let match;
-            let currentLyrics = "";
-            let currentFanchants = [];
+        if (!input) return;
 
-            while ((match = regex.exec(line)) !== null) {
-                const segment = match[0];
-                const isFC = segment.match(/[\(\（\[](.*?)[\)\）\]]/);
-                if (isFC) {
-                    currentFanchants.push(isFC[1]);
-                } else {
-                    if (currentFanchants.length > 0) {
-                        autoProcessed.push({ l: currentLyrics.trim() || "...", f: currentFanchants.join(' ') });
-                        currentLyrics = "";
-                        currentFanchants = [];
-                    }
-                    currentLyrics += segment + " ";
-                }
-            }
-            if (currentFanchants.length > 0) {
-                autoProcessed.push({ l: currentLyrics.trim() || "...", f: currentFanchants.join(' ') });
-            } else if (currentLyrics.trim()) {
-                autoProcessed.push({ l: currentLyrics.trim(), f: "" });
-            }
-        });
-
-        if (confirm("已更新。要進入【手動標記模式】微調嗎？")) {
+        // 直接進入標記模式，唔好自動處理任何括號
+        // 咁樣可以確保你輸入乜，標記模式就見到乜
+        if (confirm("已接收歌詞。要進入【手動標記模式】點選應援位嗎？")) {
             startManualMarking(input);
         } else {
-            songData = autoProcessed;
+            // 如果唔入標記模式，就簡單地按行顯示
+            let simpleLines = input.split('\n').filter(line => line.trim() !== "").map((line, idx) => {
+                return { l: line.trim(), f: "", row: idx, marks: [] };
+            });
+            songData = simpleLines;
             index = 0;
             updateUI();
         }
