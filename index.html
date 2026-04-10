@@ -96,12 +96,13 @@
         }
     }
 
+
 function startManualMarking(text) {
         const overlay = document.getElementById('editor-overlay');
         const container = document.getElementById('chips-container');
         const lines = text.split('\n');
         
-        // 建立一個位置對照表： rowIdx -> Set of chipIdx
+        // 建立位置對照表（用於「再次編輯」時還原你之前手動執過嘅位）
         const posMap = {};
         songData.forEach(item => {
             if (item.marks && item.marks.length > 0) {
@@ -117,9 +118,15 @@ function startManualMarking(text) {
             
             const words = line.split(/\s+/).filter(w => w !== "");
             words.forEach((w, chipIdx) => {
-                // 只有當 行數(rowIdx) 同 位置(chipIdx) 都對應到，先至油綠色
-                const isMarked = posMap[rowIdx] && posMap[rowIdx].has(chipIdx);
-                html += `<span onclick="this.classList.toggle('is-fc')" class="word-chip ${isMarked ? 'is-fc' : ''}">${w}</span>`;
+                // 判斷邏輯：
+                // 1. 係咪之前手動點選過嘅位置？
+                // 2. OR 粒字本身係咪自帶括號？ (例如 (張天賦) 或 [應援] )
+                const isSavedMark = posMap[rowIdx] && posMap[rowIdx].has(chipIdx);
+                const isBracketed = /[\(\（\[].*?[\)\）\]]/.test(w); 
+                
+                const shouldHighlight = isSavedMark || isBracketed;
+
+                html += `<span onclick="this.classList.toggle('is-fc')" class="word-chip ${shouldHighlight ? 'is-fc' : ''}">${w}</span>`;
             });
             html += `</div>`;
         });
@@ -209,27 +216,18 @@ function saveMarkedData() {
 
     function processInput(input) {
         if (!input) return;
-
-        // 直接進入標記模式，唔好自動處理任何括號
-        // 咁樣可以確保你輸入乜，標記模式就見到乜
-        if (confirm("已接收歌詞。要進入【手動標記模式】點選應援位嗎？")) {
-            startManualMarking(input);
-        } else {
-            // 如果唔入標記模式，就簡單地按行顯示
-            let simpleLines = input.split('\n').filter(line => line.trim() !== "").map((line, idx) => {
-                return { l: line.trim(), f: "", row: idx, marks: [] };
-            });
-            songData = simpleLines;
-            index = 0;
-            updateUI();
-        }
+        // 直接進入手動標記，唔使問
+        startManualMarking(input)；
     }
 
-    // 原本粒「➕ 匯入」掣都要改埋叫呢個新 function
     function openImporter(e) {
         e.stopPropagation();
         const input = prompt("貼上新歌詞：");
-        if (input) processInput(input);
+        if (input) {
+            // 匯入新歌時，先清空舊嘅位置紀錄，避免新舊歌位置重疊
+            songData = []; 
+            processInput(input);
+        }
     }
 // 每次更新 UI 時順便儲存到手機
     function updateUI() {
