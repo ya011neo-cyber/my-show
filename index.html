@@ -4,109 +4,44 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <link rel="manifest" href="manifest.json">
-    <title>應援助手</title>
+    <title>應援助手 Pro</title>
     <style>
-        body {
-            margin: 0; background: #000; color: #fff;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            height: 100vh; overflow: hidden; touch-action: none;
-        }
-        #app {
-            height: 100%; display: flex; flex-direction: column;
-            justify-content: center; align-items: center; padding: 0 10%;
-        }
-        .next-preview { color: #555; font-size: 1rem; margin-bottom: 30px; }
-        .lyrics { font-size: 1.5rem; color: #ccc; margin-bottom: 10px; }
-        .fanchant { 
-            font-size: 3.5rem; font-weight: 900; color: #00FF00; 
-            text-shadow: 0 0 20px rgba(0,255,0,0.5);
-        }
-        /* 喺畫面最底加條細細嘅線，幫你分左右，正式用嗰陣可以刪咗佢 */
-        #app::after {
-            content: "⬅️ 上一句 | 下一句 ➡️";
-            position: absolute;
-            bottom: 50px;
-            font-size: 0.7rem;
-            color: #222; /* 顏色好深，平時睇唔到，但幫你練習位置 */
-        }
-        .lock-btn {
-            position: absolute; top: 20px; right: 20px;
-            padding: 10px; background: #222; border-radius: 5px; font-size: 0.8rem;
-        }
+        body { margin: 0; background: #000; color: #fff; font-family: sans-serif; height: 100vh; overflow: hidden; touch-action: none; }
+        #app { height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 0 10%; text-align: center; }
+        .next-preview { color: #444; font-size: 0.9rem; margin-bottom: 20px; }
+        .lyrics { font-size: 1.4rem; color: #bbb; margin-bottom: 10px; }
+        .fanchant { font-size: 3.5rem; font-weight: 900; color: #0f0; text-shadow: 0 0 15px #0f0; }
+        .btn-group { position: absolute; top: 10px; right: 10px; display: flex; gap: 5px; }
+        .btn { padding: 8px 12px; background: #222; border-radius: 5px; font-size: 0.7rem; border: 1px solid #444; color: #fff; }
+        #app::after { content: "⬅️ 30% 區域退後 | 前進 70% ➡️"; position: absolute; bottom: 20px; font-size: 0.6rem; color: #111; }
     </style>
 </head>
 <body>
 
-<div id="app" onclick="handleTap()">
-    <div id="lockBtn" class="lock-btn" onclick="toggleLock(event)">🔓 已解鎖</div>
-    <div class="next-preview" id="nextText">準備好未？</div>
-    <div class="lyrics" id="currLyrics">點擊螢幕開始</div>
+<div id="app" onclick="handleTap(event)">
+    <div class="btn-group">
+        <div class="btn" onclick="importSongs(event)">➕ 加入新歌</div>
+        <div id="lockBtn" class="btn" onclick="toggleLock(event)">🔓 已解鎖</div>
+    </div>
+    <div class="next-preview" id="nextText">Next: ---</div>
+    <div class="lyrics" id="currLyrics">準備就緒</div>
     <div class="fanchant" id="currFanchant"></div>
 </div>
 
 <script>
+    if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js'); }
 
-// 註冊 PWA
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('sw.js');
-    }
-
-    // --- 喺度改你嘅歌單 ---
-    const songData = [
-        { l: "--- 準備開始 ---", f: "" },
-        { l: "想見你 只想見你", f: "" },
-        { l: "未來過去 我只想見你", f: "某某某！" }, // 改名做你偶像
-        { l: "穿越了 千個萬個", f: "我愛你！" },
-        { l: "時間線裡 人海裡相依", f: "" },
-        { l: "--- 完畢 / 下一首 ---", f: "拍手！" }
+    // 預設歌單
+    let songData = [
+        { l: "點擊右上角「加入新歌」", f: "開始使用" },
+        { l: "格式範例：歌詞/應援詞", f: "明白！" }
     ];
-    // ----------------------
 
     let index = 0;
     let isLocked = false;
 
-    function toggleLock(e) {
-        e.stopPropagation();
-        isLocked = !isLocked;
-        const btn = document.getElementById('lockBtn');
-        btn.innerText = isLocked ? "🔒 已鎖定" : "🔓 已解鎖";
-        btn.style.background = isLocked ? "#600" : "#222";
-    }
-
-    function handleTap(e) {
-        // 1. 防誤觸鎖定
-        if (isLocked) return;
-
-        // 2. 獲取點擊事件
-        const event = e || window.event;
-        const clickX = event.clientX;
-        const screenWidth = window.innerWidth;
-
-        // 3. 判斷左定右 (30% 區域為界)
-        if (clickX < screenWidth * 0.3) {
-            if (index > 0) index--; // 返上一句
-        } else {
-            if (index < songData.length - 1) index++; // 下一句
-            else index = 0; // 循環
-        }
-        
-        updateUI();
-    }
-
-    function updateUI() {
-        const current = songData[index];
-        const next = songData[index + 1] || { l: "完" };
-
-        document.getElementById('currLyrics').innerText = current.l;
-        document.getElementById('currFanchant').innerText = current.f;
-        document.getElementById('nextText').innerText = "Next: " + next.l;
-
-        // 如果有應援詞，震動一下提醒
-        if (current.f && navigator.vibrate) {
-            navigator.vibrate([100]);
-        }
-    }
-    function importSongs(e) {
+    // --- 新功能：輸入歌詞 ---
+function importSongs(e) {
         e.stopPropagation();
         const input = prompt("請貼上歌詞 (支援一行多個括號，會自動拆行)");
         
@@ -152,7 +87,38 @@
             alert("匯入成功！已為你自動拆分多重應援。");
         }
     }
-    // 初始化顯示
+
+    function toggleLock(e) {
+        e.stopPropagation();
+        isLocked = !isLocked;
+        const btn = document.getElementById('lockBtn');
+        btn.innerText = isLocked ? "🔒 已鎖定" : "🔓 已解鎖";
+        btn.style.borderColor = isLocked ? "red" : "#444";
+    }
+
+    function handleTap(e) {
+        if (isLocked) return;
+        const clickX = e.clientX || (e.touches && e.touches[0].clientX);
+        const screenWidth = window.innerWidth;
+
+        if (clickX < screenWidth * 0.3) {
+            if (index > 0) index--;
+        } else {
+            if (index < songData.length - 1) index++;
+            else index = 0;
+        }
+        updateUI();
+    }
+
+    function updateUI() {
+        const current = songData[index];
+        const next = songData[index + 1] || { l: "完畢" };
+        document.getElementById('currLyrics').innerText = current.l;
+        document.getElementById('currFanchant').innerText = current.f;
+        document.getElementById('nextText').innerText = "Next: " + next.l;
+        if (current.f && navigator.vibrate) navigator.vibrate(50);
+    }
+
     updateUI();
 </script>
 </body>
