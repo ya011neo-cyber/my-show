@@ -97,64 +97,71 @@
     }
 
 function startManualMarking(text) {
-    const overlay = document.getElementById('editor-overlay');
-    const container = document.getElementById('chips-container');
-    const lines = text.split('\n');
-    
-    // 攞返現有嘅應援詞做比對（用嚟自動油綠色）
-    const currentFanchants = songData.map(item => item.f.split(' ')).flat().filter(s => s !== "");
-
-    let html = "";
-    lines.forEach((line) => {
-        if (line.trim() === "") return;
-        html += `<div class="line-row" style="margin-bottom: 20px; border-bottom: 1px solid #222; padding-bottom: 10px;">`;
+        const overlay = document.getElementById('editor-overlay');
+        const container = document.getElementById('chips-container');
+        const lines = text.split('\n');
         
-        // 直接用空格拆開，完全唔刪除任何符號
-        const words = line.split(/\s+/).filter(w => w !== "");
-        
-        words.forEach(w => {
-            // 只要呢粒字（連埋符號）喺舊數據出現過，就自動變綠色
-            const isAlreadyFC = currentFanchants.some(f => w.includes(f));
-            html += `<span onclick="this.classList.toggle('is-fc')" class="word-chip ${isAlreadyFC ? 'is-fc' : ''}">${w}</span>`;
+        // 建立一個位置對照表： rowIdx -> Set of chipIdx
+        const posMap = {};
+        songData.forEach(item => {
+            if (item.marks && item.marks.length > 0) {
+                if (!posMap[item.row]) posMap[item.row] = new Set();
+                item.marks.forEach(m => posMap[item.row].add(m));
+            }
         });
-        html += `</div>`;
-    });
-    
-    container.innerHTML = html;
-    overlay.style.display = 'block';
-}
+
+        let html = "";
+        lines.forEach((line, rowIdx) => {
+            if (line.trim() === "") return;
+            html += `<div class="line-row" data-row="${rowIdx}" style="margin-bottom: 20px; border-bottom: 1px solid #222; padding-bottom: 10px;">`;
+            
+            const words = line.split(/\s+/).filter(w => w !== "");
+            words.forEach((w, chipIdx) => {
+                // 只有當 行數(rowIdx) 同 位置(chipIdx) 都對應到，先至油綠色
+                const isMarked = posMap[rowIdx] && posMap[rowIdx].has(chipIdx);
+                html += `<span onclick="this.classList.toggle('is-fc')" class="word-chip ${isMarked ? 'is-fc' : ''}">${w}</span>`;
+            });
+            html += `</div>`;
+        });
+        
+        container.innerHTML = html;
+        overlay.style.display = 'block';
+    }
+
 function saveMarkedData() {
         const rows = document.querySelectorAll('.line-row');
         let newData = [];
 
-        rows.forEach(row => {
+        rows.forEach((row, rowIdx) => {
             const chips = row.querySelectorAll('.word-chip');
             let currentL = "";
             let pendingF = [];
+            let markedIndices = []; // 記住呢一行邊粒字被點選咗
 
-            chips.forEach(chip => {
+            chips.forEach((chip, chipIdx) => {
                 if (chip.classList.contains('is-fc')) {
-                    // 遇到應援詞，先將之前累積嘅歌詞打包
-                    if (pendingF.length === 0 && currentL.trim() !== "") {
-                        // 這是應援前的歌詞
-                    }
                     pendingF.push(chip.innerText);
+                    markedIndices.push(chipIdx);
                 } else {
-                    // 遇到普通字，如果前面有暫存嘅應援詞，就出貨
                     if (pendingF.length > 0) {
-                        newData.push({ l: currentL.trim() || "...", f: pendingF.join(' ') });
+                        newData.push({ 
+                            l: currentL.trim() || "...", 
+                            f: pendingF.join(' '), 
+                            row: rowIdx, 
+                            marks: markedIndices 
+                        });
                         currentL = "";
                         pendingF = [];
+                        markedIndices = [];
                     }
                     currentL += chip.innerText + " ";
                 }
             });
 
-            // 處理每一行最後剩低嘅嘢
             if (pendingF.length > 0) {
-                newData.push({ l: currentL.trim() || "...", f: pendingF.join(' ') });
+                newData.push({ l: currentL.trim() || "...", f: pendingF.join(' '), row: rowIdx, marks: markedIndices });
             } else if (currentL.trim()) {
-                newData.push({ l: currentL.trim(), f: "" });
+                newData.push({ l: currentL.trim(), f: "", row: rowIdx, marks: [] });
             }
         });
 
