@@ -99,37 +99,57 @@
     function startManualMarking(text) {
         const overlay = document.getElementById('editor-overlay');
         const container = document.getElementById('chips-container');
-        const words = text.split(/[\s\n]+/); 
-        container.innerHTML = words.map(w => `<span onclick="this.classList.toggle('is-fc')" class="word-chip">${w}</span>`).join('');
+        const lines = text.split('\n'); // 先按行拆分
+        
+        let html = "";
+        lines.forEach((line, lineIdx) => {
+            if (line.trim() === "") return;
+            html += `<div class="line-row" style="margin-bottom: 20px; border-bottom: 1px solid #222; padding-bottom: 10px;">`;
+            const words = line.split(/\s+/); // 再按空格拆字
+            words.forEach(w => {
+                html += `<span onclick="this.classList.toggle('is-fc')" class="word-chip">${w}</span>`;
+            });
+            html += `</div>`;
+        });
+        
+        container.innerHTML = html;
         overlay.style.display = 'block';
     }
 
-    function saveMarkedData() {
-        const chips = document.querySelectorAll('.word-chip');
+function saveMarkedData() {
+        const rows = document.querySelectorAll('.line-row');
         let newData = [];
-        let currentL = "";
-        let pendingF = []; // 用嚟暫存連續嘅應援詞
 
-        chips.forEach(chip => {
-            if (chip.classList.contains('is-fc')) {
-                pendingF.push(chip.innerText);
-            } else {
-                // 如果遇到普通歌詞，先將之前暫存嘅應援詞出貨
-                if (pendingF.length > 0) {
-                    newData.push({ l: currentL.trim() || "...", f: pendingF.join(' ') });
-                    currentL = "";
-                    pendingF = [];
+        rows.forEach(row => {
+            const chips = row.querySelectorAll('.word-chip');
+            let currentL = "";
+            let pendingF = [];
+
+            chips.forEach(chip => {
+                if (chip.classList.contains('is-fc')) {
+                    // 遇到應援詞，先將之前累積嘅歌詞打包
+                    if (pendingF.length === 0 && currentL.trim() !== "") {
+                        // 這是應援前的歌詞
+                    }
+                    pendingF.push(chip.innerText);
+                } else {
+                    // 遇到普通字，如果前面有暫存嘅應援詞，就出貨
+                    if (pendingF.length > 0) {
+                        newData.push({ l: currentL.trim() || "...", f: pendingF.join(' ') });
+                        currentL = "";
+                        pendingF = [];
+                    }
+                    currentL += chip.innerText + " ";
                 }
-                currentL += chip.innerText + " ";
+            });
+
+            // 處理每一行最後剩低嘅嘢
+            if (pendingF.length > 0) {
+                newData.push({ l: currentL.trim() || "...", f: pendingF.join(' ') });
+            } else if (currentL.trim()) {
+                newData.push({ l: currentL.trim(), f: "" });
             }
         });
-
-        // 處理最後剩低嘅應援詞或歌詞
-        if (pendingF.length > 0) {
-            newData.push({ l: currentL.trim() || "...", f: pendingF.join(' ') });
-        } else if (currentL.trim()) {
-            newData.push({ l: currentL.trim(), f: "" });
-        }
 
         songData = newData;
         index = 0;
