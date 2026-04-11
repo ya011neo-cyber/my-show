@@ -293,24 +293,36 @@ function previewRefImage(event) {
 
 
 function handleManualSubmit() {
-    const isEditMode = document.getElementById('modal-title').innerText.includes("編輯");
-    
-    // 1. 攞返輸入框入面嘅歌詞文字
+    // 1. 抓取歌詞
     const lyricsText = document.getElementById('manualInput').value;
-
-    // 2. 檢查下係咪空嘅，費事落去又爆 split
     if (!lyricsText || lyricsText.trim() === "") {
         alert("請先輸入歌詞！");
         return;
     }
 
-    let name = isEditMode && songData?.meta ? songData.meta.name : prompt("請輸入歌名：");
+    // 2. 獲取歌名：
+    // 優先序：如果 modal 標題寫住編輯 -> 嘗試抓取主畫面的歌名 -> 最後才彈 prompt
+    const modalTitle = document.getElementById('modal-title').innerText;
+    const isEditMode = modalTitle.includes("編輯");
+    let name = "";
+
+    if (isEditMode) {
+        // 直接從底部的 display-song-name 抓取現有歌名，最準確
+        name = document.getElementById('display-song-name').innerText;
+        // 如果抓到的是預設字眼，就還是問一下
+        if (name === "應援助手 Fanchant Helper") name = prompt("請輸入[歌名 - 歌手]：");
+    } else {
+        name = prompt("請輸入[歌名 - 歌手]：");
+    }
+
     if (!name) return;
 
+    // 3. 儲存數據供稍後上傳使用
     window.currentSubmittingData = { name: name };
 
-    // 🚀 重點：將 lyricsText 傳入去 startManualMarking
-    startManualMarking(lyricsText); 
+    // 4. ✨ 解決問題二：關閉輸入畫面，開啟標記畫面 ✨
+    document.getElementById('import-modal').style.display = 'none'; // 讓輸入框消失
+    startManualMarking(lyricsText); // 讓標記畫面出現
 }
 
     // --- 標記與儲存 ---
