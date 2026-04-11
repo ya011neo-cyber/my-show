@@ -241,4 +241,23 @@
         document.getElementById('currLyrics').innerText = curr.l;
         document.getElementById('currFanchant').innerText = curr.f;
         document.getElementById('nextLine').innerHTML = songData[index+1] ? format(songData[index+1]) : (index === songData.length-1 ? "— 完 —" : "");
-        if (curr
+        if (curr.f && navigator.vibrate) navigator.vibrate(50);
+        localStorage.setItem('myConcertData', JSON.stringify(songData));
+    }
+
+    function toggleLock(e) {
+        e.stopPropagation();
+        isLocked = !isLocked;
+        document.getElementById('lockBtn').innerText = isLocked ? "🔒 鎖定中" : "🔓 已解鎖";
+        document.getElementById('lockBtn').style.borderColor = isLocked ? "red" : "#444";
+    }
+
+    window.onload = function() {
+        const saved = localStorage.getItem('myConcertData');
+        if (saved) { songData = JSON.parse(saved); updateUI(); }
+        const savedColor = localStorage.getItem('fanchantColor');
+        if (savedColor) document.documentElement.style.setProperty('--fc-color', savedColor);
+    };
+</script>
+</body>
+</html>
