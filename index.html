@@ -400,13 +400,11 @@ async function adminLogin() {
         alert("權限不足或連線失敗");
     }
 }
-
 async function showAdminPanel() {
     try {
-        // 1. 搵返所有待審核 (pending) 嘅歌
+        // 抓取所有待審核的歌
         const snapshot = await db.collection("songs")
                                  .where("status", "==", "pending")
-                                 .orderBy("createdAt", "desc")
                                  .get();
         
         if (snapshot.empty) {
@@ -414,32 +412,31 @@ async function showAdminPanel() {
             return;
         }
 
-        let adminList = "【待審核清單】\n請輸入編號批准公開：\n";
+        let listText = "【待審核清單】\n";
         let pendingSongs = [];
         
         snapshot.forEach((doc, i) => {
             const data = doc.data();
             pendingSongs.push({ id: doc.id, name: data.name });
-            adminList += `${i + 1}. ${data.name}\n`;
+            listText += `${i + 1}. ${data.name}\n`;
         });
 
-        const choice = prompt(adminList);
+        const choice = prompt(listText + "\n輸入編號批准公開，或撳取消：");
         const selected = pendingSongs[choice - 1];
 
         if (selected) {
             if (confirm(`確定要公開「${selected.name}」嗎？`)) {
-                // 2. 更新 Firebase 入面嗰份 doc 嘅 status
                 await db.collection("songs").doc(selected.id).update({
                     status: "public"
                 });
-                alert("已成功公開！");
+                alert("✅ 已成功公開！");
             }
         }
-    } catch (error) {
-        console.error(error);
-        alert("讀取失敗，請檢查權限或網絡。");
+    } catch (e) {
+        alert("操作失敗。");
     }
 }
+        
     // 更新主畫面「🖼️」掣
     function updateMainViewBtn() {
         const currSong = getFirstLineData();
