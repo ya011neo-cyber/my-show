@@ -139,112 +139,63 @@
 
     // --- 新增：主畫面相片控制 ---
     // --- 修正版：相片控制邏輯 ---
-    let scale = 1;
-    let posX = 0, posY = 0;
-    let isDragging = false;
-    let startX, startY;
+// --- 最終修正：相片控制邏輯 (已解決 Identifier declared 報錯) ---
+let scale = 1;
+let posX = 0, posY = 0;
+let isDragging = false;
+let startX, startY;
 
-    function showMainPhoto(e) {
-        if(e) e.stopPropagation();
-        if(!currentPhotoData) return;
-        const overlay = document.getElementById('main-photo-overlay');
-        const img = document.getElementById('main-photo-img');
-        
-        // 重設狀態
-        scale = 1; posX = 0; posY = 0;
-        img.src = currentPhotoData;
-        img.style.transform = `translate(0px, 0px) scale(1)`;
-        overlay.style.display = 'flex';
+// 這裡直接使用 ID 獲取元素，唔再用 const 重新宣告
+function showMainPhoto(e) {
+    if(e) e.stopPropagation();
+    if(!currentPhotoData) return;
+    const overlay = document.getElementById('main-photo-overlay');
+    const img = document.getElementById('main-photo-img');
+    
+    scale = 1; posX = 0; posY = 0;
+    img.src = currentPhotoData;
+    img.style.transform = `translate(0px, 0px) scale(1)`;
+    overlay.style.display = 'flex';
+}
+
+function hideMainPhoto() {
+    document.getElementById('main-photo-overlay').style.display = 'none';
+}
+
+// 直接幫 Overlay 加 Event Listener
+document.getElementById('main-photo-overlay').addEventListener('touchstart', (e) => {
+    if (e.touches.length === 1) {
+        isDragging = true;
+        startX = e.touches[0].clientX - posX;
+        startY = e.touches[0].clientY - posY;
     }
+}, { passive: false });
 
-    function hideMainPhoto() {
-        document.getElementById('main-photo-overlay').style.display = 'none';
+document.getElementById('main-photo-overlay').addEventListener('touchmove', (e) => {
+    if (!isDragging) return;
+    if (scale > 1) e.preventDefault(); // 放大咗先至阻住網頁捲動，方便拖曳
+    
+    posX = e.touches[0].clientX - startX;
+    posY = e.touches[0].clientY - startY;
+    
+    document.getElementById('main-photo-img').style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`;
+}, { passive: false });
+
+document.getElementById('main-photo-overlay').addEventListener('touchend', (e) => {
+    isDragging = false;
+    
+    // 模擬 Double Tap
+    const currentTime = new Date().getTime();
+    const tapLength = currentTime - (window.lastTap || 0);
+    if (tapLength < 300 && tapLength > 0) {
+        scale = (scale === 1) ? 2.5 : 1; 
+        if (scale === 1) { posX = 0; posY = 0; }
+        document.getElementById('main-photo-img').style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`;
+        e.preventDefault();
     }
-    
-    // 處理拖曳 (相容 Chrome & Samsung)
-    const photoImg = document.getElementById('main-photo-img');
-    const photoOverlay = document.getElementById('main-photo-overlay');
-
-    photoOverlay.addEventListener('touchstart', (e) => {
-        if (e.touches.length === 1) {
-            isDragging = true;
-            startX = e.touches[0].clientX - posX;
-            startY = e.touches[0].clientY - posY;
-        }
-    }, { passive: false });
-    
-    photoOverlay.addEventListener('touchmove', (e) => {
-        if (!isDragging) return;
-        e.preventDefault(); // 呢句好重要，防止 Chrome 郁到個網頁
-        
-        posX = e.touches[0].clientX - startX;
-        posY = e.touches[0].clientY - startY;
-        
-        photoImg.style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`;
-    }, { passive: false });
-    
-    photoOverlay.addEventListener('touchend', () => { isDragging = false; });
-
-    // 解決手機 Chrome 唔支援 dblclick 嘅問題：用計時器模擬 Double Tap
-    let lastTap = 0;
-    photoOverlay.addEventListener('touchend', (e) => {
-        const currentTime = new Date().getTime();
-        const tapLength = currentTime - lastTap;
-        if (tapLength < 300 && tapLength > 0) {
-            // Double Tap 觸發縮放
-            scale = (scale === 1) ? 2.5 : 1; // 放大 2.5 倍
-            if (scale === 1) { posX = 0; posY = 0; } // 縮細時回正
-            photoImg.style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`;
-            e.preventDefault();
-        }
-        lastTap = currentTime;
-    });
-    
-    // 監聽手勢（手機兩指縮放 + 單指拖曳）
-    const photoImg = document.getElementById('main-photo-img');
-    const photoOverlay = document.getElementById('main-photo-overlay');
-    
-    // 使用手勢庫邏輯 (簡易原生實現)
-    photoOverlay.addEventListener('touchstart', (e) => {
-        if (e.touches.length === 1) {
-            isDragging = true;
-            lastPosX = e.touches[0].clientX - posX;
-            lastPosY = e.touches[0].clientY - posY;
-        }
-    });
-
-    photoOverlay.addEventListener('touchmove', (e) => {
-        e.preventDefault(); // 防止背景捲動
-        
-        // 處理單指拖曳
-        if (e.touches.length === 1 && isDragging) {
-            posX = e.touches[0].clientX - lastPosX;
-            posY = e.touches[0].clientY - lastPosY;
-        }
-    
-        // 處理兩指縮放 (簡易模擬)
-        if (e.touches.length === 2) {
-            // 呢部分可以用更複雜的距離算法，但手機通常支援原生 Pinch Zoom
-            // 如果你發現依然唔識郁，可以將 CSS touch-action 改為 auto
-        }
-        
-        updateImageTransform();
-    });
-    
-    photoOverlay.addEventListener('touchend', () => { isDragging = false; });
-
-    function updateImageTransform() {
-        const img = document.getElementById('main-photo-img');
-        img.style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`;
-    }
-    
-    // 快捷鍵：雙擊相片重設大小
-    photoImg.addEventListener('dblclick', () => {
-        scale = (scale === 1) ? 2 : 1;
-        posX = 0; posY = 0;
-        updateImageTransform();
-    });
-
+    window.lastTap = currentTime;
+});
+      
     // --- 修改：圖片上傳預覽，同步更新主畫面掣 ---
     function previewRefImage(event) {
         const file = event.target.files[0];
