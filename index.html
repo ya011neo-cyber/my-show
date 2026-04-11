@@ -95,20 +95,9 @@
         <button class="btn" style="font-size: 1.2rem; padding: 15px 30px; background:#444;" onclick="cancelMarking()">❌ 取消</button>
     </div>
 </div>
-<div id="footer-info" onclick="handleAdminTrigger()" style="
-    position: fixed; 
-    bottom: env(safe-area-inset-bottom); 
-    left: 0; 
-    width: 100%; 
-    padding: 10px 0; 
-    background: linear-gradient(transparent, rgba(0,0,0,0.8)); 
-    color: #444; 
-    font-size: 0.75rem; 
-    text-align: center; 
-    z-index: 50; 
-    user-select: none;">
-    <div id="display-song-name">應援助手 Fanchant Helper</div>
-    <div id="display-upload-info" style="font-size: 0.6rem; margin-top: 2px; opacity: 0.6;"></div>
+<div id="footer-info" onclick="handleAdminTrigger()" style="position: fixed; bottom: env(safe-area-inset-bottom); left: 0; width: 100%; padding: 15px 0; background: linear-gradient(transparent, rgba(0,0,0,0.9) 70%); color: #555; font-size: 0.8rem; text-align: center; z-index: 50; user-select: none;">
+    <div id="display-song-name" style="font-weight: bold; color: #666;">應援助手 Fanchant Helper</div>
+    <div id="display-upload-info" style="font-size: 0.65rem; margin-top: 3px; color: #444;"></div>
 </div>
 <script>
     // --- 原有 Firebase 配置 (請保持原樣) ---
@@ -314,6 +303,7 @@ function startManualMarking(text) {
     }
 
     // --- 核心邏輯 ---
+
 async function fetchPublicSongs(e) {
     if (e) e.stopPropagation();
     try {
@@ -332,26 +322,39 @@ async function fetchPublicSongs(e) {
         if (choice && songs[choice - 1]) { 
             const selected = songs[choice - 1];
             songData = selected.data;
-            // 把歌曲元數據存入 songData 方便 UI 顯示
+            // 關鍵：將 Meta 資料暫存入 songData
             songData.meta = {
                 name: selected.name,
-                uploader: selected.uploader || "神秘粉絲" // 假設你有存 uploader
+                uploader: selected.uploader || "匿名用戶"
             };
             index = 0; 
             updateUI(); 
         }
     } catch (error) { alert("讀取雲端失敗。"); }
 }
-    async function uploadSong(e) {
-        e.stopPropagation();
-        if (songData.length < 1 || songData[0].f === "開始") { alert("請先匯入歌詞！"); return; }
-        const songName = prompt("填寫格式：歌名 - 歌手");
-        if (!songName) return;
-        try {
-            await db.collection("songs").add({ name: songName, data: songData, status: "pending", createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-            alert("投稿成功！");
-        } catch (e) { alert("投稿失敗。"); }
+async function uploadSong(e) {
+    e.stopPropagation();
+    if (songData.length < 1 || songData[0].f === "開始") { alert("請先匯入歌詞！"); return; }
+    
+    const songName = prompt("【第一步】填寫格式：歌名 - 歌手");
+    if (!songName) return;
+    
+    const uploaderName = prompt("【第二步】你的暱稱 (會顯示喺底端)：");
+    if (!uploaderName) return;
+
+    try {
+        await db.collection("songs").add({ 
+            name: songName, 
+            uploader: uploaderName, // 新增上傳者欄位
+            data: songData, 
+            status: "pending", 
+            createdAt: firebase.firestore.FieldValue.serverTimestamp() 
+        });
+        alert("投稿成功！請等候管理員審核。");
+    } catch (e) {
+        alert("投稿失敗。");
     }
+}
     function openSourceLink(e) {
         e.stopPropagation();
         const currSong = getFirstLineData();
@@ -460,7 +463,8 @@ async function deletePending(docId, songName) {
         updateUI();
     }
 
-function updateUI() {
+
+ function updateUI() {
     const curr = songData[index];
     const format = (item) => item ? `${item.l === "..." ? "" : item.l} <span class="fc-text">${item.f}</span>` : "";
     document.getElementById('prevLine').innerHTML = format(songData[index-1]);
@@ -468,23 +472,22 @@ function updateUI() {
     document.getElementById('currFanchant').innerText = curr.f;
     document.getElementById('nextLine').innerHTML = songData[index+1] ? format(songData[index+1]) : (index === songData.length-1 ? "— 完 —" : "");
     
-    // --- 新增：更新底部顯示資訊 ---
+    // --- 更新底端資訊 ---
     const footerName = document.getElementById('display-song-name');
     const footerUpload = document.getElementById('display-upload-info');
     
-    // 假設我們在歌單數據中存儲了這些資訊
-    // 如果是從 Firebase 抓取的，我們在 fetchPublicSongs 那邊可以把資訊塞進 songData 的一個隱藏屬性
-    const meta = songData.meta || {}; 
-    footerName.innerText = meta.name || "應援助手 Fanchant Helper";
-    footerUpload.innerText = meta.uploader ? `Uploaded by: ${meta.uploader}` : "";
+    if (songData.meta) {
+        footerName.innerText = songData.meta.name;
+        footerUpload.innerText = `Uploaded by: ${songData.meta.uploader}`;
+    } else {
+        footerName.innerText = "應援助手 Fanchant Helper";
+        footerUpload.innerText = "";
+    }
 
-    // 震動與儲存
     if (curr.f && navigator.vibrate) navigator.vibrate(50);
     try {
         localStorage.setItem('myConcertData', JSON.stringify(songData));
-    } catch (e) {
-        console.error("LocalStorage Save 失敗", e);
-    }
+    } catch (e) { console.error("Save Error", e); }
     updateMainViewBtn();
 }
     // --- 管理員審核功能 ---
