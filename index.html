@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title onclick="handleAdminTrigger()">應援助手 Cloud Pro</title>
+    <title>應援助手 Cloud Pro</title>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
     <style>
@@ -28,6 +28,7 @@
 <body>
 
 <div id="app" onclick="handleTap(event)">
+    <h2 onclick="handleAdminTrigger()">應援助手 Fanchant Helper</h2>
     <div class="btn-group">
         <div class="btn" style="background:#444;" onclick="location.reload()">🔄</div>
         <div id="mainViewPhotoBtn" class="btn" style="display:none; background:#444;" onclick="showMainPhoto(event)">🖼️</div>
