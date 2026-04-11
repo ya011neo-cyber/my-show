@@ -28,17 +28,6 @@
             width: 100%;
         }
 
-        /* 上一句與下一句的通用樣式 */
-        .side-lyrics {
-            font-size: clamp(0.8rem, 2.5vh, 1.5rem);
-            color: #444;
-            min-height: 2vh;
-            transition: all 0.3s ease;
-            overflow: hidden;
-            text-overflow: ellipsis; /* 如果字太長，自動出 ... 費事遮位 */
-            white-space: nowrap;
-        }
-
         /* 上下句入面的應援詞：顏色要深一點點，唔好搶戲 */
         .side-lyrics .fc-text {
             color: #006400; /* 深綠色 */
@@ -53,22 +42,37 @@
 
         /* 中間主句歌詞 */
         .lyrics { 
-            /* 100vh 係全螢幕高度，3.5vh 會隨視窗縮小而變細 */
             font-size: clamp(1rem, 3.5vh, 2.5rem); 
             color: #bbb; 
             margin-bottom: 5px; 
-            white-space: nowrap; /* 避免錄影時突然換行遮住畫面 */
+            /* 【修正】將 nowrap 改為 normal 容許換行 */
+            white-space: normal; 
+            line-height: 1.2;
+            word-break: break-word; /* 確保長單詞也會換行 */
         }
 
-        /* 中間主句應援詞：最明顯的大字 */
+        /* 中間主句應援詞 */
         .fanchant { 
-            /* 使用 clamp 確保字體唔會無限大，亦唔會細到睇唔到 */
-            /* 語法：clamp(最小高度, 喜好高度, 最大高度) */
             font-size: clamp(1.5rem, 8vh, 6rem); 
             font-weight: 900; 
             color: #0f0; 
             text-shadow: 0 0 10px #0f0; 
+            /* 【修正】同樣容許換行 */
+            white-space: normal; 
+            line-height: 1.1;
+            display: block; /* 確保獨立成行 */
+        }
+
+        /* 上下句提示 */
+        .side-lyrics {
+            font-size: clamp(0.8rem, 2.5vh, 1.5rem);
+            color: #444;
+            min-height: 2vh;
+            transition: all 0.3s ease;
+            /* 保持 side-lyrics 單行，因為太長會遮住主句，所以用 ellipsis */
             white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         /* 按鈕組與其他原本的 CSS 保持不變 */
         .btn-group { position: absolute; top: 10px; right: 10px; display: flex; gap: 5px; z-index: 100; flex-wrap: wrap; justify-content: flex-end; }
