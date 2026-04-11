@@ -33,30 +33,38 @@
             padding: 20px 0;
             transform: scale(1.1); /* 稍微放大主句 */
         }
-
-        /* 中間主句歌詞 */
-        .lyrics { 
-            font-size: clamp(1rem, 3.5vh, 2.5rem); 
-            color: #bbb; 
-            margin-bottom: 5px; 
-            /* 【修正】將 nowrap 改為 normal 容許換行 */
-            white-space: normal; 
-            line-height: 1.2;
-            word-break: break-word; /* 確保長單詞也會換行 */
-        }
+        
         :root {
             --fc-color: #0f0; /* 預設綠色 */
         }
         
+        /* 中間主句應援詞 */
         .fanchant { 
-            font-size: clamp(1.5rem, 8vh, 6rem); 
+            /* 調整最大值，由 8vh 稍微降至 7vh，最大字體由 6rem 降至 4.5rem */
+            font-size: clamp(1.5rem, 7vh, 4.5rem); 
             font-weight: 900; 
             color: var(--fc-color); 
-            /* 文字發光效果會跟隨你揀嘅色 */
-            text-shadow: 0 0 10px var(--fc-color), 0 0 20px var(--fc-color); 
+            
+            /* 【優化】收窄光暈：將 10px/20px 縮細，增加一個黑色描邊令字體更清晰 */
+            text-shadow: 
+                0 0 5px var(--fc-color), 
+                0 0 10px var(--fc-color),
+                1px 1px 2px #000; /* 黑色底影，增加對比度 */
+                
             white-space: normal; 
             line-height: 1.1;
             display: block;
+            letter-spacing: -1px; /* 稍微縮細字距，令長句子冇咁橫 */
+        }
+
+        /* 中間主句歌詞 */
+        .lyrics { 
+            font-size: clamp(1rem, 3vh, 2rem); /* 稍微縮細歌詞提示 */
+            color: #bbb; 
+            margin-bottom: 3px; 
+            white-space: normal; 
+            line-height: 1.2;
+            word-break: break-word;
         }
         
         /* 上下句提示入面的應援詞也跟著變，但調暗一點 */
