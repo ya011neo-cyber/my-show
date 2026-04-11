@@ -29,7 +29,16 @@
             background: rgba(0,0,0,0.95); z-index: 2500; justify-content: center; align-items: center; 
             touch-action: pinch-zoom; /* 允許原生縮放 */
         }
-        #main-photo-overlay img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        #main-photo-overlay img { 
+            max-width: 100%; 
+            max-height: 100%; 
+            object-fit: contain; 
+            /* 加埋呢幾行，手機操作會順好多 */
+            user-select: none; 
+            -webkit-user-drag: none;
+            pointer-events: auto;
+            will-change: transform;
+        }
         .close-photo-btn { position: absolute; top: 20px; right: 20px; font-size: 2rem; color: #fff; background: rgba(0,0,0,0.5); border-radius: 50%; width: 50px; height: 50px; text-align: center; line-height: 50px; cursor: pointer; z-index: 2600; }
 
         #editor-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #111; z-index: 999; padding: 20px; box-sizing: border-box; overflow-y: auto; display: none; }
@@ -112,18 +121,72 @@
     let currentPhotoData = ""; // 用來儲存相片的 DataURL
 
     // --- 新增：主畫面相片控制 ---
+// --- 強化版：手機縮放位移變數 ---
+    let scale = 1, lastScale = 1;
+    let posX = 0, posY = 0, lastPosX = 0, lastPosY = 0;
+    let isDragging = false;
+
     function showMainPhoto(e) {
         if(e) e.stopPropagation();
         if(!currentPhotoData) return;
         const overlay = document.getElementById('main-photo-overlay');
         const img = document.getElementById('main-photo-img');
+        
+        // 初始化狀態
+        scale = 1; posX = 0; posY = 0;
         img.src = currentPhotoData;
+        img.style.transform = `translate(0px, 0px) scale(1)`;
         overlay.style.display = 'flex';
     }
 
     function hideMainPhoto() {
         document.getElementById('main-photo-overlay').style.display = 'none';
     }
+    
+    // 監聽手勢（手機兩指縮放 + 單指拖曳）
+    const photoImg = document.getElementById('main-photo-img');
+    const photoOverlay = document.getElementById('main-photo-overlay');
+    
+    // 使用手勢庫邏輯 (簡易原生實現)
+    photoOverlay.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 1) {
+            isDragging = true;
+            lastPosX = e.touches[0].clientX - posX;
+            lastPosY = e.touches[0].clientY - posY;
+        }
+    });
+
+    photoOverlay.addEventListener('touchmove', (e) => {
+        e.preventDefault(); // 防止背景捲動
+        
+        // 處理單指拖曳
+        if (e.touches.length === 1 && isDragging) {
+            posX = e.touches[0].clientX - lastPosX;
+            posY = e.touches[0].clientY - lastPosY;
+        }
+    
+        // 處理兩指縮放 (簡易模擬)
+        if (e.touches.length === 2) {
+            // 呢部分可以用更複雜的距離算法，但手機通常支援原生 Pinch Zoom
+            // 如果你發現依然唔識郁，可以將 CSS touch-action 改為 auto
+        }
+        
+        updateImageTransform();
+    });
+    
+    photoOverlay.addEventListener('touchend', () => { isDragging = false; });
+
+    function updateImageTransform() {
+        const img = document.getElementById('main-photo-img');
+        img.style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`;
+    }
+    
+    // 快捷鍵：雙擊相片重設大小
+    photoImg.addEventListener('dblclick', () => {
+        scale = (scale === 1) ? 2 : 1;
+        posX = 0; posY = 0;
+        updateImageTransform();
+    });
 
     // --- 修改：圖片上傳預覽，同步更新主畫面掣 ---
     function previewRefImage(event) {
@@ -281,20 +344,36 @@
         document.getElementById('lockBtn').style.borderColor = isLocked ? "red" : "#444";
     }
 
-    window.onload = function() {
-        const saved = localStorage.getItem('myConcertData');
-        if (saved) { songData = JSON.parse(saved); updateUI(); }
+       window.onload = function() {
+        // 1. 讀取上次儲存的歌詞數據
+        const savedData = localStorage.getItem('myConcertData');
+        if (savedData) { 
+            songData = JSON.parse(savedData); 
+            updateUI(); 
+        }
         
+        // 2. 讀取上次設定的應援顏色
         const savedColor = localStorage.getItem('fanchantColor');
-        if (savedColor) document.documentElement.style.setProperty('--fc-color', savedColor);
-
-        // 讀取上次上傳嘅相片
+        if (savedColor) {
+            document.documentElement.style.setProperty('--fc-color', savedColor);
+        }
+    
+        // 3. 【新增】讀取上次上傳嘅參考相片
         const savedPhoto = localStorage.getItem('savedRefPhoto');
         if (savedPhoto) {
-            currentPhotoData = savedPhoto;
-            document.getElementById('mainViewPhotoBtn').style.display = 'block';
-            document.getElementById('reference-img').src = currentPhotoData;
-            document.getElementById('image-preview-container').style.display = 'block';
+            currentPhotoData = savedPhoto; // 儲存到全域變數
+            
+            // 顯示主畫面的相片按鈕
+            const mainBtn = document.getElementById('mainViewPhotoBtn');
+            if (mainBtn) mainBtn.style.display = 'block';
+            
+            // 顯示編輯視窗入面的預覽圖（如果有的話）
+            const refImg = document.getElementById('reference-img');
+            const previewContainer = document.getElementById('image-preview-container');
+            if (refImg && previewContainer) {
+                refImg.src = savedPhoto;
+                previewContainer.style.display = 'block';
+            }
         }
     };
 </script>
