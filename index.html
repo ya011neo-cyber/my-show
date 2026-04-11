@@ -136,11 +136,13 @@
         e.stopPropagation();
         document.getElementById('modal-title').innerText = "✏️ 編輯現有歌詞";
         
-        // 將現有的 songData 變回文字格式，方便大面積修改
+        // 【修正位置】：只係將歌詞同應援詞就咁排埋一齊，完全唔好加額外括號
+        // 咁樣當你進入標記模式時，inBracketScope 邏輯依然會認得原本歌詞入面帶有嘅括號
         let textFormat = songData.map(item => {
             if (item.f) {
-                // 如果是應援詞，自動幫佢加返對括號，方便編輯
-                return (item.l === "..." ? "" : item.l + " ") + "(" + item.f + ")";
+                // 如果歌詞係 "..." 代表純應援，就只出應援詞
+                // 否則就出「歌詞 + 空格 + 應援詞」
+                return (item.l === "..." ? "" : item.l + " ") + item.f;
             }
             return item.l;
         }).join('\n');
