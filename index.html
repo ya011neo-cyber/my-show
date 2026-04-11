@@ -353,7 +353,10 @@ async function fetchPublicSongs(e) {
             index = 0; 
             updateUI(); 
         }
-    } catch (error) { alert("讀取雲端失敗。"); }
+    } catch (error) {
+        console.error("真正的錯誤原因：", error); // 呢行好重要！
+        alert("讀取雲端失敗：" + error.message); // 直接將錯誤訊息彈出嚟
+    }
 }
 async function uploadSong(e) {
     e.stopPropagation();
