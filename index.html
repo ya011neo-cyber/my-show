@@ -292,12 +292,24 @@ function previewRefImage(event) {
     function removePhoto() { tempPhotoData = ""; updateEditPreview(); }
 
 async function handleManualSubmit() {
-    const name = document.getElementById('modal-title').innerText === "編輯現有歌詞" ? songData.meta.name : prompt("請輸入歌名：");
+    // 🔍 改進判斷邏輯：檢查標題是否包含 "編輯" 二字
+    const isEditMode = document.getElementById('modal-title').innerText.includes("編輯");
+    
+    let name;
+    if (isEditMode && songData && songData.meta) {
+        // 如果係編輯模式，直接用返舊歌名
+        name = songData.meta.name;
+    } else {
+        // 如果係新投稿，先彈 prompt 叫人入名
+        name = prompt("請輸入歌名：");
+    }
+
+    // 如果連名都冇（例如 prompt 撳咗取消），就停止
     if (!name) return;
 
     const lyrics = document.getElementById('manualInput').value;
     const source = document.getElementById('sourceLinkInput').value;
-
+    
     const newSong = {
         name: name,
         data: parseLyrics(lyrics), // 假設你有呢個處理歌詞嘅 function
