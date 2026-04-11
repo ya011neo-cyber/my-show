@@ -3,18 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <link rel="manifest" href="manifest.json">
-    <title>應援助手 Pro</title>
+    <title>應援助手 Cloud Pro</title>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
     <style>
         body { margin: 0; background: #000; color: #fff; font-family: sans-serif; height: 100vh; overflow: hidden; touch-action: none; }
         #app { height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 0 10%; text-align: center; }
         .next-preview { color: #444; font-size: 0.9rem; margin-bottom: 20px; }
         .lyrics { font-size: 1.4rem; color: #bbb; margin-bottom: 10px; }
         .fanchant { font-size: 3.5rem; font-weight: 900; color: #0f0; text-shadow: 0 0 15px #0f0; }
-        .btn-group { position: absolute; top: 10px; right: 10px; display: flex; gap: 5px; z-index: 100; }
+        .btn-group { position: absolute; top: 10px; right: 10px; display: flex; gap: 5px; z-index: 100; flex-wrap: wrap; justify-content: flex-end; }
         .btn { padding: 8px 12px; background: #222; border-radius: 5px; font-size: 0.7rem; border: 1px solid #444; color: #fff; cursor: pointer; }
-        
-        /* 標記模式專用樣式 */
         #editor-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #111; z-index: 999; padding: 20px; box-sizing: border-box; overflow-y: auto; display: none; }
         .word-chip { display: inline-block; padding: 8px 12px; margin: 5px; border: 1px solid #444; border-radius: 4px; cursor: pointer; color: #ccc; }
         .word-chip.is-fc { background: #0f0; color: #000; font-weight: bold; border-color: #0f0; box-shadow: 0 0 10px #0f0; }
@@ -25,8 +24,11 @@
 
 <div id="app" onclick="handleTap(event)">
     <div class="btn-group">
+        <div class="btn" onclick="fetchPublicSongs(event)">📂 歌單</div>
         <div class="btn" onclick="openImporter(event)">➕ 匯入</div>
-        <div class="btn" onclick="editCurrentSong(event)">✏️ 編輯</div> <div id="lockBtn" class="btn" onclick="toggleLock(event)">🔓 已解鎖</div>
+        <div class="btn" onclick="uploadSong(event)">☁️ 投稿</div>
+        <div class="btn" onclick="editCurrentSong(event)">✏️ 編輯</div>
+        <div id="lockBtn" class="btn" onclick="toggleLock(event)">🔓 已解鎖</div>
     </div>
     <div class="next-preview" id="nextText">Next: ---</div>
     <div class="lyrics" id="currLyrics">載入中...</div>
@@ -43,68 +45,87 @@
 </div>
 
 <script>
-    if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js'); }
+    // Firebase 初始化
+    const firebaseConfig = {
+        apiKey: "AIzaSyCOnH-KJfJqe6VGn7qG2TU1rIaT5OEL9JU",
+        authDomain: "fanchartpro.firebaseapp.com",
+        projectId: "fanchartpro",
+        storageBucket: "fanchartpro.firebasestorage.app",
+        messagingSenderId: "94013254919",
+        appId: "1:94013254919:web:929fff5cd2c71067b269a2"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
 
-    let songData = [{ l: "點擊右上角「匯入」", f: "開始" }];
+    let songData = [{ l: "歡迎使用應援助手", f: "開始" }];
     let index = 0;
     let isLocked = false;
 
-    function openImporter(e) {
+    // --- 雲端功能 ---
+    async function uploadSong(e) {
         e.stopPropagation();
-        const input = prompt("貼上歌詞：");
-        if (!input) return;
+        if (songData.length < 1 || songData[0].f === "開始") {
+            alert("請先匯入並標記歌詞再投稿！");
+            return;
+        }
+        const songName = prompt("這首歌叫什麼名字？");
+        if (!songName) return;
 
-        let autoProcessed = [];
-        const lines = input.split('\n');
-        
-        lines.forEach(line => {
-            const regex = /([\(\（\[].*?[\)\）\]])|([^\(\（\[\)\）\]\s]+)/g;
-            let match;
-            let currentLyrics = "";
-            let currentFanchants = [];
-
-            while ((match = regex.exec(line)) !== null) {
-                const segment = match[0];
-                const isFC = segment.match(/[\(\（\[](.*?)[\)\）\]]/);
-
-                if (isFC) {
-                    currentFanchants.push(isFC[1]);
-                } else {
-                    // 遇到歌詞，先把之前的應援打包
-                    if (currentFanchants.length > 0) {
-                        autoProcessed.push({ l: currentLyrics.trim() || "...", f: currentFanchants.join(' ') });
-                        currentLyrics = "";
-                        currentFanchants = [];
-                    }
-                    currentLyrics += segment + " ";
-                }
-            }
-            // 處理句尾
-            if (currentFanchants.length > 0) {
-                autoProcessed.push({ l: currentLyrics.trim() || "...", f: currentFanchants.join(' ') });
-            } else if (currentLyrics.trim()) {
-                autoProcessed.push({ l: currentLyrics.trim(), f: "" });
-            }
-        });
-
-        if (confirm("已偵測到內容。要進入【手動標記模式】嗎？")) {
-            startManualMarking(input);
-        } else {
-            songData = autoProcessed;
-            index = 0;
-            updateUI();
+        try {
+            await db.collection("songs").add({
+                name: songName,
+                data: songData,
+                status: "pending",
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            alert("投稿成功！請等候管理員審核。");
+        } catch (error) {
+            alert("投稿失敗，請檢查網絡或 Config。");
         }
     }
 
+    async function fetchPublicSongs(e) {
+        if (e) e.stopPropagation();
+        try {
+            const snapshot = await db.collection("songs").where("status", "==", "public").get();
+            if (snapshot.empty) {
+                alert("暫時未有公開歌單。");
+                return;
+            }
+            let list = "請選擇歌曲編號：\n";
+            let songs = [];
+            snapshot.forEach((doc, i) => {
+                songs.push(doc.data());
+                list += `${i + 1}. ${doc.data().name}\n`;
+            });
+            const choice = prompt(list);
+            if (choice && songs[choice - 1]) {
+                songData = songs[choice - 1].data;
+                index = 0;
+                updateUI();
+            }
+        } catch (error) {
+            alert("讀取雲端失敗。");
+        }
+    }
+
+    // --- 原有邏輯修正版 ---
+    function openImporter(e) {
+        e.stopPropagation();
+        const input = prompt("貼上新歌詞：");
+        if (input) {
+            songData = []; 
+            startManualMarking(input);
+        }
+    }
 
     function startManualMarking(text) {
         const overlay = document.getElementById('editor-overlay');
         const container = document.getElementById('chips-container');
         const lines = text.split('\n');
-        
         const posMap = {};
         songData.forEach(item => {
-            if (item.marks && item.marks.length > 0) {
+            if (item.marks) {
                 if (!posMap[item.row]) posMap[item.row] = new Set();
                 item.marks.forEach(m => posMap[item.row].add(m));
             }
@@ -113,81 +134,53 @@
         let html = "";
         lines.forEach((line, rowIdx) => {
             if (line.trim() === "") return;
-            html += `<div class="line-row" data-row="${rowIdx}" style="margin-bottom: 20px; border-bottom: 1px solid #222; padding-bottom: 10px;">`;
-            
+            html += `<div class="line-row" data-row="${rowIdx}" style="margin-bottom: 20px; border-bottom: 1px solid #222;">`;
             const words = line.split(/\s+/).filter(w => w !== "");
-            
-            // 新增變數：用嚟追蹤依家係咪處於一對括號中間
-            let inBracketScope = false;
-
+            let inBracket = false;
             words.forEach((w, chipIdx) => {
-                const isSavedMark = posMap[rowIdx] && posMap[rowIdx].has(chipIdx);
-                
-                // 檢查係咪括號嘅開頭或結尾
-                const hasOpen = /[\(\（\[]/.test(w);
-                const hasClose = /[\)\）\]]/.test(w);
-
-                // 邏輯：
-                // 1. 如果本身有括號開頭，進入 inBracketScope 狀態
-                // 2. 如果本身係 saved mark，油綠色
-                // 3. 如果喺 inBracketScope 狀態入面，油綠色
-                if (hasOpen) inBracketScope = true;
-
-                const shouldHighlight = isSavedMark || inBracketScope;
-
+                if (/[\(\（\[]/.test(w)) inBracket = true;
+                const isSaved = posMap[rowIdx] && posMap[rowIdx].has(chipIdx);
+                const shouldHighlight = isSaved || inBracket;
                 html += `<span onclick="this.classList.toggle('is-fc')" class="word-chip ${shouldHighlight ? 'is-fc' : ''}">${w}</span>`;
-                
-                // 如果呢粒字包含結尾括號，就結束 inBracketScope 狀態
-                if (hasClose) inBracketScope = false;
+                if (/[\)\）\]]/.test(w)) inBracket = false;
             });
             html += `</div>`;
         });
-        
         container.innerHTML = html;
         overlay.style.display = 'block';
     }
 
-function saveMarkedData() {
+    function saveMarkedData() {
         const rows = document.querySelectorAll('.line-row');
         let newData = [];
-
         rows.forEach((row, rowIdx) => {
             const chips = row.querySelectorAll('.word-chip');
-            let currentL = "";
-            let pendingF = [];
-            let markedIndices = []; // 記住呢一行邊粒字被點選咗
-
+            let currentL = ""; let pendingF = []; let markedIndices = [];
             chips.forEach((chip, chipIdx) => {
                 if (chip.classList.contains('is-fc')) {
                     pendingF.push(chip.innerText);
                     markedIndices.push(chipIdx);
                 } else {
                     if (pendingF.length > 0) {
-                        newData.push({ 
-                            l: currentL.trim() || "...", 
-                            f: pendingF.join(' '), 
-                            row: rowIdx, 
-                            marks: markedIndices 
-                        });
-                        currentL = "";
-                        pendingF = [];
-                        markedIndices = [];
+                        newData.push({ l: currentL.trim() || "...", f: pendingF.join(' '), row: rowIdx, marks: markedIndices });
+                        currentL = ""; pendingF = []; markedIndices = [];
                     }
                     currentL += chip.innerText + " ";
                 }
             });
-
-            if (pendingF.length > 0) {
-                newData.push({ l: currentL.trim() || "...", f: pendingF.join(' '), row: rowIdx, marks: markedIndices });
-            } else if (currentL.trim()) {
-                newData.push({ l: currentL.trim(), f: "", row: rowIdx, marks: [] });
-            }
+            if (pendingF.length > 0) newData.push({ l: currentL.trim() || "...", f: pendingF.join(' '), row: rowIdx, marks: markedIndices });
+            else if (currentL.trim()) newData.push({ l: currentL.trim(), f: "", row: rowIdx, marks: [] });
         });
-
-        songData = newData;
-        index = 0;
+        songData = newData; index = 0;
         document.getElementById('editor-overlay').style.display = 'none';
         updateUI();
+    }
+
+    function editCurrentSong(e) {
+        e.stopPropagation();
+        let textFormat = songData.map(item => (item.f ? (item.l === "..." ? "" : item.l + " ") + item.f : item.l)).join('\n');
+        const newInput = prompt("編輯中：", textFormat);
+        if (newInput !== null) startManualMarking(newInput);
     }
 
     function toggleLock(e) {
@@ -201,69 +194,24 @@ function saveMarkedData() {
     function handleTap(e) {
         if (isLocked) return;
         const clickX = e.clientX || (e.touches && e.touches[0].clientX);
-        const screenWidth = window.innerWidth;
-        if (clickX < screenWidth * 0.3) { if (index > 0) index--; }
+        if (clickX < window.innerWidth * 0.3) { if (index > 0) index--; }
         else { if (index < songData.length - 1) index++; else index = 0; }
         updateUI();
     }
-    function editCurrentSong(e) {
-        e.stopPropagation();
-        
-        // 直接將歌詞同應援詞排埋一齊，完全唔加任何額外括號或符號
-        let textFormat = songData.map(item => {
-            if (item.f) {
-                // 如果歌詞係 "..." 代表淨應援，就只出應援詞
-                // 否則就出「歌詞 + 應援詞」
-                return (item.l === "..." ? "" : item.l + " ") + item.f;
-            }
-            return item.l;
-        }).join('\n');
-    
-        const newInput = prompt("編輯現有歌單：", textFormat);
-        
-        if (newInput !== null) {
-            processInput(newInput); 
-        }
-    }
 
-    function processInput(input) {
-        if (!input) return;
-        // 直接進入手動標記，唔使問
-        startManualMarking(input);
-    }
-
-    function openImporter(e) {
-        e.stopPropagation();
-        const input = prompt("貼上新歌詞：");
-        if (input) {
-            // 匯入新歌時，先清空舊嘅位置紀錄，避免新舊歌位置重疊
-            songData = []; 
-            processInput(input);
-        }
-    }
-// 每次更新 UI 時順便儲存到手機
     function updateUI() {
-        const current = songData[index];
-        const next = songData[index + 1] || { l: "完畢" };
-        document.getElementById('currLyrics').innerText = current.l;
-        document.getElementById('currFanchant').innerText = current.f;
-        document.getElementById('nextText').innerText = "Next: " + next.l;
-        
-        // 儲存落手機
+        if (!songData[index]) return;
+        document.getElementById('currLyrics').innerText = songData[index].l;
+        document.getElementById('currFanchant').innerText = songData[index].f;
+        document.getElementById('nextText').innerText = "Next: " + (songData[index+1] ? songData[index+1].l : "完畢");
         localStorage.setItem('myConcertData', JSON.stringify(songData));
-        
-        if (current.f && navigator.vibrate) navigator.vibrate(50);
+        if (songData[index].f && navigator.vibrate) navigator.vibrate(50);
     }
 
-    // 網頁一開嗰陣，讀取舊紀錄
     window.onload = function() {
         const saved = localStorage.getItem('myConcertData');
-        if (saved) {
-            songData = JSON.parse(saved);
-            updateUI();
-        }
+        if (saved) { songData = JSON.parse(saved); updateUI(); }
     };
-    updateUI();
 </script>
 </body>
 </html>
