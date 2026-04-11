@@ -6,6 +6,7 @@
     <title>應援助手 Cloud Pro</title>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <script src="https://unpkg.com/tesseract.js@v4.1.1/dist/tesseract.min.js"></script>
     <style>
         body { margin: 0; background: #000; color: #fff; font-family: sans-serif; height: 100vh; overflow: hidden; touch-action: none; }
         #app { height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 0 10%; text-align: center; }
@@ -41,6 +42,8 @@
     <div class="editor-footer">
         <button class="btn" style="font-size: 1.2rem; padding: 15px 30px;" onclick="saveMarkedData()">✅ 完成生成</button>
         <button class="btn" style="margin-left: 10px;" onclick="document.getElementById('editor-overlay').style.display='none'">取消</button>
+        <div class="btn" onclick="triggerOCR()">📷 相片</div>
+        <input type="file" id="ocrInput" accept="image/*" style="display:none" onchange="handleOCR(event)">
     </div>
 </div>
 
@@ -182,7 +185,44 @@
         const newInput = prompt("編輯中：", textFormat);
         if (newInput !== null) startManualMarking(newInput);
     }
+    function triggerOCR() {
+        document.getElementById('ocrInput').click();
+    }
 
+    async function handleOCR(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        // 顯示 loading 提示
+        document.getElementById('currLyrics').innerText = "辨識中... 請稍候";
+        document.getElementById('currFanchant').innerText = "☕";
+
+        try {
+            // 開始 OCR 辨識 (設定韓文 ko 同英文 eng 混合，因為 NCT WISH 歌單通常有呢兩隻)
+            const result = await Tesseract.recognize(
+                file,
+                'kor+eng', 
+                { logger: m => console.log(m) } // 進度會印喺 console
+            );
+
+            const text = result.data.text;
+            if (text.trim() === "") {
+                alert("辨識失敗，請換一張清晰啲嘅相。");
+                updateUI();
+                return;
+            }
+
+            // 辨識成功後，直接將文字送入原本嘅標記模式
+            if (confirm("辨識完成！要進入標記模式微調嗎？")) {
+                songData = [];
+                startManualMarking(text);
+            }
+        } catch (e) {
+            console.error(e);
+            alert("OCR 發生錯誤，請檢查網絡。");
+            updateUI();
+        }
+    }
     function toggleLock(e) {
         e.stopPropagation();
         isLocked = !isLocked;
