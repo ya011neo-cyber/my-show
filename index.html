@@ -455,44 +455,7 @@ async function adminLogin() {
         console.error(error);
         alert("權限不足或連線失敗");
     }
-}
-async function showAdminPanel() {
-    try {
-        // 抓取所有待審核的歌
-        const snapshot = await db.collection("songs")
-                                 .where("status", "==", "pending")
-                                 .get();
-        
-        if (snapshot.empty) {
-            alert("暫時冇待審核嘅歌。");
-            return;
-        }
-
-        let listText = "【待審核清單】\n";
-        let pendingSongs = [];
-        
-        snapshot.forEach((doc, i) => {
-            const data = doc.data();
-            pendingSongs.push({ id: doc.id, name: data.name });
-            listText += `${i + 1}. ${data.name}\n`;
-        });
-
-        const choice = prompt(listText + "\n輸入編號批准公開，或撳取消：");
-        const selected = pendingSongs[choice - 1];
-
-        if (selected) {
-            if (confirm(`確定要公開「${selected.name}」嗎？`)) {
-                await db.collection("songs").doc(selected.id).update({
-                    status: "public"
-                });
-                alert("✅ 已成功公開！");
-            }
-        }
-    } catch (e) {
-        alert("操作失敗。");
-    }
-}
-        
+}   
     // 更新主畫面「🖼️」掣
     function updateMainViewBtn() {
         const currSong = getFirstLineData();
