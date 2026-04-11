@@ -98,8 +98,22 @@
 
 <div id="app" onclick="handleTap(event)">
     <div class="btn-group">
-        <div class="btn" onclick="triggerColorPicker(event)">🎨 顏色</div>
-        <input type="color" id="favColor" style="display:none;" onchange="applyCustomColor(this.value)">
+        <div class="btn" onclick="openColorMenu(event)">🎨 顏色</div>
+        
+        <div id="color-modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:#222; padding:20px; border-radius:15px; z-index:2000; border:1px solid #444; width:250px; text-align:center;">
+            <h4 style="margin:0 0 15px 0;">自定義顏色</h4>
+            <input type="color" id="colorPicker" onchange="updateHexInput(this.value)" style="width:100%; height:40px; border:none; background:none; cursor:pointer;">
+            
+            <div style="margin:15px 0;">
+                <label style="font-size:0.8rem; color:#888;">HEX Code:</label><br>
+                <input type="text" id="hexInput" placeholder="#00ff00" style="width:100%; background:#111; color:#fff; border:1px solid #555; padding:8px; border-radius:5px; margin-top:5px; text-align:center; font-family:monospace;">
+            </div>
+            
+            <div style="display:flex; gap:10px;">
+                <button class="btn" style="flex:1; background:#0f0; color:#000; font-weight:bold; border:none;" onclick="saveCustomColor()">套用</button>
+                <button class="btn" style="flex:1;" onclick="closeColorMenu()">取消</button>
+            </div>
+        </div>
         <div class="btn" onclick="fetchPublicSongs(event)">📂 歌單</div>
         <div class="btn" onclick="openImporter(event)">➕ 匯入</div>
         <div class="btn" onclick="uploadSong(event)">☁️ 投稿</div>
@@ -362,7 +376,40 @@
         // 儲存顏色到本地，下次開返都係呢隻
         localStorage.setItem('fanchantColor', newColor);
     }
+    // 打開顏色選單
+    function openColorMenu(e) {
+        if(e) e.stopPropagation();
+        const currentColor = getComputedStyle(document.documentElement).getPropertyValue('--fc-color').trim();
+        document.getElementById('hexInput').value = currentColor;
+        document.getElementById('colorPicker').value = currentColor;
+        document.getElementById('color-modal').style.display = 'block';
+    }
+
+    function closeColorMenu() {
+        document.getElementById('color-modal').style.display = 'none';
+    }
     
+    // 當轉動顏色盤時，自動更新 HEX 文字框
+    function updateHexInput(val) {
+        document.getElementById('hexInput').value = val.toUpperCase();
+    }
+    
+    // 按下「套用」時執行
+    function saveCustomColor() {
+        let newColor = document.getElementById('hexInput').value.trim();
+        
+        // 基本格式檢查，如果冇 # 就幫佢加返
+        if (!newColor.startsWith('#')) newColor = '#' + newColor;
+        
+        // 檢查係咪有效嘅 HEX 格式
+        if (/^#[0-9A-F]{6}$/i.test(newColor)) {
+            document.documentElement.style.setProperty('--fc-color', newColor);
+            localStorage.setItem('fanchantColor', newColor);
+            closeColorMenu();
+        } else {
+            alert("請輸入有效的 HEX 格式 (例如: #00FF00)");
+        }
+    }    
     // 修改 window.onload 確保讀取到自定義顏色
     window.onload = function() {
         const saved = localStorage.getItem('myConcertData');
