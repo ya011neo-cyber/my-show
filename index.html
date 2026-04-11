@@ -162,16 +162,50 @@
     }
 
     // 處理上傳相片 (Base64)
-    function previewRefImage(event) {
-        const file = event.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            tempPhotoData = e.target.result; // 儲存 Base64
+// --- 強化版：自動壓縮相片，解決手機 LocalStorage 爆容量問題 ---
+function previewRefImage(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const img = new Image();
+        img.onload = function() {
+            // 建立畫布進行壓縮
+            const canvas = document.createElement('canvas');
+            let width = img.width;
+            let height = img.height;
+
+            // 如果張相太大，限制最大寬度為 1200px (貓紙夠睇有餘)
+            const max_size = 1200;
+            if (width > height) {
+                if (width > max_size) {
+                    height *= max_size / width;
+                    width = max_size;
+                }
+            } else {
+                if (height > max_size) {
+                    width *= max_size / height;
+                    height = max_size;
+                }
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+
+            // 輸出壓縮後的 Base64 (質量設為 0.7)
+            tempPhotoData = canvas.toDataURL('image/jpeg', 0.7); 
+            
+            // 更新編輯器預覽
             updateEditPreview();
+            console.log("相片已壓縮，宜家大細約:", Math.round(tempPhotoData.length / 1024), "KB");
         };
-        reader.readAsDataURL(file);
-    }
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
 
     // 移除圖片
     function removePhoto() { tempPhotoData = ""; updateEditPreview(); }
@@ -274,8 +308,12 @@
         
         // 震動與儲存
         if (curr.f && navigator.vibrate) navigator.vibrate(50);
-        localStorage.setItem('myConcertData', JSON.stringify(songData));
-        
+    // 儲存到 LocalStorage
+        try {
+            localStorage.setItem('myConcertData', JSON.stringify(songData));
+        } catch (e) {
+            console.error("LocalStorage Save 失敗，可能張相仲係太大:", e);
+        }
         // --- 修改：根據當前歌曲是否有相片，更新主畫面掣 ---
         updateMainViewBtn();
     }
