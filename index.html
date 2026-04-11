@@ -90,6 +90,7 @@
     <div id="chips-container" style="text-align:center;"></div>
     <div style="text-align:center; margin-top:30px; padding-bottom:50px;">
         <button class="btn" style="font-size: 1.2rem; padding: 15px 30px; background:#0f0; color:#000;" onclick="saveMarkedData()">✅ 完成生成</button>
+        <button class="btn" style="font-size: 1.2rem; padding: 15px 30px; background:#444;" onclick="cancelMarking()">❌ 取消</button>
     </div>
 </div>
 
@@ -260,7 +261,10 @@ function startManualMarking(text) {
     container.innerHTML = html;
     document.getElementById('editor-overlay').style.display = 'block';
 }
-
+    function cancelMarking() {
+        // 直接隱藏標記畫面，唔執行 saveMarkedData，所以原本嘅數據唔會被覆蓋
+        document.getElementById('editor-overlay').style.display = 'none';
+    }
     function saveMarkedData() {
         const rows = document.querySelectorAll('.line-row');
         let newData = [];
