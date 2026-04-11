@@ -28,12 +28,6 @@
             width: 100%;
         }
 
-        /* 上下句入面的應援詞：顏色要深一點點，唔好搶戲 */
-        .side-lyrics .fc-text {
-            color: #006400; /* 深綠色 */
-            margin-left: 8px;
-        }
-
         /* 中間主句容器 */
         .main-focus {
             padding: 20px 0;
@@ -50,17 +44,25 @@
             line-height: 1.2;
             word-break: break-word; /* 確保長單詞也會換行 */
         }
-
-        /* 中間主句應援詞 */
+        :root {
+            --fc-color: #0f0; /* 預設綠色 */
+        }
+        
         .fanchant { 
             font-size: clamp(1.5rem, 8vh, 6rem); 
             font-weight: 900; 
-            color: #0f0; 
-            text-shadow: 0 0 10px #0f0; 
-            /* 【修正】同樣容許換行 */
+            color: var(--fc-color); /* 使用變數 */
+            text-shadow: 0 0 10px var(--fc-color); 
             white-space: normal; 
             line-height: 1.1;
-            display: block; /* 確保獨立成行 */
+            display: block;
+        }
+        
+        /* 上下句提示入面的應援詞也跟著變，但調暗一點 */
+        .side-lyrics .fc-text {
+            color: var(--fc-color);
+            filter: brightness(0.5); /* 自動變暗 50% */
+            margin-left: 8px;
         }
 
         /* 上下句提示 */
@@ -95,6 +97,7 @@
 
 <div id="app" onclick="handleTap(event)">
     <div class="btn-group">
+        <div class="btn" onclick="changeColor(event)">🎨 顏色</div>
         <div class="btn" onclick="fetchPublicSongs(event)">📂 歌單</div>
         <div class="btn" onclick="openImporter(event)">➕ 匯入</div>
         <div class="btn" onclick="uploadSong(event)">☁️ 投稿</div>
@@ -343,10 +346,33 @@
         localStorage.setItem('myConcertData', JSON.stringify(songData));
         if (curr.f && navigator.vibrate) navigator.vibrate(50);
     }
+    let colorIndex = 0;
+    const colors = ['#0f0', '#ff0', '#f0f', '#0ff', '#fff', '#f00']; 
+    // 綠、黃、桃紅、青、白、紅
+    
+    function changeColor(e) {
+        if(e) e.stopPropagation();
+        colorIndex = (colorIndex + 1) % colors.length;
+        const newColor = colors[colorIndex];
+        
+        // 一句指令改晒全場顏色
+        document.documentElement.style.setProperty('--fc-color', newColor);
+        
+        // 順便儲存埋，下次開返都係呢隻色
+        localStorage.setItem('fanchantColor', newColor);
+    }
 
+    // 在 window.onload 加入讀取顏色
     window.onload = function() {
         const saved = localStorage.getItem('myConcertData');
         if (saved) { songData = JSON.parse(saved); updateUI(); }
+        
+        const savedColor = localStorage.getItem('fanchantColor');
+        if (savedColor) {
+            document.documentElement.style.setProperty('--fc-color', savedColor);
+            // 更新 colorIndex 以免下次切換跳咗色
+            colorIndex = colors.indexOf(savedColor);
+        }
     };
 </script>
 </body>
