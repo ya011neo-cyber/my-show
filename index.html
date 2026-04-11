@@ -336,51 +336,85 @@ function startManualMarking(text) {
             window.open(url, '_blank');
         }
     }
-    async function showAdminPanel() {
-        try {
-            // 1. 抓取所有待審核 (pending) 的歌
-            const snapshot = await db.collection("songs")
-                                     .where("status", "==", "pending")
-                                     .get();
-            
-            if (snapshot.empty) {
-                alert("暫時冇待審核嘅歌。");
-                return;
-            }
-    
-            let listText = "【待審核清單】\n";
-            let pendingSongs = [];
-            
-            snapshot.forEach((doc, i) => {
-                const data = doc.data();
-                pendingSongs.push({ id: doc.id, name: data.name, data: data.data });
-                listText += `${i + 1}. ${data.name}\n`;
-            });
-    
-            const choice = prompt(listText + "\n請輸入編號進行【預覽】：");
-            const selected = pendingSongs[choice - 1];
-    
-            if (selected) {
-                // --- 關鍵步驟：先將數據載入 App 介面 ---
-                songData = selected.data; 
-                index = 0;
-                updateUI(); // 呢度會更新主畫面，你可以見到歌詞、應援色同相片
-                
-                // 畀管理員檢查一下
-                setTimeout(() => {
-                    if (confirm(`【預覽中】\n歌名：${selected.name}\n\n睇完內容，確定要公開呢首歌嗎？`)) {
-                        approveSong(selected.id, selected.name);
-                    } else {
-                        alert("已取消審核，你可以繼續查看或修改。");
-                    }
-                }, 500); // 延遲少少彈出，等你有時間睇到個 UI 更新
-            }
-        } catch (e) {
-            console.error(e);
-            alert("讀取失敗。");
+async function showAdminPanel() {
+    try {
+        const snapshot = await db.collection("songs")
+                                 .where("status", "==", "pending")
+                                 .get();
+        
+        if (snapshot.empty) {
+            alert("暫時冇待審核嘅歌。");
+            return;
         }
-    }
 
+        let listText = "【待審核清單】\n";
+        let pendingSongs = [];
+        
+        snapshot.forEach((doc, i) => {
+            const data = doc.data();
+            pendingSongs.push({ id: doc.id, name: data.name, data: data.data });
+            listText += `${i + 1}. ${data.name}\n`;
+        });
+
+        const choice = prompt(listText + "\n輸入編號進行預覽：");
+        const selected = pendingSongs[choice - 1];
+
+        if (selected) {
+            // 1. 載入數據到 UI
+            songData = selected.data; 
+            index = 0;
+            updateUI(); 
+            
+            // 2. 唔好用 confirm，改為顯示一個自定義嘅審核工具列
+            showAuditBar(selected.id, selected.name);
+        }
+    } catch (e) {
+        alert("讀取失敗。");
+    }
+}
+function showAuditBar(docId, songName) {
+    // 如果已經有浮窗就先拎走
+    const oldBar = document.getElementById('audit-bar');
+    if (oldBar) oldBar.remove();
+
+    const bar = document.createElement('div');
+    bar.id = 'audit-bar';
+    bar.style = `
+        position: fixed; bottom: 0; left: 0; width: 100%; 
+        background: rgba(0, 100, 0, 0.9); color: white; 
+        padding: 20px; text-align: center; z-index: 3000;
+        box-shadow: 0 -5px 15px rgba(0,0,0,0.5);
+        display: flex; flex-direction: column; gap: 10px;
+    `;
+    
+    bar.innerHTML = `
+        <div style="font-weight:bold;">審核預覽中：${songName}</div>
+        <div style="display:flex; gap:10px; justify-content:center;">
+            <button class="btn" style="background:#0f0; color:#000; flex:1;" onclick="finalizeApproval('${docId}', '${songName}')">✅ 公開此歌</button>
+            <button class="btn" style="background:#f00; color:#fff; flex:1;" onclick="deletePending('${docId}', '${songName}')">🗑️ 刪除</button>
+            <button class="btn" style="background:#444; color:#fff; flex:1;" onclick="document.getElementById('audit-bar').remove()">❌ 關閉</button>
+        </div>
+    `;
+    document.body.appendChild(bar);
+}
+
+// 執行公開
+async function finalizeApproval(docId, songName) {
+    if (confirm(`確定公開「${songName}」？`)) {
+        await db.collection("songs").doc(docId).update({ status: "public" });
+        alert("已公開！");
+        document.getElementById('audit-bar').remove();
+    }
+}
+
+// 執行刪除 (可選：如果係垃圾投稿可以直接刪)
+async function deletePending(docId, songName) {
+    if (confirm(`確定要刪除「${songName}」？此動作不能撤銷。`)) {
+        await db.collection("songs").doc(docId).delete();
+        alert("已刪除！");
+        document.getElementById('audit-bar').remove();
+    }
+}
     // 獨立出來的批准 function
     async function approveSong(docId, songName) {
         try {
