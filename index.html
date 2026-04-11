@@ -312,10 +312,12 @@ async function fetchPublicSongs(e) {
         
         let list = "【公開歌單】請選擇編號：\n";
         let songs = [];
-        snapshot.forEach((doc, i) => { 
+        let i = 0; // 手動加個計數器
+        snapshot.forEach((doc) => {  // 唔好放 i 入個括號度
             const d = doc.data();
             songs.push({ id: doc.id, ...d }); 
             list += `${i + 1}. ${d.name}\n`; 
+            i++; // 每次行完一行就加 1
         });
         
         const choice = prompt(list + "\n(Admin 提示：輸入 del1 可刪除第 1 首歌)");
@@ -400,18 +402,23 @@ async function showAdminPanel() {
         let listText = "【待審核清單】\n";
         let pendingSongs = [];
         
-        snapshot.forEach((doc, i) => {
+        let i = 0; // 手動加個計數器
+        snapshot.forEach((doc) => {
             const data = doc.data();
-            pendingSongs.push({ id: doc.id, name: data.name, data: data.data });
+            pendingSongs.push({ id: doc.id, name: data.name, data: data.data, uploader: data.uploader });
             listText += `${i + 1}. ${data.name}\n`;
+            i++; // 每次加 1
         });
-
         const choice = prompt(listText + "\n輸入編號進行預覽：");
         const selected = pendingSongs[choice - 1];
 
         if (selected) {
             // 1. 載入數據到 UI
             songData = selected.data; 
+            songData.meta = { 
+                name: selected.name, 
+                uploader: selected.uploader || "未知" 
+            };
             index = 0;
             updateUI(); 
             
