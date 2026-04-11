@@ -19,8 +19,19 @@
         .lyrics { font-size: clamp(1rem, 3vh, 2rem); color: #bbb; margin-bottom: 3px; white-space: normal; line-height: 1.2; word-break: break-word; }
         .side-lyrics { font-size: clamp(0.8rem, 2.5vh, 1.5rem); color: #444; min-height: 2vh; transition: all 0.3s ease; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .side-lyrics .fc-text { color: var(--fc-color); filter: brightness(0.5); margin-left: 8px; }
+        
         .btn-group { position: absolute; top: 10px; right: 10px; display: flex; gap: 5px; z-index: 100; flex-wrap: wrap; justify-content: flex-end; }
         .btn { padding: 8px 12px; background: #222; border-radius: 5px; font-size: 0.7rem; border: 1px solid #444; color: #fff; cursor: pointer; }
+        
+        /* 全螢幕相片檢視器樣式 */
+        #main-photo-overlay { 
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(0,0,0,0.95); z-index: 2500; justify-content: center; align-items: center; 
+            touch-action: pinch-zoom; /* 允許原生縮放 */
+        }
+        #main-photo-overlay img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        .close-photo-btn { position: absolute; top: 20px; right: 20px; font-size: 2rem; color: #fff; background: rgba(0,0,0,0.5); border-radius: 50%; width: 50px; height: 50px; text-align: center; line-height: 50px; cursor: pointer; z-index: 2600; }
+
         #editor-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #111; z-index: 999; padding: 20px; box-sizing: border-box; overflow-y: auto; display: none; }
         .word-chip { display: inline-block; padding: 8px 12px; margin: 5px; border: 1px solid #444; border-radius: 4px; cursor: pointer; color: #ccc; }
         .word-chip.is-fc { background: var(--fc-color); color: #000; font-weight: bold; border-color: var(--fc-color); box-shadow: 0 0 10px var(--fc-color); }
@@ -30,6 +41,7 @@
 
 <div id="app" onclick="handleTap(event)">
     <div class="btn-group">
+        <div id="mainViewPhotoBtn" class="btn" style="display:none; background:#444;" onclick="showMainPhoto(event)">🖼️ 相片</div>
         <div class="btn" onclick="openColorMenu(event)">🎨 顏色</div>
         <div class="btn" onclick="fetchPublicSongs(event)">📂 歌單</div>
         <div class="btn" onclick="openImporter(event)">➕ 匯入</div>
@@ -48,6 +60,11 @@
     </div>
 </div>
 
+<div id="main-photo-overlay">
+    <div class="close-photo-btn" onclick="hideMainPhoto()">×</div>
+    <img id="main-photo-img" src="" alt="應援參考圖">
+</div>
+
 <div id="color-modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:#222; padding:20px; border-radius:15px; z-index:2000; border:1px solid #444; width:250px; text-align:center;">
     <h4 style="margin:0 0 15px 0;">自定義顏色</h4>
     <input type="color" id="colorPicker" onchange="updateHexInput(this.value)" style="width:100%; height:40px; border:none; background:none; cursor:pointer;">
@@ -64,8 +81,7 @@
 <div id="import-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:1000; padding:20px; box-sizing:border-box; overflow-y:auto;">
     <h3 id="modal-title" style="text-align:center; color:#0f0;">編輯歌詞</h3>
     <div id="image-preview-container" style="display:none; text-align:center; margin-bottom:10px;">
-        <img id="reference-img" style="max-width:100%; max-height:150px; border:1px solid #444; border-radius:5px;" onclick="viewFullImage()">
-        <p style="font-size:0.6rem; color:#888;">點擊放大</p>
+        <img id="reference-img" style="max-width:100%; max-height:150px; border:1px solid #444; border-radius:5px;">
     </div>
     <textarea id="manualInput" style="width:100%; height:50vh; background:#111; color:#fff; border:1px solid #444; padding:15px; border-radius:10px; font-size:1rem;" placeholder="括號 () 內文字會自動變應援色..."></textarea>
     <div style="margin-top:20px; display:flex; gap:10px; flex-wrap:wrap;">
@@ -74,10 +90,6 @@
         <button class="btn" style="flex:1; padding:15px; background:#444;" onclick="closeImporter()">取消</button>
     </div>
     <input type="file" id="refInput" accept="image/*" style="display:none" onchange="previewRefImage(event)">
-</div>
-
-<div id="full-image-overlay" onclick="this.style.display='none'" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:3000; justify-content:center; align-items:center;">
-    <img id="full-img" style="max-width:95%; max-height:95%;">
 </div>
 
 <div id="editor-overlay">
@@ -89,7 +101,7 @@
 </div>
 
 <script>
-    // --- Firebase 配置 (請保持原樣) ---
+    // --- 原有 Firebase 配置 (請保持原樣) ---
     const firebaseConfig = { apiKey: "AIzaSyCOnH-KJfJqe6VGn7qG2TU1rIaT5OEL9JU", authDomain: "fanchartpro.firebaseapp.com", projectId: "fanchartpro", storageBucket: "fanchartpro.firebasestorage.app", messagingSenderId: "94013254919", appId: "1:94013254919:web:929fff5cd2c71067b269a2" };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
@@ -97,8 +109,44 @@
     let songData = [{ l: "歡迎使用應援助手", f: "開始" }];
     let index = 0;
     let isLocked = false;
+    let currentPhotoData = ""; // 用來儲存相片的 DataURL
 
-    // --- 雲端功能 (修復返嚟) ---
+    // --- 新增：主畫面相片控制 ---
+    function showMainPhoto(e) {
+        if(e) e.stopPropagation();
+        if(!currentPhotoData) return;
+        const overlay = document.getElementById('main-photo-overlay');
+        const img = document.getElementById('main-photo-img');
+        img.src = currentPhotoData;
+        overlay.style.display = 'flex';
+    }
+
+    function hideMainPhoto() {
+        document.getElementById('main-photo-overlay').style.display = 'none';
+    }
+
+    // --- 修改：圖片上傳預覽，同步更新主畫面掣 ---
+    function previewRefImage(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            currentPhotoData = e.target.result; // 儲存到變數
+            document.getElementById('reference-img').src = currentPhotoData;
+            document.getElementById('image-preview-container').style.display = 'block';
+            
+            // 顯示主畫面的相片按鈕
+            document.getElementById('mainViewPhotoBtn').style.display = 'block';
+            
+            // 同時儲存到 localStorage，下次開 App 仲喺度
+            localStorage.setItem('savedRefPhoto', currentPhotoData);
+        };
+        reader.readAsDataURL(file);
+    }
+
+    // (其餘 Function：fetchPublicSongs, uploadSong, openColorMenu, startManualMarking, updateUI 等請保留原本內容)
+    // 這裡只寫出需要變動的部分...
+
     async function fetchPublicSongs(e) {
         if (e) e.stopPropagation();
         try {
@@ -123,21 +171,6 @@
         } catch (e) { alert("投稿失敗。"); }
     }
 
-    // --- 圖片功能 ---
-    function previewRefImage(event) {
-        const file = event.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            document.getElementById('reference-img').src = e.target.result;
-            document.getElementById('full-img').src = e.target.result;
-            document.getElementById('image-preview-container').style.display = 'block';
-        };
-        reader.readAsDataURL(file);
-    }
-    function viewFullImage() { document.getElementById('full-image-overlay').style.display = 'flex'; }
-
-    // --- 顏色功能 ---
     function openColorMenu(e) {
         e.stopPropagation();
         const curr = getComputedStyle(document.documentElement).getPropertyValue('--fc-color').trim();
@@ -157,12 +190,10 @@
         } else { alert("格式錯誤！"); }
     }
 
-    // --- 匯入與標記 ---
     function openImporter(e) {
         if(e) e.stopPropagation();
         document.getElementById('modal-title').innerText = "➕ 匯入新歌詞";
         document.getElementById('manualInput').value = ""; 
-        document.getElementById('image-preview-container').style.display = 'none';
         document.getElementById('import-modal').style.display = 'block';
     }
 
@@ -191,7 +222,6 @@
             const words = line.split(/\s+/).filter(w => w !== "");
             let inBracket = false;
             words.forEach(w => {
-                // 自動識別括號
                 if (/[\(\（\[]/.test(w)) inBracket = true;
                 html += `<span onclick="this.classList.toggle('is-fc')" class="word-chip ${inBracket ? 'is-fc' : ''}">${w}</span>`;
                 if (/[\)\）\]]/.test(w)) inBracket = false;
@@ -225,7 +255,6 @@
         updateUI();
     }
 
-    // --- UI 與 操作 ---
     function handleTap(e) {
         if (isLocked) return;
         const x = e.clientX || (e.touches && e.touches[0].clientX);
@@ -255,8 +284,18 @@
     window.onload = function() {
         const saved = localStorage.getItem('myConcertData');
         if (saved) { songData = JSON.parse(saved); updateUI(); }
+        
         const savedColor = localStorage.getItem('fanchantColor');
         if (savedColor) document.documentElement.style.setProperty('--fc-color', savedColor);
+
+        // 讀取上次上傳嘅相片
+        const savedPhoto = localStorage.getItem('savedRefPhoto');
+        if (savedPhoto) {
+            currentPhotoData = savedPhoto;
+            document.getElementById('mainViewPhotoBtn').style.display = 'block';
+            document.getElementById('reference-img').src = currentPhotoData;
+            document.getElementById('image-preview-container').style.display = 'block';
+        }
     };
 </script>
 </body>
