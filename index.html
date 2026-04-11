@@ -8,16 +8,77 @@
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
     <style>
         body { margin: 0; background: #000; color: #fff; font-family: sans-serif; height: 100vh; overflow: hidden; touch-action: none; }
-        #app { height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 0 10%; text-align: center; }
-        .next-preview { color: #444; font-size: 0.9rem; margin-bottom: 20px; }
-        .lyrics { font-size: 1.4rem; color: #bbb; margin-bottom: 10px; }
-        .fanchant { font-size: 3.5rem; font-weight: 900; color: #0f0; text-shadow: 0 0 15px #0f0; }
+        
+        /* 核心佈局：確保容器撐開並置中 */
+        #app { 
+            height: 100%; 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: center; 
+            align-items: center; 
+            padding: 0 5%; 
+            text-align: center; 
+        }
+
+        /* 新增：三層歌詞的總容器 */
+        .lyrics-container {
+            display: flex;
+            flex-direction: column;
+            gap: 40px; /* 上中下三句之間的間距 */
+            width: 100%;
+        }
+
+        /* 上一句與下一句的通用樣式 */
+        .side-lyrics {
+            font-size: 1.2rem;
+            color: #444; /* 較暗的灰色，代表背景 */
+            min-height: 1.5rem;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+
+        /* 上下句入面的應援詞：顏色要深一點點，唔好搶戲 */
+        .side-lyrics .fc-text {
+            color: #006400; /* 深綠色 */
+            margin-left: 8px;
+        }
+
+        /* 中間主句容器 */
+        .main-focus {
+            padding: 20px 0;
+            transform: scale(1.1); /* 稍微放大主句 */
+        }
+
+        /* 中間主句歌詞 */
+        .lyrics { 
+            font-size: 1.6rem; 
+            color: #bbb; 
+            margin-bottom: 5px; 
+        }
+
+        /* 中間主句應援詞：最明顯的大字 */
+        .fanchant { 
+            font-size: 3.5rem; 
+            font-weight: 900; 
+            color: #0f0; 
+            text-shadow: 0 0 15px #0f0; 
+        }
+
+        /* 按鈕組與其他原本的 CSS 保持不變 */
         .btn-group { position: absolute; top: 10px; right: 10px; display: flex; gap: 5px; z-index: 100; flex-wrap: wrap; justify-content: flex-end; }
         .btn { padding: 8px 12px; background: #222; border-radius: 5px; font-size: 0.7rem; border: 1px solid #444; color: #fff; cursor: pointer; }
+        
         #editor-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #111; z-index: 999; padding: 20px; box-sizing: border-box; overflow-y: auto; display: none; }
         .word-chip { display: inline-block; padding: 8px 12px; margin: 5px; border: 1px solid #444; border-radius: 4px; cursor: pointer; color: #ccc; }
         .word-chip.is-fc { background: #0f0; color: #000; font-weight: bold; border-color: #0f0; box-shadow: 0 0 10px #0f0; }
         .editor-footer { margin-top: 30px; padding-bottom: 50px; text-align: center; }
+        
+        /* 編輯器內的大文字框樣式 */
+        #manualInput {
+            width: 100%; height: 60vh; background: #111; color: #fff; border: 1px solid #444; 
+            padding: 15px; box-sizing: border-box; font-size: 1.1rem; line-height: 1.6; 
+            border-radius: 10px; outline: none;
+        }
     </style>
 </head>
 <body>
@@ -30,9 +91,15 @@
         <div class="btn" onclick="editCurrentSong(event)">✏️ 編輯</div>
         <div id="lockBtn" class="btn" onclick="toggleLock(event)">🔓 已解鎖</div>
     </div>
-    <div class="next-preview" id="nextText">Next: ---</div>
-    <div class="lyrics" id="currLyrics">載入中...</div>
-    <div class="fanchant" id="currFanchant"></div>
+    
+    <div class="lyrics-container">
+        <div class="side-lyrics" id="prevLine"></div>
+        <div class="main-focus">
+            <div class="lyrics" id="currLyrics">載入中...</div>
+            <div class="fanchant" id="currFanchant"></div>
+        </div>
+        <div class="side-lyrics" id="nextLine"></div>
+    </div>
 </div>
 <div id="import-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:1000; padding:20px; box-sizing:border-box;">
     <h3 id="modal-title" style="text-align:center; color:#0f0;">匯入/編輯歌詞</h3>
@@ -237,14 +304,34 @@
         else { if (index < songData.length - 1) index++; else index = 0; }
         updateUI();
     }
+    function formatLine(item) {
+        if (!item) return "";
+        // 如果歌詞係 "..." 隱藏佢，只顯示應援
+        let lText = item.l === "..." ? "" : item.l;
+        let fText = item.f ? `<span class="fc-text">${item.f}</span>` : "";
+        return `${lText} ${fText}`.trim();
+    }
 
     function updateUI() {
         if (!songData[index]) return;
-        document.getElementById('currLyrics').innerText = songData[index].l;
-        document.getElementById('currFanchant').innerText = songData[index].f;
-        document.getElementById('nextText').innerText = "Next: " + (songData[index+1] ? songData[index+1].l : "完畢");
+
+        const prev = songData[index - 1];
+        const curr = songData[index];
+        const next = songData[index + 1];
+
+        // 1. 顯示上一句 (連應援)
+        document.getElementById('prevLine').innerHTML = prev ? formatLine(prev) : "";
+
+        // 2. 顯示中間主句
+        document.getElementById('currLyrics').innerText = curr.l;
+        document.getElementById('currFanchant').innerText = curr.f;
+
+        // 3. 顯示下一句 (連應援)
+        document.getElementById('nextLine').innerHTML = next ? formatLine(next) : (index === songData.length - 1 ? "— 完 —" : "");
+
+        // 儲存及震動
         localStorage.setItem('myConcertData', JSON.stringify(songData));
-        if (songData[index].f && navigator.vibrate) navigator.vibrate(50);
+        if (curr.f && navigator.vibrate) navigator.vibrate(50);
     }
 
     window.onload = function() {
