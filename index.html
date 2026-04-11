@@ -396,8 +396,11 @@ async function adminDeletePublic(docId, songName) {
     if (pw === null) return;
 
     try {
+        // 1. 從 Database 讀取所有安全設定 (密碼同 Discord Link)
         const adminDoc = await db.collection("admin_config").doc("security").get();
-        const correctPw = adminDoc.data().password;
+        const adminData = adminDoc.data();
+        const correctPw = adminData.password;
+        const webhookURL = adminData.discord_webhook; // ✨ 喺 Database 攞 Link
 
         if (pw === correctPw) {
             await db.collection("songs").doc(docId).delete();
@@ -407,7 +410,7 @@ async function adminDeletePublic(docId, songName) {
             const reason = prompt("密碼不正確。如果您想建議刪除此歌，請輸入原因：");
             
             if (reason && reason.trim() !== "") {
-                // 1. 儲存紀錄到 Firebase
+                // 儲存紀錄
                 await db.collection("delete_requests").add({
                     songId: docId,
                     songName: songName,
@@ -415,34 +418,28 @@ async function adminDeletePublic(docId, songName) {
                     timestamp: firebase.firestore.FieldValue.serverTimestamp()
                 });
 
-                // 2. ✨ 發送 Discord 即時通知 ✨
-                const webhookURL = "https://discord.com/api/webhooks/1492590335501668643/agFZXtsVJM82DS3_krK-os4T2KzVTozl3jkjm4b2TZ3Cu32bG6oU3HlAZ38a0C6tYQDT";
-                
-                const discordMsg = {
-                    username: "應援助手管理員",
-                    avatar_url: "https://i.imgur.com/4M34pZ0.png", // 你可以換成你鍾意嘅 Icon
-                    embeds: [{
-                        title: "🚨 收到刪除建議！",
-                        color: 16711680, // 紅色
-                        fields: [
-                            { name: "歌曲名稱", value: songName, inline: true },
-                            { name: "建議原因", value: reason, inline: false },
-                            { name: "時間", value: new Date().toLocaleString(), inline: false }
-                        ],
-                        footer: { text: "來自 My-Show Web App" }
-                    }]
-                };
+                // 2. ✨ 檢查有無 Webhook URL 先至發送
+                if (webhookURL) {
+                    const discordMsg = {
+                        username: "應援助手管理員",
+                        embeds: [{
+                            title: "🚨 收到刪除建議！",
+                            color: 16711680,
+                            fields: [
+                                { name: "歌曲名稱", value: songName, inline: true },
+                                { name: "建議原因", value: reason, inline: false }
+                            ]
+                        }]
+                    };
 
-                // 用 fetch 寄出數據
-                fetch(webhookURL, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(discordMsg)
-                });
+                    fetch(webhookURL, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(discordMsg)
+                    });
+                }
 
-                alert("感謝您的意見！Discord 通知已傳送給管理員。");
-            } else {
-                alert("已取消操作。");
+                alert("感謝您的意見！通知已發送。");
             }
         }
     } catch (e) {
