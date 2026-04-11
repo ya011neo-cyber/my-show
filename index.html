@@ -292,33 +292,17 @@ function previewRefImage(event) {
     function removePhoto() { tempPhotoData = ""; updateEditPreview(); }
 
 
-async function handleManualSubmit() {
-    // 🔍 判斷係咪編輯緊舊歌
+function handleManualSubmit() {
     const isEditMode = document.getElementById('modal-title').innerText.includes("編輯");
+    let name = isEditMode && songData?.meta ? songData.meta.name : prompt("請輸入歌名：");
     
-    let name;
-    if (isEditMode && songData && songData.meta) {
-        name = songData.meta.name;
-    } else {
-        name = prompt("請輸入歌名：");
-    }
-
     if (!name) return;
 
-    const lyrics = document.getElementById('manualInput').value;
-    const source = document.getElementById('sourceLinkInput').value;
+    // 淨係記低個名，等陣 uploadToCloud 嗰陣用
+    window.currentSubmittingData = { name: name };
 
-    // ✨ 關鍵：將所有資料暫存在 window 一個地方，等陣標記完用
-    window.currentSubmittingData = {
-        name: name,
-        source: source,
-        photo: tempPhotoData || "", // 帶埋張相
-        isEdit: isEditMode
-    };
-
-    // 🚀 執行你原本嘅標記功能，將歌詞變做一粒粒掣
-    // 確保 startManualInput 係讀取 manualInput.value 嚟整 chips
-    startManualMarking(); 
+    // 🚀 去標記顏色囉！(請確保 function 名稱同你本身嗰個一致)
+    processManualInput(); 
 }
 
     // --- 標記與儲存 ---
@@ -362,12 +346,11 @@ function cancelMarking() {
     document.getElementById('editor-overlay').style.display = 'none';
 }
     
-async function saveMarkedData() {
+function saveMarkedData() {
     const rows = document.querySelectorAll('.line-row');
     const sourceLink = document.getElementById('sourceLinkInput').value.trim(); 
     let newData = [];
 
-    // --- 1. 你原本處理歌詞標記的邏輯 (保留) ---
     rows.forEach(row => {
         const chips = row.querySelectorAll('.word-chip');
         let currentL = ""; let pendingF = [];
@@ -384,39 +367,19 @@ async function saveMarkedData() {
         if (pendingF.length > 0 || currentL.trim()) newData.push({ l: currentL.trim() || "...", f: pendingF.join(' ') });
     });
 
-    // --- 2. 處理相片同 Link (保留) ---
     if (newData.length > 0) {
         if (tempPhotoData) newData[0].photo = tempPhotoData;
         if (sourceLink) newData[0].link = sourceLink; 
     }
 
-    // --- 3. 更新本地 UI (保留，等你可以即刻睇到結果) ---
+    // ✨ 只更新本地變數同 UI
     songData = newData;
     index = 0;
     document.getElementById('editor-overlay').style.display = 'none';
-    closeImporter(); // 順便關埋匯入框
+    closeImporter();
     updateUI();
-
-    // --- 4. ✨ 新增：自動背後提交到 Firebase 同 Discord ---
-    const info = window.currentSubmittingData || {};
-    const finalSong = {
-        name: info.name || "未命名",
-        data: newData, // 剛剛處理完的數據
-        status: "pending", 
-        source: sourceLink || info.source || "",
-        photo: tempPhotoData || "",
-        timestamp: firebase.firestore.FieldValue.serverTimestamp()
-    };
-
-    try {
-        const docRef = await db.collection("songs").add(finalSong);
-        console.log("雲端備份成功，ID:", docRef.id);
-
-        // 呼叫 Discord 通知 (記得要寫埋呢個 function)
-        sendDiscordNotification(finalSong.name, finalSong.source, docRef.id);
-    } catch (e) {
-        console.error("雲端儲存失敗，但本地已更新：", e);
-    }
+    
+    console.log("本地預覽已更新");
 }
     async function sendDiscordNotification(name, source, id) {
     try {
@@ -565,16 +528,56 @@ async function uploadSong(e) {
     if (!uploaderName) return;
 
     try {
-        await db.collection("songs").add({ 
+        const docRef = await db.collection("songs").add({ 
             name: songName, 
-            uploader: uploaderName, // 新增上傳者欄位
+            uploader: uploaderName, 
             data: songData, 
             status: "pending", 
             createdAt: firebase.firestore.FieldValue.serverTimestamp() 
         });
+
         alert("投稿成功！請等候管理員審核。");
+
+        // ✨ 新增：成功投稿後，發送 Discord 通知 ✨
+        sendDiscordNotification(songName, uploaderName, docRef.id);
+
     } catch (e) {
+        console.error(e);
         alert("投稿失敗。");
+    }
+}
+
+// ------------------------------------------------
+// 抽離出嚟嘅 Discord 通知 Function (放喺 script 任何地方都得)
+// ------------------------------------------------
+async function sendDiscordNotification(songName, uploader, docId) {
+    try {
+        // 從資料庫攞返之前收埋嘅 Webhook URL
+        const adminDoc = await db.collection("admin_config").doc("security").get();
+        const webhookURL = adminDoc.data().discord_webhook;
+
+        if (webhookURL) {
+            fetch(webhookURL, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    username: "應援助手投稿機",
+                    embeds: [{
+                        title: "🆕 收到新歌投稿！",
+                        color: 65280, // 綠色
+                        fields: [
+                            { name: "歌曲名稱", value: songName, inline: true },
+                            { name: "投稿者", value: uploader, inline: true },
+                            { name: "Firebase ID", value: docId, inline: false }
+                        ],
+                        footer: { text: "請進入管理後台審核" },
+                        timestamp: new Date().toISOString()
+                    }]
+                })
+            });
+        }
+    } catch (err) {
+        console.error("Discord 通知發送失敗", err);
     }
 }
     function openSourceLink(e) {
