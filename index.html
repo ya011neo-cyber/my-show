@@ -86,16 +86,21 @@
 </div>
 
 <div id="editor-overlay">
-    <h2 style="text-align:center;">點擊【應援詞】使其變色</h2>
-    <div style="text-align:center; margin-bottom: 20px;">
-        <button id="editorPhotoBtn" class="btn" style="background:#444; display:none;" onclick="showMainPhoto(event)">🖼️ 睇參考圖</button>
+    <div style="position: sticky; top: 0; background: #111; z-index: 1000; padding: 10px 0; border-bottom: 1px solid #333; margin-bottom: 20px;">
+        <h2 style="text-align:center; margin: 0 0 10px 0; font-size: 1.2rem;">點擊【應援詞】使其變色</h2>
+        <div style="text-align:center;">
+            <button id="editorPhotoBtn" class="btn" style="background:#444; display:none; padding: 10px 20px;" onclick="showMainPhoto(event)">🖼️ 睇參考圖</button>
+        </div>
     </div>
+    
     <div id="chips-container" style="text-align:center;"></div>
+    
     <div style="text-align:center; margin-top:30px; padding-bottom:50px;">
         <button class="btn" style="font-size: 1.2rem; padding: 15px 30px; background:#0f0; color:#000;" onclick="saveMarkedData()">✅ 完成生成</button>
         <button class="btn" style="font-size: 1.2rem; padding: 15px 30px; background:#444;" onclick="cancelMarking()">❌ 取消</button>
     </div>
 </div>
+    
 <div id="footer-info" onclick="handleAdminTrigger()" style="position: fixed; bottom: env(safe-area-inset-bottom); left: 0; width: 100%; padding: 15px 0; background: linear-gradient(transparent, rgba(0,0,0,0.9) 70%); color: #555; font-size: 0.8rem; text-align: center; z-index: 50; user-select: none;">
     <div id="display-song-name" style="font-weight: bold; color: #666;">應援助手 Fanchant Helper</div>
     <div id="display-upload-info" style="font-size: 0.65rem; margin-top: 3px; color: #444;"></div>
