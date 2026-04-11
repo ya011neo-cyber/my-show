@@ -219,32 +219,45 @@ function previewRefImage(event) {
     }
 
     // --- 標記與儲存 ---
-    function startManualMarking(text) {
-        const container = document.getElementById('chips-container');
-        // --- 新增：檢查是否有相片，有就顯示標記畫面的相片掣 ---
-        const editorBtn = document.getElementById('editorPhotoBtn');
-        if (tempPhotoData && editorBtn) {
-            editorBtn.style.display = 'inline-block';
-        } else if (editorBtn) {
-            editorBtn.style.display = 'none';
-        }
-        const lines = text.split('\n');
-        let html = "";
-        lines.forEach((line, rowIdx) => {
-            if (line.trim() === "") return;
-            html += `<div class="line-row" data-row="${rowIdx}" style="margin-bottom:15px; border-bottom:1px solid #222;">`;
-            const words = line.split(/\s+/).filter(w => w !== "");
-            let inBracket = false;
-            words.forEach(w => {
-                if (/[\(\（\[]/.test(w)) inBracket = true;
-                html += `<span onclick="this.classList.toggle('is-fc')" class="word-chip ${inBracket ? 'is-fc' : ''}">${w}</span>`;
-                if (/[\)\傷\]]/.test(w)) inBracket = false;
-            });
-            html += `</div>`;
-        });
-        container.innerHTML = html;
-        document.getElementById('editor-overlay').style.display = 'block';
+function startManualMarking(text) {
+    const container = document.getElementById('chips-container');
+    
+    // 處理參考圖按鈕
+    const editorBtn = document.getElementById('editorPhotoBtn');
+    if (tempPhotoData && editorBtn) {
+        editorBtn.style.display = 'inline-block';
+    } else if (editorBtn) {
+        editorBtn.style.display = 'none';
     }
+
+    const lines = text.split('\n');
+    let html = "";
+
+    lines.forEach((line, rowIdx) => {
+        if (line.trim() === "") return;
+        html += `<div class="line-row" data-row="${rowIdx}" style="margin-bottom:15px; border-bottom:1px solid #222;">`;
+        
+        const words = line.split(/\s+/).filter(w => w !== "");
+        let inBracket = false;
+
+        // --- 修正邏輯：只針對現有括號做預設變色 ---
+        words.forEach(w => {
+            // 1. 檢查係咪本身帶有括號 (e.g. (HEY) )
+            // 2. 或者係處於括號開啟狀態
+            if (/[\(\（\[]/.test(w)) inBracket = true;
+            
+            const shouldBeMarked = inBracket;
+            
+            html += `<span onclick="this.classList.toggle('is-fc')" class="word-chip ${shouldBeMarked ? 'is-fc' : ''}">${w}</span>`;
+            
+            if (/[\)\）\]]/.test(w)) inBracket = false;
+        });
+        html += `</div>`;
+    });
+    
+    container.innerHTML = html;
+    document.getElementById('editor-overlay').style.display = 'block';
+}
 
     function saveMarkedData() {
         const rows = document.querySelectorAll('.line-row');
