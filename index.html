@@ -310,7 +310,7 @@ async function fetchPublicSongs(e) {
         const snapshot = await db.collection("songs").where("status", "==", "public").get();
         if (snapshot.empty) { alert("暫時未有公開歌單。"); return; }
         
-        let list = "請選擇歌曲編號：\n";
+        let list = "【公開歌單】請選擇編號：\n";
         let songs = [];
         snapshot.forEach((doc, i) => { 
             const d = doc.data();
@@ -318,11 +318,32 @@ async function fetchPublicSongs(e) {
             list += `${i + 1}. ${d.name}\n`; 
         });
         
-        const choice = prompt(list);
-        if (choice && songs[choice - 1]) { 
-            const selected = songs[choice - 1];
+        const choice = prompt(list + "\n(Admin 提示：輸入 del1 可刪除第 1 首歌)");
+        if (!choice) return;
+
+        // --- 管理員刪除邏輯 ---
+        if (choice.startsWith('del')) {
+            const num = parseInt(choice.substring(3));
+            const selected = songs[num - 1];
+            if (selected) {
+                // 先驗證 Admin 身份（彈個密碼框，或者如果你已經 login 咗就直接刪）
+                const pw = prompt(`確定要【永久刪除】公開歌曲「${selected.name}」？請輸入管理員密碼確認：`);
+                const adminDoc = await db.collection("admin_config").doc("security").get();
+                
+                if (pw === adminDoc.data().password) {
+                    await db.collection("songs").doc(selected.id).delete();
+                    alert("🗑️ 該公開歌曲已從雲端移除。");
+                } else {
+                    alert("密碼錯誤，拒絕刪除。");
+                }
+            }
+            return;
+        }
+
+        // --- 一般用戶揀歌邏輯 ---
+        const selected = songs[parseInt(choice) - 1];
+        if (selected) { 
             songData = selected.data;
-            // 關鍵：將 Meta 資料暫存入 songData
             songData.meta = {
                 name: selected.name,
                 uploader: selected.uploader || "匿名用戶"
