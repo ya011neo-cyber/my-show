@@ -143,17 +143,23 @@
     function editCurrentSong(e) {
         e.stopPropagation();
         document.getElementById('modal-title').innerText = "✏️ 編輯現有歌詞";
-        let text = songData.map(item => (item.l === "..." ? "" : item.l + " ") + item.f).join('\n');
+    
+        // 淨係還原文字，唔加括號
+        let text = songData.map(item => {
+            let line = "";
+            if (item.l && item.l !== "...") line += item.l + " ";
+            if (item.f) line += item.f; 
+            return line.trim();
+        }).join('\n');
+    
         document.getElementById('manualInput').value = text;
         
-        // 讀取當前歌嘅相片
         const currSong = getFirstLineData();
         tempPhotoData = currSong.photo || "";
         updateEditPreview();
         
         document.getElementById('import-modal').style.display = 'block';
     }
-
     function closeImporter() { document.getElementById('import-modal').style.display = 'none'; }
 
     // 編輯時預覽圖片
@@ -222,7 +228,7 @@ function previewRefImage(event) {
 function startManualMarking(text) {
     const container = document.getElementById('chips-container');
     
-    // 處理參考圖按鈕
+    // 處理相片按鈕
     const editorBtn = document.getElementById('editorPhotoBtn');
     if (tempPhotoData && editorBtn) {
         editorBtn.style.display = 'inline-block';
@@ -238,19 +244,15 @@ function startManualMarking(text) {
         html += `<div class="line-row" data-row="${rowIdx}" style="margin-bottom:15px; border-bottom:1px solid #222;">`;
         
         const words = line.split(/\s+/).filter(w => w !== "");
-        let inBracket = false;
+        
+        // 搵返原本呢一行嘅應援詞數據 (如果有的話)
+        const originalFanchant = (songData[rowIdx] && songData[rowIdx].f) ? songData[rowIdx].f.split(/\s+/) : [];
 
-        // --- 修正邏輯：只針對現有括號做預設變色 ---
         words.forEach(w => {
-            // 1. 檢查係咪本身帶有括號 (e.g. (HEY) )
-            // 2. 或者係處於括號開啟狀態
-            if (/[\(\（\[]/.test(w)) inBracket = true;
+            // 修正邏輯：如果呢粒字喺原本嗰行嘅 f 入面出現過，就預設變色
+            const isPreviouslyMarked = originalFanchant.includes(w);
             
-            const shouldBeMarked = inBracket;
-            
-            html += `<span onclick="this.classList.toggle('is-fc')" class="word-chip ${shouldBeMarked ? 'is-fc' : ''}">${w}</span>`;
-            
-            if (/[\)\）\]]/.test(w)) inBracket = false;
+            html += `<span onclick="this.classList.toggle('is-fc')" class="word-chip ${isPreviouslyMarked ? 'is-fc' : ''}">${w}</span>`;
         });
         html += `</div>`;
     });
