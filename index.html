@@ -291,10 +291,54 @@ function previewRefImage(event) {
     // 移除圖片
     function removePhoto() { tempPhotoData = ""; updateEditPreview(); }
 
-    function handleManualSubmit() {
-        const input = document.getElementById('manualInput').value;
-        if (input.trim()) { closeImporter(); startManualMarking(input); }
+async function handleManualSubmit() {
+    const name = document.getElementById('modal-title').innerText === "編輯現有歌詞" ? songData.meta.name : prompt("請輸入歌名：");
+    if (!name) return;
+
+    const lyrics = document.getElementById('manualInput').value;
+    const source = document.getElementById('sourceLinkInput').value;
+
+    const newSong = {
+        name: name,
+        data: parseLyrics(lyrics), // 假設你有呢個處理歌詞嘅 function
+        status: "pending",
+        uploader: "匿名用戶", // 你可以之後加個名輸入框
+        source: source,
+        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    };
+
+    try {
+        const docRef = await db.collection("songs").add(newSong);
+        alert("提交成功！請等待管理員審核。");
+        closeImporter();
+
+        // ✨ 新增：發送 Discord 投稿通知 ✨
+        const adminDoc = await db.collection("admin_config").doc("security").get();
+        const webhookURL = adminDoc.data().discord_webhook;
+
+        if (webhookURL) {
+            fetch(webhookURL, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    username: "應援助手投稿機",
+                    embeds: [{
+                        title: "🆕 收到新歌投稿！",
+                        color: 65280, // 綠色
+                        fields: [
+                            { name: "歌名", value: name, inline: true },
+                            { name: "來源", value: source || "無提供", inline: false },
+                            { name: "狀態", value: "等待審核中...", inline: true }
+                        ],
+                        footer: { text: `ID: ${docRef.id}` }
+                    }]
+                })
+            });
+        }
+    } catch (e) {
+        alert("提交失敗：" + e.message);
     }
+}
 
     // --- 標記與儲存 ---
 function startManualMarking(text) {
