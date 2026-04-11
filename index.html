@@ -31,6 +31,7 @@
     <div class="btn-group">
         <div class="btn" style="background:#444;" onclick="location.reload()">🔄</div>
         <div id="mainViewPhotoBtn" class="btn" style="display:none; background:#444;" onclick="showMainPhoto(event)">🖼️</div>
+        <div id="mainViewLinkBtn" class="btn" style="display:none; background:#0055aa;" onclick="openSourceLink(event)">🔗</div>
         <div class="btn" onclick="openColorMenu(event)">🎨</div>
         <div class="btn" onclick="fetchPublicSongs(event)">📂</div>
         <div class="btn" onclick="openImporter(event)">➕</div>
@@ -74,6 +75,9 @@
         <button class="btn" style="padding:4px 8px; font-size:0.6rem; background:#800; margin-top:5px;" onclick="removePhoto()">❌ 移除</button>
     </div>
     <textarea id="manualInput" style="width:100%; height:45vh; background:#111; color:#fff; border:1px solid #444; padding:15px; border-radius:10px; font-size:1rem; box-sizing:border-box;" placeholder="括號 () 內文字會自動變應援色..."></textarea>
+    <div style="margin-top:10px;">
+        <input type="text" id="sourceLinkInput" style="width:100%; background:#111; color:#0f0; border:1px solid #444; padding:10px; border-radius:5px; box-sizing:border-box; font-size:0.8rem;" placeholder="🔗 貼上來源網址 (例如 YouTube 或歌詞網)...">
+    </div>
     <div style="margin-top:20px; display:flex; gap:10px; flex-wrap:wrap;">
         <button class="btn" style="flex:2; padding:15px; background:#0f0; color:#000; font-weight:bold;" onclick="handleManualSubmit()">✅ 確認並標記</button>
         <button class="btn" style="flex:1; padding:15px;" onclick="document.getElementById('refInput').click()">📷 附相</button>
@@ -145,7 +149,6 @@
         e.stopPropagation();
         document.getElementById('modal-title').innerText = "✏️ 編輯現有歌詞";
     
-        // 淨係還原文字，唔加括號
         let text = songData.map(item => {
             let line = "";
             if (item.l && item.l !== "...") line += item.l + " ";
@@ -155,10 +158,12 @@
     
         document.getElementById('manualInput').value = text;
         
+        // --- 新增：讀取 Link ---
         const currSong = getFirstLineData();
+        document.getElementById('sourceLinkInput').value = currSong.link || "";
+        
         tempPhotoData = currSong.photo || "";
         updateEditPreview();
-        
         document.getElementById('import-modal').style.display = 'block';
     }
     function closeImporter() { document.getElementById('import-modal').style.display = 'none'; }
@@ -267,6 +272,7 @@ function startManualMarking(text) {
     }
     function saveMarkedData() {
         const rows = document.querySelectorAll('.line-row');
+        const sourceLink = document.getElementById('sourceLinkInput').value.trim(); // 攞 Link
         let newData = [];
         rows.forEach(row => {
             const chips = row.querySelectorAll('.word-chip');
@@ -284,12 +290,13 @@ function startManualMarking(text) {
             if (pendingF.length > 0 || currentL.trim()) newData.push({ l: currentL.trim() || "...", f: pendingF.join(' ') });
         });
         
-        // --- 關鍵修改：將 tempPhotoData 儲存到第一行 ---
         if (newData.length > 0) {
             if (tempPhotoData) newData[0].photo = tempPhotoData;
+            if (sourceLink) newData[0].link = sourceLink; // 儲存 Link
         }
         
-        songData = newData; index = 0;
+        songData = newData;
+        index = 0;
         document.getElementById('editor-overlay').style.display = 'none';
         updateUI();
     }
@@ -318,7 +325,16 @@ function startManualMarking(text) {
             alert("投稿成功！");
         } catch (e) { alert("投稿失敗。"); }
     }
-
+    function openSourceLink(e) {
+        e.stopPropagation();
+        const currSong = getFirstLineData();
+        if (currSong && currSong.link) {
+            // 如果條 link 冇 http，幫佢加返費事 error
+            let url = currSong.link;
+            if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+            window.open(url, '_blank');
+        }
+    }
     function handleTap(e) {
         if (isLocked) return;
         const x = e.clientX || (e.touches && e.touches[0].clientX);
@@ -350,9 +366,13 @@ function startManualMarking(text) {
     // 更新主畫面「🖼️」掣
     function updateMainViewBtn() {
         const currSong = getFirstLineData();
-        const mainBtn = document.getElementById('mainViewPhotoBtn');
-        if (currSong && currSong.photo) { mainBtn.style.display = 'block'; }
-        else { mainBtn.style.display = 'none'; }
+        // 處理相片掣
+        const mainPhotoBtn = document.getElementById('mainViewPhotoBtn');
+        mainPhotoBtn.style.display = (currSong && currSong.photo) ? 'block' : 'none';
+        
+        // --- 新增：處理 Link 掣 ---
+        const mainLinkBtn = document.getElementById('mainViewLinkBtn');
+        mainLinkBtn.style.display = (currSong && currSong.link) ? 'block' : 'none';
     }
 
     // --- 顏色功能與 Lock (保持原樣) ---
