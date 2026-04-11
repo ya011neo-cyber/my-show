@@ -34,7 +34,17 @@
     <div class="lyrics" id="currLyrics">載入中...</div>
     <div class="fanchant" id="currFanchant"></div>
 </div>
-
+<div id="import-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:1000; padding:20px; box-sizing:border-box;">
+    <h3 id="modal-title" style="text-align:center; color:#0f0;">匯入/編輯歌詞</h3>
+    <p style="font-size:0.8rem; color:#888; text-align:center;">括號字 ( ) 會自動識別為應援詞</p>
+    
+    <textarea id="manualInput" style="width:100%; height:60vh; background:#111; color:#fff; border:1px solid #444; padding:15px; box-sizing:border-box; font-size:1.1rem; line-height:1.6; border-radius:10px; outline:none;" placeholder="在此貼上或修改歌詞..."></textarea>
+    
+    <div style="margin-top:20px; display:flex; gap:10px;">
+        <button class="btn" style="flex:1; padding:15px; font-size:1rem; background:#0f0; color:#000; font-weight:bold; border:none;" onclick="handleManualSubmit()">✅ 確認並進入標記模式</button>
+        <button class="btn" style="padding:15px; background:#444; border:none;" onclick="closeImporter()">取消</button>
+    </div>
+</div>
 <input type="file" id="ocrInput" accept="image/*" style="display:none" onchange="handleOCR(event)">
     
 
@@ -112,12 +122,43 @@
         }
     }
 
-    // 簡單匯入
+// 打開視窗 (用於新匯入)
     function openImporter(e) {
         if(e) e.stopPropagation();
-        const input = prompt("貼上歌詞（括號字會自動識別為應援詞）：");
-        if (input) {
-            songData = []; 
+        document.getElementById('modal-title').innerText = "➕ 匯入新歌詞";
+        document.getElementById('manualInput').value = ""; 
+        document.getElementById('import-modal').style.display = 'block';
+        songData = []; // 新匯入就清空舊數據
+    }
+
+    // 打開視窗 (用於編輯現有歌曲)
+    function editCurrentSong(e) {
+        e.stopPropagation();
+        document.getElementById('modal-title').innerText = "✏️ 編輯現有歌詞";
+        
+        // 將現有的 songData 變回文字格式，方便大面積修改
+        let textFormat = songData.map(item => {
+            if (item.f) {
+                // 如果是應援詞，自動幫佢加返對括號，方便編輯
+                return (item.l === "..." ? "" : item.l + " ") + "(" + item.f + ")";
+            }
+            return item.l;
+        }).join('\n');
+
+        document.getElementById('manualInput').value = textFormat;
+        document.getElementById('import-modal').style.display = 'block';
+    }
+
+    function closeImporter() {
+        document.getElementById('import-modal').style.display = 'none';
+    }
+
+    // 統一處理送出內容
+    function handleManualSubmit() {
+        const input = document.getElementById('manualInput').value;
+        if (input.trim()) {
+            closeImporter();
+            // 進入你原本最強的那個 startManualMarking
             startManualMarking(input);
         }
     }
@@ -178,51 +219,7 @@
         document.getElementById('editor-overlay').style.display = 'none';
         updateUI();
     }
-
-    function editCurrentSong(e) {
-        e.stopPropagation();
-        let textFormat = songData.map(item => (item.f ? (item.l === "..." ? "" : item.l + " ") + item.f : item.l)).join('\n');
-        const newInput = prompt("編輯中：", textFormat);
-        if (newInput !== null) startManualMarking(newInput);
-    }
-    function triggerOCR() {
-        document.getElementById('ocrInput').click();
-    }
-
-    async function handleOCR(event) {
-        const file = event.target.files[0];
-        if (!file) return;
-
-        // 顯示 loading 提示
-        document.getElementById('currLyrics').innerText = "辨識中... 請稍候";
-        document.getElementById('currFanchant').innerText = "☕";
-
-        try {
-            // 開始 OCR 辨識 (設定韓文 ko 同英文 eng 混合，因為 NCT WISH 歌單通常有呢兩隻)
-            const result = await Tesseract.recognize(
-                file,
-                'kor+eng', 
-                { logger: m => console.log(m) } // 進度會印喺 console
-            );
-
-            const text = result.data.text;
-            if (text.trim() === "") {
-                alert("辨識失敗，請換一張清晰啲嘅相。");
-                updateUI();
-                return;
-            }
-
-            // 辨識成功後，直接將文字送入原本嘅標記模式
-            if (confirm("辨識完成！要進入標記模式微調嗎？")) {
-                songData = [];
-                startManualMarking(text);
-            }
-        } catch (e) {
-            console.error(e);
-            alert("OCR 發生錯誤，請檢查網絡。");
-            updateUI();
-        }
-    }
+    
     function toggleLock(e) {
         e.stopPropagation();
         isLocked = !isLocked;
