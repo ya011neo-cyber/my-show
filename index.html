@@ -294,15 +294,23 @@ function previewRefImage(event) {
 
 function handleManualSubmit() {
     const isEditMode = document.getElementById('modal-title').innerText.includes("編輯");
-    let name = isEditMode && songData?.meta ? songData.meta.name : prompt("請輸入歌名：");
     
+    // 1. 攞返輸入框入面嘅歌詞文字
+    const lyricsText = document.getElementById('manualInput').value;
+
+    // 2. 檢查下係咪空嘅，費事落去又爆 split
+    if (!lyricsText || lyricsText.trim() === "") {
+        alert("請先輸入歌詞！");
+        return;
+    }
+
+    let name = isEditMode && songData?.meta ? songData.meta.name : prompt("請輸入歌名：");
     if (!name) return;
 
-    // 淨係記低個名，等陣 uploadToCloud 嗰陣用
     window.currentSubmittingData = { name: name };
 
-    // 🚀 去標記顏色囉！(請確保 function 名稱同你本身嗰個一致)
-    startManualMarking(); 
+    // 🚀 重點：將 lyricsText 傳入去 startManualMarking
+    startManualMarking(lyricsText); 
 }
 
     // --- 標記與儲存 ---
