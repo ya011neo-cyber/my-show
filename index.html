@@ -398,7 +398,30 @@ function saveMarkedData() {
     document.getElementById('editor-overlay').style.display = 'none';
     closeImporter();
     updateUI();
-    
+    // ✨ 新增：更新底端的歌名顯示 ✨
+    const info = window.currentSubmittingData || {};
+    if (info.name) {
+        // 1. 更新歌名
+        document.getElementById('display-song-name').innerText = info.name;
+        
+        // 2. 處理作者名 (根據是否有前作者決定點顯示)
+        const uploadInfoEl = document.getElementById('display-upload-info');
+        
+        // 假設 info.uploader 係剛才 prompt 攞到嘅新名 (或者你預設咗係 "本地編輯者")
+        const newEditor = "本地編輯者"; 
+        
+        // 攞返原本顯示緊嘅作者名 (如果有)
+        // 假設原本格式係 "作者: XXX" 或者 "Uploader: XXX"
+        let oldUploader = uploadInfoEl.innerText.replace("作者: ", "").replace("Uploader: ", "").trim();
+
+        if (oldUploader && oldUploader !== "" && oldUploader !== "本地編輯中") {
+            // 如果有舊作者，用 - 連接
+            uploadInfoEl.innerText = `作者: ${oldUploader} - ${newEditor}`;
+        } else {
+            // 如果係全新或者原本冇名，就單獨顯示新編輯者
+            uploadInfoEl.innerText = `作者: ${newEditor}`;
+        }
+    }
     console.log("本地預覽已更新");
 }
     async function sendDiscordNotification(name, source, id) {
@@ -539,9 +562,16 @@ async function adminDeletePublic(docId, songName) {
 }
 async function uploadSong(e) {
     e.stopPropagation();
-    if (songData.length < 1 || songData[0].f === "開始") { alert("請先匯入歌詞！"); return; }
+    if (songData.length < 1 || songData[0].f === "開始") { 
+        alert("請先匯入歌詞！"); 
+        return; 
+    }
     
-    const songName = prompt("【第一步】填寫格式：歌名 - 歌手");
+    // ✨ 改進：嘗試攞返之前入過嘅歌名，如果冇就用現時底端顯示嘅名
+    const defaultName = window.currentSubmittingData?.name || document.getElementById('display-song-name').innerText;
+    
+    // 第一個 prompt 依家會預填個名 (第二個參數就係預填內容)
+    const songName = prompt("【第一步】填寫格式：歌名 - 歌手", defaultName);
     if (!songName) return;
     
     const uploaderName = prompt("【第二步】你的暱稱 (會顯示喺底端)：");
@@ -558,7 +588,7 @@ async function uploadSong(e) {
 
         alert("投稿成功！請等候管理員審核。");
 
-        // ✨ 新增：成功投稿後，發送 Discord 通知 ✨
+        // 發送 Discord 通知
         sendDiscordNotification(songName, uploaderName, docRef.id);
 
     } catch (e) {
@@ -566,7 +596,6 @@ async function uploadSong(e) {
         alert("投稿失敗。");
     }
 }
-
 // ------------------------------------------------
 // 抽離出嚟嘅 Discord 通知 Function (放喺 script 任何地方都得)
 // ------------------------------------------------
