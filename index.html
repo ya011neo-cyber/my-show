@@ -336,6 +336,62 @@ function startManualMarking(text) {
             window.open(url, '_blank');
         }
     }
+    async function showAdminPanel() {
+        try {
+            // 1. 抓取所有待審核 (pending) 的歌
+            const snapshot = await db.collection("songs")
+                                     .where("status", "==", "pending")
+                                     .get();
+            
+            if (snapshot.empty) {
+                alert("暫時冇待審核嘅歌。");
+                return;
+            }
+    
+            let listText = "【待審核清單】\n";
+            let pendingSongs = [];
+            
+            snapshot.forEach((doc, i) => {
+                const data = doc.data();
+                pendingSongs.push({ id: doc.id, name: data.name, data: data.data });
+                listText += `${i + 1}. ${data.name}\n`;
+            });
+    
+            const choice = prompt(listText + "\n請輸入編號進行【預覽】：");
+            const selected = pendingSongs[choice - 1];
+    
+            if (selected) {
+                // --- 關鍵步驟：先將數據載入 App 介面 ---
+                songData = selected.data; 
+                index = 0;
+                updateUI(); // 呢度會更新主畫面，你可以見到歌詞、應援色同相片
+                
+                // 畀管理員檢查一下
+                setTimeout(() => {
+                    if (confirm(`【預覽中】\n歌名：${selected.name}\n\n睇完內容，確定要公開呢首歌嗎？`)) {
+                        approveSong(selected.id, selected.name);
+                    } else {
+                        alert("已取消審核，你可以繼續查看或修改。");
+                    }
+                }, 500); // 延遲少少彈出，等你有時間睇到個 UI 更新
+            }
+        } catch (e) {
+            console.error(e);
+            alert("讀取失敗。");
+        }
+    }
+
+    // 獨立出來的批准 function
+    async function approveSong(docId, songName) {
+        try {
+            await db.collection("songs").doc(docId).update({
+                status: "public"
+            });
+            alert(`✅ 「${songName}」已正式公開！`);
+        } catch (e) {
+            alert("批准失敗，請檢查權限。");
+        }
+    }
     function handleTap(e) {
         if (isLocked) return;
         const x = e.clientX || (e.touches && e.touches[0].clientX);
