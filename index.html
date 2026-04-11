@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>應援助手 Cloud Pro</title>
+    <title onclick="handleAdminTrigger()">應援助手 Cloud Pro</title>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
     <style>
@@ -364,12 +364,40 @@ function startManualMarking(text) {
         updateMainViewBtn();
     }
     // --- 管理員審核功能 ---
+    // 搵返你 HTML 顯示歌詞標題或某個地方，加個 counter
+let adminClickCount = 0;
+
+function handleAdminTrigger() {
+    adminClickCount++;
+    if (adminClickCount >= 5) {
+        adminClickCount = 0; // reset
+        adminLogin();
+    }
+    // 3秒後自動重設次數，費事平時誤觸
+    setTimeout(() => { adminClickCount = 0; }, 3000);
+}
 async function adminLogin() {
-    const pw = prompt("請輸入管理員密碼：");
-    if (pw === "你要設定的密碼") { // <--- 呢度改做你自己嘅密碼
-        showAdminPanel();
-    } else {
-        alert("密碼錯誤！");
+    const userInput = prompt("請輸入管理員金鑰：");
+    if (!userInput) return;
+
+    try {
+        // 嘗試去 Firebase 讀取那個名為 security 的文件
+        const doc = await db.collection("admin_config").doc("security").get();
+        
+        if (doc.exists) {
+            const correctPassword = doc.data().password;
+
+            if (userInput === correctPassword) {
+                showAdminPanel(); // 密碼正確，進入審核面板
+            } else {
+                alert("金鑰無效！");
+            }
+        } else {
+            alert("系統設定錯誤，請檢查 Firebase 資料。");
+        }
+    } catch (error) {
+        console.error(error);
+        alert("權限不足或連線失敗");
     }
 }
 
