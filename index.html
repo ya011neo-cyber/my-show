@@ -38,6 +38,7 @@
         <div class="btn" onclick="uploadSong(event)">☁️</div>
         <div class="btn" onclick="editCurrentSong(event)">✏️</div>
         <div id="lockBtn" class="btn" onclick="toggleLock(event)">🔓</div>
+        <div class="btn" style="background:#333; color:#666;" onclick="adminLogin()">🔑</div>
     </div>
     
     <div class="lyrics-container">
@@ -362,7 +363,55 @@ function startManualMarking(text) {
         // --- 修改：根據當前歌曲是否有相片，更新主畫面掣 ---
         updateMainViewBtn();
     }
-    
+    // --- 管理員審核功能 ---
+async function adminLogin() {
+    const pw = prompt("請輸入管理員密碼：");
+    if (pw === "你要設定的密碼") { // <--- 呢度改做你自己嘅密碼
+        showAdminPanel();
+    } else {
+        alert("密碼錯誤！");
+    }
+}
+
+async function showAdminPanel() {
+    try {
+        // 1. 搵返所有待審核 (pending) 嘅歌
+        const snapshot = await db.collection("songs")
+                                 .where("status", "==", "pending")
+                                 .orderBy("createdAt", "desc")
+                                 .get();
+        
+        if (snapshot.empty) {
+            alert("暫時冇待審核嘅歌。");
+            return;
+        }
+
+        let adminList = "【待審核清單】\n請輸入編號批准公開：\n";
+        let pendingSongs = [];
+        
+        snapshot.forEach((doc, i) => {
+            const data = doc.data();
+            pendingSongs.push({ id: doc.id, name: data.name });
+            adminList += `${i + 1}. ${data.name}\n`;
+        });
+
+        const choice = prompt(adminList);
+        const selected = pendingSongs[choice - 1];
+
+        if (selected) {
+            if (confirm(`確定要公開「${selected.name}」嗎？`)) {
+                // 2. 更新 Firebase 入面嗰份 doc 嘅 status
+                await db.collection("songs").doc(selected.id).update({
+                    status: "public"
+                });
+                alert("已成功公開！");
+            }
+        }
+    } catch (error) {
+        console.error(error);
+        alert("讀取失敗，請檢查權限或網絡。");
+    }
+}
     // 更新主畫面「🖼️」掣
     function updateMainViewBtn() {
         const currSong = getFirstLineData();
