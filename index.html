@@ -25,6 +25,7 @@
         .word-chip.is-fc { background: var(--fc-color); color: #000; font-weight: bold; border-color: var(--fc-color); box-shadow: 0 0 10px var(--fc-color); }
     </style>
 </head>
+    
 <body>
 <div id="app" onclick="handleTap(event)">
     <div class="btn-group">
@@ -303,59 +304,76 @@ function startManualMarking(text) {
     }
 
     // --- 核心邏輯 ---
-
 async function fetchPublicSongs(e) {
     if (e) e.stopPropagation();
     try {
         const snapshot = await db.collection("songs").where("status", "==", "public").get();
         if (snapshot.empty) { alert("暫時未有公開歌單。"); return; }
         
-        let list = "【公開歌單】請選擇編號：\n";
-        let songs = [];
-        let i = 0; // 手動加個計數器
-        snapshot.forEach((doc) => {  // 唔好放 i 入個括號度
+        const container = document.getElementById('list-container');
+        container.innerHTML = ""; // 清空舊內容
+
+        snapshot.forEach((doc) => {
             const d = doc.data();
-            songs.push({ id: doc.id, ...d }); 
-            list += `${i + 1}. ${d.name}\n`; 
-            i++; // 每次行完一行就加 1
+            const songDiv = document.createElement('div');
+            songDiv.className = 'song-item';
+            
+            // 構建歌單 HTML
+            songDiv.innerHTML = `
+                <div class="song-info" onclick="selectSong('${doc.id}')">
+                    <div class="song-name">${d.name}</div>
+                    <div class="song-uploader">By: ${d.uploader || "匿名"}</div>
+                </div>
+                <button class="admin-del-btn" onclick="adminDeletePublic('${doc.id}', '${d.name}')">🗑️</button>
+            `;
+            container.appendChild(songDiv);
         });
-        
-        const choice = prompt(list);
-        if (!choice) return;
 
-        // --- 管理員刪除邏輯 ---
-        if (choice.startsWith('del')) {
-            const num = parseInt(choice.substring(3));
-            const selected = songs[num - 1];
-            if (selected) {
-                // 先驗證 Admin 身份（彈個密碼框，或者如果你已經 login 咗就直接刪）
-                const pw = prompt(`確定要【永久刪除】公開歌曲「${selected.name}」？請輸入管理員密碼確認：`);
-                const adminDoc = await db.collection("admin_config").doc("security").get();
-                
-                if (pw === adminDoc.data().password) {
-                    await db.collection("songs").doc(selected.id).delete();
-                    alert("🗑️ 該公開歌曲已從雲端移除。");
-                } else {
-                    alert("密碼錯誤，拒絕刪除。");
-                }
-            }
-            return;
-        }
-
-        // --- 一般用戶揀歌邏輯 ---
-        const selected = songs[parseInt(choice) - 1];
-        if (selected) { 
-            songData = selected.data;
-            songData.meta = {
-                name: selected.name,
-                uploader: selected.uploader || "匿名用戶"
-            };
-            index = 0; 
-            updateUI(); 
-        }
+        document.getElementById('song-list-overlay').style.display = 'block';
     } catch (error) {
-        console.error("真正的錯誤原因：", error); // 呢行好重要！
-        alert("讀取雲端失敗：" + error.message); // 直接將錯誤訊息彈出嚟
+        console.error(error);
+        alert("讀取歌單失敗");
+    }
+}
+
+function closeSongList() {
+    document.getElementById('song-list-overlay').style.display = 'none';
+}
+// 點擊歌名載入歌曲
+async function selectSong(docId) {
+    try {
+        const doc = await db.collection("songs").doc(docId).get();
+        const selected = doc.data();
+        
+        songData = selected.data;
+        songData.meta = {
+            name: selected.name,
+            uploader: selected.uploader || "匿名用戶"
+        };
+        index = 0; 
+        updateUI();
+        closeSongList();
+    } catch (e) {
+        alert("載入歌曲失敗");
+    }
+}
+
+// 點擊垃圾桶刪除（管理員用）
+async function adminDeletePublic(docId, songName) {
+    const pw = prompt(`確定要刪除「${songName}」嗎？\n請輸入管理員密碼：`);
+    if (!pw) return;
+
+    try {
+        const adminDoc = await db.collection("admin_config").doc("security").get();
+        if (pw === adminDoc.data().password) {
+            await db.collection("songs").doc(docId).delete();
+            alert("🗑️ 已成功刪除！");
+            fetchPublicSongs(); // 重新整理列表
+        } else {
+            alert("密碼錯誤");
+        }
+    } catch (e) {
+        alert("刪除失敗");
     }
 }
 async function uploadSong(e) {
@@ -597,5 +615,30 @@ async function adminLogin() {
         }
     };
 </script>
+<div id="song-list-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:4000; padding:20px; box-sizing:border-box; overflow-y:auto;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+        <h3 style="color:#0f0; margin:0;">📜 公開歌單</h3>
+        <button class="btn" onclick="closeSongList()">關閉</button>
+    </div>
+    <div id="list-container">
+        </div>
+</div>
+
+<style>
+    .song-item {
+        background: #222;
+        padding: 15px;
+        margin-bottom: 10px;
+        border-radius: 8px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border: 1px solid #333;
+    }
+    .song-info { flex: 1; cursor: pointer; }
+    .song-name { color: #fff; font-size: 1.1rem; font-weight: bold; }
+    .song-uploader { color: #888; font-size: 0.8rem; margin-top: 4px; }
+    .admin-del-btn { background: #400; color: #f55; padding: 8px; border-radius: 4px; margin-left: 10px; font-size: 0.8rem; border: 1px solid #600; }
+</style>    
 </body>
 </html>
