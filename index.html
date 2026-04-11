@@ -320,7 +320,7 @@ async function fetchPublicSongs(e) {
             i++; // 每次行完一行就加 1
         });
         
-        const choice = prompt(list + "\n(Admin 提示：輸入 del1 可刪除第 1 首歌)");
+        const choice = prompt(list);
         if (!choice) return;
 
         // --- 管理員刪除邏輯 ---
