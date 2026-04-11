@@ -25,9 +25,26 @@
         
         /* 全螢幕相片檢視器樣式 */
         #main-photo-overlay { 
-            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-            background: rgba(0,0,0,0.95); z-index: 2500; justify-content: center; align-items: center; 
-            touch-action: pinch-zoom; /* 允許原生縮放 */
+            display: none; 
+            position: fixed; 
+            top: 0; left: 0; 
+            width: 100%; height: 100%; 
+            background: rgba(0,0,0,0.95); 
+            z-index: 2500; 
+            justify-content: center; 
+            align-items: center; 
+            /* 必須係 none，我哋先可以用 JS 接管拖曳 */
+            touch-action: none; 
+            overflow: hidden;
+        }
+        
+        #main-photo-img { 
+            max-width: 100%; 
+            max-height: 100%; 
+            object-fit: contain; 
+            /* 增加 transition 令放大縮細順滑啲 */
+            transition: transform 0.2s ease-out; 
+            pointer-events: none; /* 讓事件穿透到 Overlay 處理 */
         }
         #main-photo-overlay img { 
             max-width: 100%; 
@@ -121,10 +138,11 @@
     let currentPhotoData = ""; // 用來儲存相片的 DataURL
 
     // --- 新增：主畫面相片控制 ---
-// --- 強化版：手機縮放位移變數 ---
-    let scale = 1, lastScale = 1;
-    let posX = 0, posY = 0, lastPosX = 0, lastPosY = 0;
+    // --- 修正版：相片控制邏輯 ---
+    let scale = 1;
+    let posX = 0, posY = 0;
     let isDragging = false;
+    let startX, startY;
 
     function showMainPhoto(e) {
         if(e) e.stopPropagation();
@@ -132,7 +150,7 @@
         const overlay = document.getElementById('main-photo-overlay');
         const img = document.getElementById('main-photo-img');
         
-        // 初始化狀態
+        // 重設狀態
         scale = 1; posX = 0; posY = 0;
         img.src = currentPhotoData;
         img.style.transform = `translate(0px, 0px) scale(1)`;
@@ -142,6 +160,45 @@
     function hideMainPhoto() {
         document.getElementById('main-photo-overlay').style.display = 'none';
     }
+    
+    // 處理拖曳 (相容 Chrome & Samsung)
+    const photoImg = document.getElementById('main-photo-img');
+    const photoOverlay = document.getElementById('main-photo-overlay');
+
+    photoOverlay.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 1) {
+            isDragging = true;
+            startX = e.touches[0].clientX - posX;
+            startY = e.touches[0].clientY - posY;
+        }
+    }, { passive: false });
+    
+    photoOverlay.addEventListener('touchmove', (e) => {
+        if (!isDragging) return;
+        e.preventDefault(); // 呢句好重要，防止 Chrome 郁到個網頁
+        
+        posX = e.touches[0].clientX - startX;
+        posY = e.touches[0].clientY - startY;
+        
+        photoImg.style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`;
+    }, { passive: false });
+    
+    photoOverlay.addEventListener('touchend', () => { isDragging = false; });
+
+    // 解決手機 Chrome 唔支援 dblclick 嘅問題：用計時器模擬 Double Tap
+    let lastTap = 0;
+    photoOverlay.addEventListener('touchend', (e) => {
+        const currentTime = new Date().getTime();
+        const tapLength = currentTime - lastTap;
+        if (tapLength < 300 && tapLength > 0) {
+            // Double Tap 觸發縮放
+            scale = (scale === 1) ? 2.5 : 1; // 放大 2.5 倍
+            if (scale === 1) { posX = 0; posY = 0; } // 縮細時回正
+            photoImg.style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`;
+            e.preventDefault();
+        }
+        lastTap = currentTime;
+    });
     
     // 監聽手勢（手機兩指縮放 + 單指拖曳）
     const photoImg = document.getElementById('main-photo-img');
