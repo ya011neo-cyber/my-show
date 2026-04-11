@@ -8,98 +8,31 @@
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
     <style>
         body { margin: 0; background: #000; color: #fff; font-family: sans-serif; height: 100vh; overflow: hidden; touch-action: none; }
+        #app { height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 0 5%; text-align: center; }
         
-        /* 核心佈局：確保容器撐開並置中 */
-        #app { 
-            height: 100%; 
-            display: flex; 
-            flex-direction: column; 
-            justify-content: center; 
-            align-items: center; 
-            padding: 0 5%; 
-            text-align: center; 
-        }
+        .lyrics-container { display: flex; flex-direction: column; gap: 2vh; width: 100%; }
+        
+        :root { --fc-color: #0f0; }
 
-        /* 新增：三層歌詞的總容器 */
-        .lyrics-container {
-            display: flex;
-            flex-direction: column;
-            gap: 2vh; 
-            width: 100%;
-        }
-
-        /* 中間主句容器 */
-        .main-focus {
-            padding: 20px 0;
-            transform: scale(1.1); /* 稍微放大主句 */
-        }
-        
-        :root {
-            --fc-color: #0f0; /* 預設綠色 */
-        }
-        
-        /* 中間主句應援詞 */
+        /* 主應援詞：優化光暈，令字體更利 */
         .fanchant { 
-            /* 調整最大值，由 8vh 稍微降至 7vh，最大字體由 6rem 降至 4.5rem */
             font-size: clamp(1.5rem, 7vh, 4.5rem); 
             font-weight: 900; 
             color: var(--fc-color); 
-            
-            /* 【優化】收窄光暈：將 10px/20px 縮細，增加一個黑色描邊令字體更清晰 */
-            text-shadow: 
-                0 0 5px var(--fc-color), 
-                0 0 10px var(--fc-color),
-                1px 1px 2px #000; /* 黑色底影，增加對比度 */
-                
-            white-space: normal; 
-            line-height: 1.1;
-            display: block;
-            letter-spacing: -1px; /* 稍微縮細字距，令長句子冇咁橫 */
+            text-shadow: 0 0 5px var(--fc-color), 0 0 10px var(--fc-color), 1px 1px 2px #000;
+            white-space: normal; line-height: 1.1; display: block; letter-spacing: -1px; 
         }
 
-        /* 中間主句歌詞 */
-        .lyrics { 
-            font-size: clamp(1rem, 3vh, 2rem); /* 稍微縮細歌詞提示 */
-            color: #bbb; 
-            margin-bottom: 3px; 
-            white-space: normal; 
-            line-height: 1.2;
-            word-break: break-word;
-        }
-        
-        /* 上下句提示入面的應援詞也跟著變，但調暗一點 */
-        .side-lyrics .fc-text {
-            color: var(--fc-color);
-            filter: brightness(0.5); /* 自動變暗 50% */
-            margin-left: 8px;
-        }
+        .lyrics { font-size: clamp(1rem, 3vh, 2rem); color: #bbb; margin-bottom: 3px; white-space: normal; line-height: 1.2; word-break: break-word; }
+        .side-lyrics { font-size: clamp(0.8rem, 2.5vh, 1.5rem); color: #444; min-height: 2vh; transition: all 0.3s ease; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .side-lyrics .fc-text { color: var(--fc-color); filter: brightness(0.5); margin-left: 8px; }
 
-        /* 上下句提示 */
-        .side-lyrics {
-            font-size: clamp(0.8rem, 2.5vh, 1.5rem);
-            color: #444;
-            min-height: 2vh;
-            transition: all 0.3s ease;
-            /* 保持 side-lyrics 單行，因為太長會遮住主句，所以用 ellipsis */
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        /* 按鈕組與其他原本的 CSS 保持不變 */
         .btn-group { position: absolute; top: 10px; right: 10px; display: flex; gap: 5px; z-index: 100; flex-wrap: wrap; justify-content: flex-end; }
         .btn { padding: 8px 12px; background: #222; border-radius: 5px; font-size: 0.7rem; border: 1px solid #444; color: #fff; cursor: pointer; }
         
         #editor-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #111; z-index: 999; padding: 20px; box-sizing: border-box; overflow-y: auto; display: none; }
         .word-chip { display: inline-block; padding: 8px 12px; margin: 5px; border: 1px solid #444; border-radius: 4px; cursor: pointer; color: #ccc; }
         .word-chip.is-fc { background: #0f0; color: #000; font-weight: bold; border-color: #0f0; box-shadow: 0 0 10px #0f0; }
-        .editor-footer { margin-top: 30px; padding-bottom: 50px; text-align: center; }
-        
-        /* 編輯器內的大文字框樣式 */
-        #manualInput {
-            width: 100%; height: 60vh; background: #111; color: #fff; border: 1px solid #444; 
-            padding: 15px; box-sizing: border-box; font-size: 1.1rem; line-height: 1.6; 
-            border-radius: 10px; outline: none;
-        }
     </style>
 </head>
 <body>
@@ -107,70 +40,68 @@
 <div id="app" onclick="handleTap(event)">
     <div class="btn-group">
         <div class="btn" onclick="openColorMenu(event)">🎨 顏色</div>
-        
-        <div id="color-modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:#222; padding:20px; border-radius:15px; z-index:2000; border:1px solid #444; width:250px; text-align:center;">
-            <h4 style="margin:0 0 15px 0;">自定義顏色</h4>
-            <input type="color" id="colorPicker" onchange="updateHexInput(this.value)" style="width:100%; height:40px; border:none; background:none; cursor:pointer;">
-            
-            <div style="margin:15px 0;">
-                <label style="font-size:0.8rem; color:#888;">HEX Code:</label><br>
-                <input type="text" id="hexInput" placeholder="#00ff00" style="width:100%; background:#111; color:#fff; border:1px solid #555; padding:8px; border-radius:5px; margin-top:5px; text-align:center; font-family:monospace;">
-            </div>
-            
-            <div style="display:flex; gap:10px;">
-                <button class="btn" style="flex:1; background:#0f0; color:#000; font-weight:bold; border:none;" onclick="saveCustomColor()">套用</button>
-                <button class="btn" style="flex:1;" onclick="closeColorMenu()">取消</button>
-            </div>
-        </div>
         <div class="btn" onclick="fetchPublicSongs(event)">📂 歌單</div>
         <div class="btn" onclick="openImporter(event)">➕ 匯入</div>
-        <div class="btn" onclick="uploadSong(event)">☁️ 投稿</div>
         <div class="btn" onclick="editCurrentSong(event)">✏️ 編輯</div>
         <div id="lockBtn" class="btn" onclick="toggleLock(event)">🔓 已解鎖</div>
     </div>
     
     <div class="lyrics-container">
         <div class="side-lyrics" id="prevLine"></div>
-        <div class="main-focus">
+        <div class="main-focus" style="padding: 20px 0; transform: scale(1.1);">
             <div class="lyrics" id="currLyrics">載入中...</div>
             <div class="fanchant" id="currFanchant"></div>
         </div>
         <div class="side-lyrics" id="nextLine"></div>
     </div>
 </div>
-<div id="import-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:1000; padding:20px; box-sizing:border-box;">
-    <h3 id="modal-title" style="text-align:center; color:#0f0;">匯入/編輯歌詞</h3>
-    <p style="font-size:0.8rem; color:#888; text-align:center;">括號字 ( ) 會自動識別為應援詞</p>
-    
-    <textarea id="manualInput" style="width:100%; height:60vh; background:#111; color:#fff; border:1px solid #444; padding:15px; box-sizing:border-box; font-size:1.1rem; line-height:1.6; border-radius:10px; outline:none;" placeholder="在此貼上或修改歌詞..."></textarea>
-    
-    <div style="margin-top:20px; display:flex; gap:10px;">
-        <button class="btn" style="flex:1; padding:15px; font-size:1rem; background:#0f0; color:#000; font-weight:bold; border:none;" onclick="handleManualSubmit()">✅ 確認並進入標記模式</button>
-        <button class="btn" style="padding:15px; background:#444; border:none;" onclick="closeImporter()">取消</button>
+
+<div id="color-modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:#222; padding:20px; border-radius:15px; z-index:2000; border:1px solid #444; width:250px; text-align:center;">
+    <h4 style="margin:0 0 15px 0;">自定義顏色</h4>
+    <input type="color" id="colorPicker" onchange="updateHexInput(this.value)" style="width:100%; height:40px; border:none; background:none; cursor:pointer;">
+    <div style="margin:15px 0;">
+        <label style="font-size:0.8rem; color:#888;">HEX Code:</label>
+        <input type="text" id="hexInput" style="width:100%; background:#111; color:#fff; border:1px solid #555; padding:8px; border-radius:5px; margin-top:5px; text-align:center;">
+    </div>
+    <div style="display:flex; gap:10px;">
+        <button class="btn" style="flex:1; background:#0f0; color:#000; font-weight:bold; border:none;" onclick="saveCustomColor()">套用</button>
+        <button class="btn" style="flex:1;" onclick="closeColorMenu()">取消</button>
     </div>
 </div>
-<input type="file" id="ocrInput" accept="image/*" style="display:none" onchange="handleOCR(event)">
+
+<div id="import-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:1000; padding:20px; box-sizing:border-box; overflow-y:auto;">
+    <h3 id="modal-title" style="text-align:center; color:#0f0;">編輯歌詞</h3>
     
+    <div id="image-preview-container" style="display:none; text-align:center; margin-bottom:10px;">
+        <img id="reference-img" style="max-width:100%; max-height:150px; border:1px solid #444; border-radius:5px;" onclick="viewFullImage()">
+        <p style="font-size:0.6rem; color:#888;">點擊圖片放大</p>
+    </div>
+
+    <textarea id="manualInput" style="width:100%; height:50vh; background:#111; color:#fff; border:1px solid #444; padding:15px; border-radius:10px;"></textarea>
+    
+    <div style="margin-top:20px; display:flex; gap:10px; flex-wrap:wrap;">
+        <button class="btn" style="flex:2; padding:15px; background:#0f0; color:#000; font-weight:bold;" onclick="handleManualSubmit()">✅ 確認並標記</button>
+        <button class="btn" style="flex:1; padding:15px;" onclick="document.getElementById('refInput').click()">📷 附相</button>
+        <button class="btn" style="flex:1; padding:15px; background:#444;" onclick="closeImporter()">取消</button>
+    </div>
+    <input type="file" id="refInput" accept="image/*" style="display:none" onchange="previewRefImage(event)">
+</div>
+
+<div id="full-image-overlay" onclick="this.style.display='none'" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:3000; justify-content:center; align-items:center;">
+    <img id="full-img" style="max-width:95%; max-height:95%;">
+</div>
 
 <div id="editor-overlay">
     <h2 style="text-align:center;">點擊【應援詞】使其變綠色</h2>
     <div id="chips-container" style="text-align:center;"></div>
-    <div class="editor-footer">
+    <div style="text-align:center; margin-top:30px; padding-bottom:50px;">
         <button class="btn" style="font-size: 1.2rem; padding: 15px 30px;" onclick="saveMarkedData()">✅ 完成生成</button>
-        <button class="btn" style="margin-left: 10px;" onclick="document.getElementById('editor-overlay').style.display='none'">取消</button>
     </div>
 </div>
 
 <script>
-    // Firebase 初始化
-    const firebaseConfig = {
-        apiKey: "AIzaSyCOnH-KJfJqe6VGn7qG2TU1rIaT5OEL9JU",
-        authDomain: "fanchartpro.firebaseapp.com",
-        projectId: "fanchartpro",
-        storageBucket: "fanchartpro.firebasestorage.app",
-        messagingSenderId: "94013254919",
-        appId: "1:94013254919:web:929fff5cd2c71067b269a2"
-    };
+    // Firebase 初始化 (請保留你原本的 config)
+    const firebaseConfig = { apiKey: "...", authDomain: "...", projectId: "...", storageBucket: "...", messagingSenderId: "...", appId: "..." };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
@@ -178,126 +109,78 @@
     let index = 0;
     let isLocked = false;
 
-    // --- 雲端功能 ---
-    async function uploadSong(e) {
+    // --- 圖片功能 ---
+    function previewRefImage(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('reference-img').src = e.target.result;
+            document.getElementById('full-img').src = e.target.result;
+            document.getElementById('image-preview-container').style.display = 'block';
+        }
+        reader.readAsDataURL(file);
+    }
+    function viewFullImage() { document.getElementById('full-image-overlay').style.display = 'flex'; }
+
+    // --- 顏色功能 ---
+    function openColorMenu(e) {
         e.stopPropagation();
-        if (songData.length < 1 || songData[0].f === "開始") {
-            alert("請先匯入並標記歌詞再投稿！");
-            return;
-        }
-        const songName = prompt("請按此格式填寫（最好根據YouTube官方命名）： 歌名 - 歌手");
-        if (!songName) return;
-
-        try {
-            await db.collection("songs").add({
-                name: songName,
-                data: songData,
-                status: "pending",
-                createdAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
-            alert("投稿成功！請等候管理員審核。");
-        } catch (error) {
-            alert("投稿失敗，請檢查網絡或 Config。");
+        const curr = getComputedStyle(document.documentElement).getPropertyValue('--fc-color').trim();
+        document.getElementById('hexInput').value = curr;
+        document.getElementById('colorPicker').value = curr;
+        document.getElementById('color-modal').style.display = 'block';
+    }
+    function closeColorMenu() { document.getElementById('color-modal').style.display = 'none'; }
+    function updateHexInput(val) { document.getElementById('hexInput').value = val.toUpperCase(); }
+    function saveCustomColor() {
+        let col = document.getElementById('hexInput').value.trim();
+        if (!col.startsWith('#')) col = '#' + col;
+        if (/^#[0-9A-F]{6}$/i.test(col)) {
+            document.documentElement.style.setProperty('--fc-color', col);
+            localStorage.setItem('fanchantColor', col);
+            closeColorMenu();
         }
     }
 
-    async function fetchPublicSongs(e) {
-        if (e) e.stopPropagation();
-        try {
-            const snapshot = await db.collection("songs").where("status", "==", "public").get();
-            if (snapshot.empty) {
-                alert("暫時未有公開歌單。");
-                return;
-            }
-            let list = "請選擇歌曲編號：\n";
-            let songs = [];
-            snapshot.forEach((doc, i) => {
-                songs.push(doc.data());
-                list += `${i + 1}. ${doc.data().name}\n`;
-            });
-            const choice = prompt(list);
-            if (choice && songs[choice - 1]) {
-                songData = songs[choice - 1].data;
-                index = 0;
-                updateUI();
-            }
-        } catch (error) {
-            alert("讀取雲端失敗。");
-        }
-    }
-
-// 打開視窗 (用於新匯入)
+    // --- 核心 logic (簡化版) ---
     function openImporter(e) {
         if(e) e.stopPropagation();
         document.getElementById('modal-title').innerText = "➕ 匯入新歌詞";
         document.getElementById('manualInput').value = ""; 
+        document.getElementById('image-preview-container').style.display = 'none';
         document.getElementById('import-modal').style.display = 'block';
-        songData = []; // 新匯入就清空舊數據
     }
 
-    // 打開視窗 (用於編輯現有歌曲)
     function editCurrentSong(e) {
         e.stopPropagation();
         document.getElementById('modal-title').innerText = "✏️ 編輯現有歌詞";
-        
-        // 【修正位置】：只係將歌詞同應援詞就咁排埋一齊，完全唔好加額外括號
-        // 咁樣當你進入標記模式時，inBracketScope 邏輯依然會認得原本歌詞入面帶有嘅括號
-        let textFormat = songData.map(item => {
-            if (item.f) {
-                // 如果歌詞係 "..." 代表純應援，就只出應援詞
-                // 否則就出「歌詞 + 空格 + 應援詞」
-                return (item.l === "..." ? "" : item.l + " ") + item.f;
-            }
-            return item.l;
-        }).join('\n');
-
-        document.getElementById('manualInput').value = textFormat;
+        let text = songData.map(item => (item.l === "..." ? "" : item.l + " ") + item.f).join('\n');
+        document.getElementById('manualInput').value = text;
         document.getElementById('import-modal').style.display = 'block';
     }
 
-    function closeImporter() {
-        document.getElementById('import-modal').style.display = 'none';
-    }
+    function closeImporter() { document.getElementById('import-modal').style.display = 'none'; }
 
-    // 統一處理送出內容
     function handleManualSubmit() {
         const input = document.getElementById('manualInput').value;
-        if (input.trim()) {
-            closeImporter();
-            // 進入你原本最強的那個 startManualMarking
-            startManualMarking(input);
-        }
+        if (input.trim()) { closeImporter(); startManualMarking(input); }
     }
-        
+
     function startManualMarking(text) {
-        const overlay = document.getElementById('editor-overlay');
         const container = document.getElementById('chips-container');
         const lines = text.split('\n');
-        const posMap = {};
-        songData.forEach(item => {
-            if (item.marks) {
-                if (!posMap[item.row]) posMap[item.row] = new Set();
-                item.marks.forEach(m => posMap[item.row].add(m));
-            }
-        });
-
         let html = "";
         lines.forEach((line, rowIdx) => {
             if (line.trim() === "") return;
-            html += `<div class="line-row" data-row="${rowIdx}" style="margin-bottom: 20px; border-bottom: 1px solid #222;">`;
-            const words = line.split(/\s+/).filter(w => w !== "");
-            let inBracket = false;
-            words.forEach((w, chipIdx) => {
-                if (/[\(\（\[]/.test(w)) inBracket = true;
-                const isSaved = posMap[rowIdx] && posMap[rowIdx].has(chipIdx);
-                const shouldHighlight = isSaved || inBracket;
-                html += `<span onclick="this.classList.toggle('is-fc')" class="word-chip ${shouldHighlight ? 'is-fc' : ''}">${w}</span>`;
-                if (/[\)\）\]]/.test(w)) inBracket = false;
+            html += `<div class="line-row" data-row="${rowIdx}" style="margin-bottom:15px;">`;
+            line.split(/\s+/).forEach(w => {
+                if(w) html += `<span onclick="this.classList.toggle('is-fc')" class="word-chip">${w}</span>`;
             });
             html += `</div>`;
         });
         container.innerHTML = html;
-        overlay.style.display = 'block';
+        document.getElementById('editor-overlay').style.display = 'block';
     }
 
     function saveMarkedData() {
@@ -305,129 +188,54 @@
         let newData = [];
         rows.forEach((row, rowIdx) => {
             const chips = row.querySelectorAll('.word-chip');
-            let currentL = ""; let pendingF = []; let markedIndices = [];
-            chips.forEach((chip, chipIdx) => {
-                if (chip.classList.contains('is-fc')) {
-                    pendingF.push(chip.innerText);
-                    markedIndices.push(chipIdx);
-                } else {
+            let currentL = ""; let pendingF = [];
+            chips.forEach(chip => {
+                if (chip.classList.contains('is-fc')) { pendingF.push(chip.innerText); }
+                else {
                     if (pendingF.length > 0) {
-                        newData.push({ l: currentL.trim() || "...", f: pendingF.join(' '), row: rowIdx, marks: markedIndices });
-                        currentL = ""; pendingF = []; markedIndices = [];
+                        newData.push({ l: currentL.trim() || "...", f: pendingF.join(' ') });
+                        currentL = ""; pendingF = [];
                     }
                     currentL += chip.innerText + " ";
                 }
             });
-            if (pendingF.length > 0) newData.push({ l: currentL.trim() || "...", f: pendingF.join(' '), row: rowIdx, marks: markedIndices });
-            else if (currentL.trim()) newData.push({ l: currentL.trim(), f: "", row: rowIdx, marks: [] });
+            if (pendingF.length > 0 || currentL.trim()) 
+                newData.push({ l: currentL.trim() || "...", f: pendingF.join(' ') });
         });
         songData = newData; index = 0;
         document.getElementById('editor-overlay').style.display = 'none';
         updateUI();
     }
-    
-    function toggleLock(e) {
-        e.stopPropagation();
-        isLocked = !isLocked;
-        const btn = document.getElementById('lockBtn');
-        btn.innerText = isLocked ? "🔒 鎖定中" : "🔓 已解鎖";
-        btn.style.borderColor = isLocked ? "red" : "#444";
-    }
 
     function handleTap(e) {
         if (isLocked) return;
-        const clickX = e.clientX || (e.touches && e.touches[0].clientX);
-        if (clickX < window.innerWidth * 0.3) { if (index > 0) index--; }
+        if (e.clientX < window.innerWidth * 0.3) { if (index > 0) index--; }
         else { if (index < songData.length - 1) index++; else index = 0; }
         updateUI();
     }
-    function formatLine(item) {
-        if (!item) return "";
-        // 如果歌詞係 "..." 隱藏佢，只顯示應援
-        let lText = item.l === "..." ? "" : item.l;
-        let fText = item.f ? `<span class="fc-text">${item.f}</span>` : "";
-        return `${lText} ${fText}`.trim();
-    }
 
     function updateUI() {
-        if (!songData[index]) return;
-
-        const prev = songData[index - 1];
         const curr = songData[index];
-        const next = songData[index + 1];
-
-        // 1. 顯示上一句 (連應援)
-        document.getElementById('prevLine').innerHTML = prev ? formatLine(prev) : "";
-
-        // 2. 顯示中間主句
+        document.getElementById('prevLine').innerText = songData[index-1] ? (songData[index-1].l + " " + songData[index-1].f) : "";
         document.getElementById('currLyrics').innerText = curr.l;
         document.getElementById('currFanchant').innerText = curr.f;
-
-        // 3. 顯示下一句 (連應援)
-        document.getElementById('nextLine').innerHTML = next ? formatLine(next) : (index === songData.length - 1 ? "— 完 —" : "");
-
-        // 儲存及震動
-        localStorage.setItem('myConcertData', JSON.stringify(songData));
+        document.getElementById('nextLine').innerText = songData[index+1] ? (songData[index+1].l + " " + songData[index+1].f) : (index === songData.length-1 ? "— 完 —" : "");
+        
         if (curr.f && navigator.vibrate) navigator.vibrate(50);
-    }
-    // 觸發隱藏的顏色選擇器
-    function triggerColorPicker(e) {
-        if(e) e.stopPropagation();
-        document.getElementById('favColor').click();
+        localStorage.setItem('myConcertData', JSON.stringify(songData));
     }
 
-    // 當用戶揀完色後執行
-    function applyCustomColor(newColor) {
-        // 套用顏色到 CSS 變數
-        document.documentElement.style.setProperty('--fc-color', newColor);
-        
-        // 儲存顏色到本地，下次開返都係呢隻
-        localStorage.setItem('fanchantColor', newColor);
-    }
-    // 打開顏色選單
-    function openColorMenu(e) {
-        if(e) e.stopPropagation();
-        const currentColor = getComputedStyle(document.documentElement).getPropertyValue('--fc-color').trim();
-        document.getElementById('hexInput').value = currentColor;
-        document.getElementById('colorPicker').value = currentColor;
-        document.getElementById('color-modal').style.display = 'block';
+    function toggleLock(e) {
+        e.stopPropagation();
+        isLocked = !isLocked;
+        document.getElementById('lockBtn').innerText = isLocked ? "🔒 鎖定中" : "🔓 已解鎖";
     }
 
-    function closeColorMenu() {
-        document.getElementById('color-modal').style.display = 'none';
-    }
-    
-    // 當轉動顏色盤時，自動更新 HEX 文字框
-    function updateHexInput(val) {
-        document.getElementById('hexInput').value = val.toUpperCase();
-    }
-    
-    // 按下「套用」時執行
-    function saveCustomColor() {
-        let newColor = document.getElementById('hexInput').value.trim();
-        
-        // 基本格式檢查，如果冇 # 就幫佢加返
-        if (!newColor.startsWith('#')) newColor = '#' + newColor;
-        
-        // 檢查係咪有效嘅 HEX 格式
-        if (/^#[0-9A-F]{6}$/i.test(newColor)) {
-            document.documentElement.style.setProperty('--fc-color', newColor);
-            localStorage.setItem('fanchantColor', newColor);
-            closeColorMenu();
-        } else {
-            alert("請輸入有效的 HEX 格式 (例如: #00FF00)");
-        }
-    }    
-    // 修改 window.onload 確保讀取到自定義顏色
     window.onload = function() {
         const saved = localStorage.getItem('myConcertData');
         if (saved) { songData = JSON.parse(saved); updateUI(); }
-        
         const savedColor = localStorage.getItem('fanchantColor');
-        if (savedColor) {
-            document.documentElement.style.setProperty('--fc-color', savedColor);
-            document.getElementById('favColor').value = savedColor; // 同步顏色盤個底色
-        }
+        if (savedColor) document.documentElement.style.setProperty('--fc-color', savedColor);
     };
 </script>
 </body>
