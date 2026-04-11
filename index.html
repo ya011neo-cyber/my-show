@@ -69,28 +69,26 @@
 
 <div id="import-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:1000; padding:20px; box-sizing:border-box; overflow-y:auto;">
     
-    <div style="position: sticky; top: -20px; background: rgba(0,0,0,0.95); z-index: 1100; padding: 10px 0 20px 0; border-bottom: 1px solid #333; margin-bottom: 20px; margin-top: -20px;">
-        <h3 id="modal-title" style="text-align:center; color:#0f0; margin: 10px 0;">編輯歌詞</h3>
-        <div style="text-align:center;">
-            <button id="importViewPhotoBtn" class="btn" style="background:#444; display:none; padding: 10px 20px;" onclick="showMainPhoto(event)">🖼️ 睇參考圖</button>
+    <div style="position: sticky; top: -20px; background: rgba(0,0,0,0.95); z-index: 1100; padding: 15px 0; border-bottom: 1px solid #333; margin-bottom: 15px; margin-top: -20px; text-align: center;">
+        <h3 id="modal-title" style="color:#0f0; margin: 5px 0;">編輯歌詞</h3>
+        <div style="display: flex; gap: 10px; justify-content: center; align-items: center;">
+            <button id="importViewPhotoBtn" class="btn" style="background:#444; display:none;" onclick="showMainPhoto(event)">🖼️ 睇參考圖</button>
+            <button id="importRemovePhotoBtn" class="btn" style="background:#800; display:none; font-size:0.7rem;" onclick="removePhoto()">❌ 移除相片</button>
         </div>
     </div>
-    <div id="image-preview-container" style="display:none; text-align:center; margin-bottom:15px;">
-        <img id="reference-img" style="max-width:100%; max-height:150px; border:1px solid #444; border-radius:5px; object-fit:contain;">
-        <div style="margin-top:5px;">
-            <button class="btn" style="padding:4px 8px; font-size:0.6rem; background:#800;" onclick="removePhoto()">❌ 移除相片</button>
-        </div>
-    </div>
+
+    <textarea id="manualInput" style="width:100%; height:50vh; background:#111; color:#fff; border:1px solid #444; padding:15px; border-radius:10px; font-size:1rem; box-sizing:border-box; margin-bottom: 15px;" placeholder="括號 () 內文字會自動變應援色..."></textarea>
     
-    <textarea id="manualInput" ... placeholder="括號 () 內文字會自動變應援色..."></textarea>
-    <div style="margin-top:10px;">
-        <input type="text" id="sourceLinkInput" style="width:100%; background:#111; color:#0f0; border:1px solid #444; padding:10px; border-radius:5px; box-sizing:border-box; font-size:0.8rem;" placeholder="🔗 貼上來源網址 (例如 YouTube 或歌詞網)...">
+    <div style="margin-bottom: 20px;">
+        <input type="text" id="sourceLinkInput" style="width:100%; background:#111; color:#0f0; border:1px solid #444; padding:12px; border-radius:5px; box-sizing:border-box; font-size:0.8rem;" placeholder="🔗 貼上來源網址 (YouTube/歌詞網)...">
     </div>
-    <div style="margin-top:20px; display:flex; gap:10px; flex-wrap:wrap;">
+
+    <div style="display:flex; gap:10px; flex-wrap:wrap; padding-bottom: 30px;">
         <button class="btn" style="flex:2; padding:15px; background:#0f0; color:#000; font-weight:bold;" onclick="handleManualSubmit()">✅ 確認並標記</button>
         <button class="btn" style="flex:1; padding:15px;" onclick="document.getElementById('refInput').click()">📷 附相</button>
         <button class="btn" style="flex:1; padding:15px; background:#444;" onclick="closeImporter()">取消</button>
     </div>
+    
     <input type="file" id="refInput" accept="image/*" style="display:none" onchange="previewRefImage(event)">
 </div>
 
@@ -198,27 +196,17 @@ function showMainPhoto(e) {
     // 編輯時預覽圖片
 // 編輯/匯入時預覽圖片
 function updateEditPreview() {
-    // 1. 處理原本個細 preview container (如果你選擇保留)
-    const container = document.getElementById('image-preview-container');
-    const img = document.getElementById('reference-img');
-    
-    // 2. 處理新加個 Sticky 「🖼️ 睇參考圖」掣
     const importPhotoBtn = document.getElementById('importViewPhotoBtn');
+    const importRemoveBtn = document.getElementById('importRemovePhotoBtn');
 
     if (tempPhotoData) { 
-        // 有相
-        if(img) img.src = tempPhotoData; 
-        if(container) container.style.display = 'block'; 
-        
-        // 顯示 Sticky 掣
+        // 有相時：顯示「睇參考圖」同「移除」掣
         if(importPhotoBtn) importPhotoBtn.style.display = 'inline-block';
+        if(importRemoveBtn) importRemoveBtn.style.display = 'inline-block';
     } else { 
-        // 冇相
-        if(img) img.src = ""; 
-        if(container) container.style.display = 'none'; 
-        
-        // 隱藏 Sticky 掣
+        // 冇相時：全部隱藏
         if(importPhotoBtn) importPhotoBtn.style.display = 'none';
+        if(importRemoveBtn) importRemoveBtn.style.display = 'none';
     }
 }
 
