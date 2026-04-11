@@ -291,65 +291,34 @@ function previewRefImage(event) {
     // 移除圖片
     function removePhoto() { tempPhotoData = ""; updateEditPreview(); }
 
+
 async function handleManualSubmit() {
-    // 🔍 改進判斷邏輯：檢查標題是否包含 "編輯" 二字
+    // 🔍 判斷係咪編輯緊舊歌
     const isEditMode = document.getElementById('modal-title').innerText.includes("編輯");
     
     let name;
     if (isEditMode && songData && songData.meta) {
-        // 如果係編輯模式，直接用返舊歌名
         name = songData.meta.name;
     } else {
-        // 如果係新投稿，先彈 prompt 叫人入名
         name = prompt("請輸入歌名：");
     }
 
-    // 如果連名都冇（例如 prompt 撳咗取消），就停止
     if (!name) return;
 
     const lyrics = document.getElementById('manualInput').value;
     const source = document.getElementById('sourceLinkInput').value;
-    
-    const newSong = {
+
+    // ✨ 關鍵：將所有資料暫存在 window 一個地方，等陣標記完用
+    window.currentSubmittingData = {
         name: name,
-        data: parseLyrics(lyrics), // 假設你有呢個處理歌詞嘅 function
-        status: "pending",
-        uploader: "匿名用戶", // 你可以之後加個名輸入框
         source: source,
-        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        photo: tempPhotoData || "", // 帶埋張相
+        isEdit: isEditMode
     };
 
-    try {
-        const docRef = await db.collection("songs").add(newSong);
-        alert("提交成功！請等待管理員審核。");
-        closeImporter();
-
-        // ✨ 新增：發送 Discord 投稿通知 ✨
-        const adminDoc = await db.collection("admin_config").doc("security").get();
-        const webhookURL = adminDoc.data().discord_webhook;
-
-        if (webhookURL) {
-            fetch(webhookURL, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    username: "應援助手投稿機",
-                    embeds: [{
-                        title: "🆕 收到新歌投稿！",
-                        color: 65280, // 綠色
-                        fields: [
-                            { name: "歌名", value: name, inline: true },
-                            { name: "來源", value: source || "無提供", inline: false },
-                            { name: "狀態", value: "等待審核中...", inline: true }
-                        ],
-                        footer: { text: `ID: ${docRef.id}` }
-                    }]
-                })
-            });
-        }
-    } catch (e) {
-        alert("提交失敗：" + e.message);
-    }
+    // 🚀 執行你原本嘅標記功能，將歌詞變做一粒粒掣
+    // 確保 startManualInput 係讀取 manualInput.value 嚟整 chips
+    startManualInput(); 
 }
 
     // --- 標記與儲存 ---
@@ -388,41 +357,91 @@ function startManualMarking(text) {
     container.innerHTML = html;
     document.getElementById('editor-overlay').style.display = 'block';
 }
-    function cancelMarking() {
-        // 直接隱藏標記畫面，唔執行 saveMarkedData，所以原本嘅數據唔會被覆蓋
-        document.getElementById('editor-overlay').style.display = 'none';
-    }
-    function saveMarkedData() {
-        const rows = document.querySelectorAll('.line-row');
-        const sourceLink = document.getElementById('sourceLinkInput').value.trim(); // 攞 Link
-        let newData = [];
-        rows.forEach(row => {
-            const chips = row.querySelectorAll('.word-chip');
-            let currentL = ""; let pendingF = [];
-            chips.forEach(chip => {
-                if (chip.classList.contains('is-fc')) { pendingF.push(chip.innerText); }
-                else {
-                    if (pendingF.length > 0) {
-                        newData.push({ l: currentL.trim() || "...", f: pendingF.join(' ') });
-                        currentL = ""; pendingF = [];
-                    }
-                    currentL += chip.innerText + " ";
+function cancelMarking() {
+    // 直接隱藏標記畫面，唔執行 saveMarkedData，所以原本嘅數據唔會被覆蓋
+    document.getElementById('editor-overlay').style.display = 'none';
+}
+    
+async function saveMarkedData() {
+    const rows = document.querySelectorAll('.line-row');
+    const sourceLink = document.getElementById('sourceLinkInput').value.trim(); 
+    let newData = [];
+
+    // --- 1. 你原本處理歌詞標記的邏輯 (保留) ---
+    rows.forEach(row => {
+        const chips = row.querySelectorAll('.word-chip');
+        let currentL = ""; let pendingF = [];
+        chips.forEach(chip => {
+            if (chip.classList.contains('is-fc')) { pendingF.push(chip.innerText); }
+            else {
+                if (pendingF.length > 0) {
+                    newData.push({ l: currentL.trim() || "...", f: pendingF.join(' ') });
+                    currentL = ""; pendingF = [];
                 }
-            });
-            if (pendingF.length > 0 || currentL.trim()) newData.push({ l: currentL.trim() || "...", f: pendingF.join(' ') });
+                currentL += chip.innerText + " ";
+            }
         });
-        
-        if (newData.length > 0) {
-            if (tempPhotoData) newData[0].photo = tempPhotoData;
-            if (sourceLink) newData[0].link = sourceLink; // 儲存 Link
-        }
-        
-        songData = newData;
-        index = 0;
-        document.getElementById('editor-overlay').style.display = 'none';
-        updateUI();
+        if (pendingF.length > 0 || currentL.trim()) newData.push({ l: currentL.trim() || "...", f: pendingF.join(' ') });
+    });
+
+    // --- 2. 處理相片同 Link (保留) ---
+    if (newData.length > 0) {
+        if (tempPhotoData) newData[0].photo = tempPhotoData;
+        if (sourceLink) newData[0].link = sourceLink; 
     }
 
+    // --- 3. 更新本地 UI (保留，等你可以即刻睇到結果) ---
+    songData = newData;
+    index = 0;
+    document.getElementById('editor-overlay').style.display = 'none';
+    closeImporter(); // 順便關埋匯入框
+    updateUI();
+
+    // --- 4. ✨ 新增：自動背後提交到 Firebase 同 Discord ---
+    const info = window.currentSubmittingData || {};
+    const finalSong = {
+        name: info.name || "未命名",
+        data: newData, // 剛剛處理完的數據
+        status: "pending", 
+        source: sourceLink || info.source || "",
+        photo: tempPhotoData || "",
+        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    };
+
+    try {
+        const docRef = await db.collection("songs").add(finalSong);
+        console.log("雲端備份成功，ID:", docRef.id);
+
+        // 呼叫 Discord 通知 (記得要寫埋呢個 function)
+        sendDiscordNotification(finalSong.name, finalSong.source, docRef.id);
+    } catch (e) {
+        console.error("雲端儲存失敗，但本地已更新：", e);
+    }
+}
+    async function sendDiscordNotification(name, source, id) {
+    try {
+        const adminDoc = await db.collection("admin_config").doc("security").get();
+        const webhookURL = adminDoc.data().discord_webhook;
+        if (!webhookURL) return;
+
+        fetch(webhookURL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                username: "應援助手投稿機",
+                embeds: [{
+                    title: "🆕 收到新歌投稿/編輯！",
+                    color: 65280,
+                    fields: [
+                        { name: "歌名", value: name, inline: true },
+                        { name: "來源", value: source || "無", inline: false }
+                    ],
+                    footer: { text: `ID: ${id}` }
+                }]
+            })
+        });
+    } catch (e) { console.error("Discord 通知失敗", e); }
+}
     // --- 核心邏輯 ---
 async function fetchPublicSongs(e) {
     if (e) e.stopPropagation();
