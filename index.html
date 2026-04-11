@@ -51,8 +51,9 @@
         .fanchant { 
             font-size: clamp(1.5rem, 8vh, 6rem); 
             font-weight: 900; 
-            color: var(--fc-color); /* 使用變數 */
-            text-shadow: 0 0 10px var(--fc-color); 
+            color: var(--fc-color); 
+            /* 文字發光效果會跟隨你揀嘅色 */
+            text-shadow: 0 0 10px var(--fc-color), 0 0 20px var(--fc-color); 
             white-space: normal; 
             line-height: 1.1;
             display: block;
@@ -97,7 +98,8 @@
 
 <div id="app" onclick="handleTap(event)">
     <div class="btn-group">
-        <div class="btn" onclick="changeColor(event)">🎨 顏色</div>
+        <div class="btn" onclick="triggerColorPicker(event)">🎨 顏色</div>
+        <input type="color" id="favColor" style="display:none;" onchange="applyCustomColor(this.value)">
         <div class="btn" onclick="fetchPublicSongs(event)">📂 歌單</div>
         <div class="btn" onclick="openImporter(event)">➕ 匯入</div>
         <div class="btn" onclick="uploadSong(event)">☁️ 投稿</div>
@@ -346,23 +348,22 @@
         localStorage.setItem('myConcertData', JSON.stringify(songData));
         if (curr.f && navigator.vibrate) navigator.vibrate(50);
     }
-    let colorIndex = 0;
-    const colors = ['#0f0', '#ff0', '#f0f', '#0ff', '#fff', '#f00']; 
-    // 綠、黃、桃紅、青、白、紅
-    
-    function changeColor(e) {
+    // 觸發隱藏的顏色選擇器
+    function triggerColorPicker(e) {
         if(e) e.stopPropagation();
-        colorIndex = (colorIndex + 1) % colors.length;
-        const newColor = colors[colorIndex];
-        
-        // 一句指令改晒全場顏色
-        document.documentElement.style.setProperty('--fc-color', newColor);
-        
-        // 順便儲存埋，下次開返都係呢隻色
-        localStorage.setItem('fanchantColor', newColor);
+        document.getElementById('favColor').click();
     }
 
-    // 在 window.onload 加入讀取顏色
+    // 當用戶揀完色後執行
+    function applyCustomColor(newColor) {
+        // 套用顏色到 CSS 變數
+        document.documentElement.style.setProperty('--fc-color', newColor);
+        
+        // 儲存顏色到本地，下次開返都係呢隻
+        localStorage.setItem('fanchantColor', newColor);
+    }
+    
+    // 修改 window.onload 確保讀取到自定義顏色
     window.onload = function() {
         const saved = localStorage.getItem('myConcertData');
         if (saved) { songData = JSON.parse(saved); updateUI(); }
@@ -370,8 +371,7 @@
         const savedColor = localStorage.getItem('fanchantColor');
         if (savedColor) {
             document.documentElement.style.setProperty('--fc-color', savedColor);
-            // 更新 colorIndex 以免下次切換跳咗色
-            colorIndex = colors.indexOf(savedColor);
+            document.getElementById('favColor').value = savedColor; // 同步顏色盤個底色
         }
     };
 </script>
