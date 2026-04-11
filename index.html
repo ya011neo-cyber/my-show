@@ -84,6 +84,9 @@
 
 <div id="editor-overlay">
     <h2 style="text-align:center;">點擊【應援詞】使其變色</h2>
+    <div style="text-align:center; margin-bottom: 20px;">
+        <button id="editorPhotoBtn" class="btn" style="background:#444; display:none;" onclick="showMainPhoto(event)">🖼️ 睇參考圖</button>
+    </div>
     <div id="chips-container" style="text-align:center;"></div>
     <div style="text-align:center; margin-top:30px; padding-bottom:50px;">
         <button class="btn" style="font-size: 1.2rem; padding: 15px 30px; background:#0f0; color:#000;" onclick="saveMarkedData()">✅ 完成生成</button>
@@ -218,6 +221,13 @@ function previewRefImage(event) {
     // --- 標記與儲存 ---
     function startManualMarking(text) {
         const container = document.getElementById('chips-container');
+        // --- 新增：檢查是否有相片，有就顯示標記畫面的相片掣 ---
+        const editorBtn = document.getElementById('editorPhotoBtn');
+        if (tempPhotoData && editorBtn) {
+            editorBtn.style.display = 'inline-block';
+        } else if (editorBtn) {
+            editorBtn.style.display = 'none';
+        }
         const lines = text.split('\n');
         let html = "";
         lines.forEach((line, rowIdx) => {
@@ -282,7 +292,7 @@ function previewRefImage(event) {
     async function uploadSong(e) {
         e.stopPropagation();
         if (songData.length < 1 || songData[0].f === "開始") { alert("請先匯入歌詞！"); return; }
-        const songName = prompt("格式：歌名 - 歌手");
+        const songName = prompt("填寫格式：歌名 - 歌手");
         if (!songName) return;
         try {
             await db.collection("songs").add({ name: songName, data: songData, status: "pending", createdAt: firebase.firestore.FieldValue.serverTimestamp() });
