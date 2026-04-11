@@ -9,30 +9,21 @@
     <style>
         body { margin: 0; background: #000; color: #fff; font-family: sans-serif; height: 100vh; overflow: hidden; touch-action: none; }
         #app { height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 0 5%; text-align: center; }
-        
         .lyrics-container { display: flex; flex-direction: column; gap: 2vh; width: 100%; }
-        
         :root { --fc-color: #0f0; }
-
-        /* 主應援詞：優化光暈，令字體更利 */
         .fanchant { 
-            font-size: clamp(1.5rem, 7vh, 4.5rem); 
-            font-weight: 900; 
-            color: var(--fc-color); 
+            font-size: clamp(1.5rem, 7vh, 4.5rem); font-weight: 900; color: var(--fc-color); 
             text-shadow: 0 0 5px var(--fc-color), 0 0 10px var(--fc-color), 1px 1px 2px #000;
             white-space: normal; line-height: 1.1; display: block; letter-spacing: -1px; 
         }
-
         .lyrics { font-size: clamp(1rem, 3vh, 2rem); color: #bbb; margin-bottom: 3px; white-space: normal; line-height: 1.2; word-break: break-word; }
         .side-lyrics { font-size: clamp(0.8rem, 2.5vh, 1.5rem); color: #444; min-height: 2vh; transition: all 0.3s ease; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .side-lyrics .fc-text { color: var(--fc-color); filter: brightness(0.5); margin-left: 8px; }
-
         .btn-group { position: absolute; top: 10px; right: 10px; display: flex; gap: 5px; z-index: 100; flex-wrap: wrap; justify-content: flex-end; }
         .btn { padding: 8px 12px; background: #222; border-radius: 5px; font-size: 0.7rem; border: 1px solid #444; color: #fff; cursor: pointer; }
-        
         #editor-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #111; z-index: 999; padding: 20px; box-sizing: border-box; overflow-y: auto; display: none; }
         .word-chip { display: inline-block; padding: 8px 12px; margin: 5px; border: 1px solid #444; border-radius: 4px; cursor: pointer; color: #ccc; }
-        .word-chip.is-fc { background: #0f0; color: #000; font-weight: bold; border-color: #0f0; box-shadow: 0 0 10px #0f0; }
+        .word-chip.is-fc { background: var(--fc-color); color: #000; font-weight: bold; border-color: var(--fc-color); box-shadow: 0 0 10px var(--fc-color); }
     </style>
 </head>
 <body>
@@ -42,6 +33,7 @@
         <div class="btn" onclick="openColorMenu(event)">🎨 顏色</div>
         <div class="btn" onclick="fetchPublicSongs(event)">📂 歌單</div>
         <div class="btn" onclick="openImporter(event)">➕ 匯入</div>
+        <div class="btn" onclick="uploadSong(event)">☁️ 投稿</div>
         <div class="btn" onclick="editCurrentSong(event)">✏️ 編輯</div>
         <div id="lockBtn" class="btn" onclick="toggleLock(event)">🔓 已解鎖</div>
     </div>
@@ -61,24 +53,21 @@
     <input type="color" id="colorPicker" onchange="updateHexInput(this.value)" style="width:100%; height:40px; border:none; background:none; cursor:pointer;">
     <div style="margin:15px 0;">
         <label style="font-size:0.8rem; color:#888;">HEX Code:</label>
-        <input type="text" id="hexInput" style="width:100%; background:#111; color:#fff; border:1px solid #555; padding:8px; border-radius:5px; margin-top:5px; text-align:center;">
+        <input type="text" id="hexInput" style="width:100%; background:#111; color:#fff; border:1px solid #555; padding:8px; border-radius:5px; margin-top:5px; text-align:center; font-family:monospace;">
     </div>
     <div style="display:flex; gap:10px;">
-        <button class="btn" style="flex:1; background:#0f0; color:#000; font-weight:bold; border:none;" onclick="saveCustomColor()">套用</button>
+        <button class="btn" style="flex:1; background:#0f0; color:#000; font-weight:bold;" onclick="saveCustomColor()">套用</button>
         <button class="btn" style="flex:1;" onclick="closeColorMenu()">取消</button>
     </div>
 </div>
 
 <div id="import-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:1000; padding:20px; box-sizing:border-box; overflow-y:auto;">
     <h3 id="modal-title" style="text-align:center; color:#0f0;">編輯歌詞</h3>
-    
     <div id="image-preview-container" style="display:none; text-align:center; margin-bottom:10px;">
         <img id="reference-img" style="max-width:100%; max-height:150px; border:1px solid #444; border-radius:5px;" onclick="viewFullImage()">
-        <p style="font-size:0.6rem; color:#888;">點擊圖片放大</p>
+        <p style="font-size:0.6rem; color:#888;">點擊放大</p>
     </div>
-
-    <textarea id="manualInput" style="width:100%; height:50vh; background:#111; color:#fff; border:1px solid #444; padding:15px; border-radius:10px;"></textarea>
-    
+    <textarea id="manualInput" style="width:100%; height:50vh; background:#111; color:#fff; border:1px solid #444; padding:15px; border-radius:10px; font-size:1rem;" placeholder="括號 () 內文字會自動變應援色..."></textarea>
     <div style="margin-top:20px; display:flex; gap:10px; flex-wrap:wrap;">
         <button class="btn" style="flex:2; padding:15px; background:#0f0; color:#000; font-weight:bold;" onclick="handleManualSubmit()">✅ 確認並標記</button>
         <button class="btn" style="flex:1; padding:15px;" onclick="document.getElementById('refInput').click()">📷 附相</button>
@@ -92,22 +81,47 @@
 </div>
 
 <div id="editor-overlay">
-    <h2 style="text-align:center;">點擊【應援詞】使其變綠色</h2>
+    <h2 style="text-align:center;">點擊【應援詞】使其變色</h2>
     <div id="chips-container" style="text-align:center;"></div>
     <div style="text-align:center; margin-top:30px; padding-bottom:50px;">
-        <button class="btn" style="font-size: 1.2rem; padding: 15px 30px;" onclick="saveMarkedData()">✅ 完成生成</button>
+        <button class="btn" style="font-size: 1.2rem; padding: 15px 30px; background:#0f0; color:#000;" onclick="saveMarkedData()">✅ 完成生成</button>
     </div>
 </div>
 
 <script>
-    // Firebase 初始化 (請保留你原本的 config)
-    const firebaseConfig = { apiKey: "...", authDomain: "...", projectId: "...", storageBucket: "...", messagingSenderId: "...", appId: "..." };
+    // --- Firebase 配置 (請保持原樣) ---
+    const firebaseConfig = { apiKey: "AIzaSyCOnH-KJfJqe6VGn7qG2TU1rIaT5OEL9JU", authDomain: "fanchartpro.firebaseapp.com", projectId: "fanchartpro", storageBucket: "fanchartpro.firebasestorage.app", messagingSenderId: "94013254919", appId: "1:94013254919:web:929fff5cd2c71067b269a2" };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
     let songData = [{ l: "歡迎使用應援助手", f: "開始" }];
     let index = 0;
     let isLocked = false;
+
+    // --- 雲端功能 (修復返嚟) ---
+    async function fetchPublicSongs(e) {
+        if (e) e.stopPropagation();
+        try {
+            const snapshot = await db.collection("songs").where("status", "==", "public").get();
+            if (snapshot.empty) { alert("暫時未有公開歌單。"); return; }
+            let list = "請選擇歌曲編號：\n";
+            let songs = [];
+            snapshot.forEach((doc, i) => { songs.push(doc.data()); list += `${i + 1}. ${doc.data().name}\n`; });
+            const choice = prompt(list);
+            if (choice && songs[choice - 1]) { songData = songs[choice - 1].data; index = 0; updateUI(); }
+        } catch (error) { alert("讀取雲端失敗。"); }
+    }
+
+    async function uploadSong(e) {
+        e.stopPropagation();
+        if (songData.length < 1 || songData[0].f === "開始") { alert("請先匯入並標記歌詞！"); return; }
+        const songName = prompt("格式：歌名 - 歌手");
+        if (!songName) return;
+        try {
+            await db.collection("songs").add({ name: songName, data: songData, status: "pending", createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+            alert("投稿成功，請等候審核！");
+        } catch (e) { alert("投稿失敗。"); }
+    }
 
     // --- 圖片功能 ---
     function previewRefImage(event) {
@@ -118,7 +132,7 @@
             document.getElementById('reference-img').src = e.target.result;
             document.getElementById('full-img').src = e.target.result;
             document.getElementById('image-preview-container').style.display = 'block';
-        }
+        };
         reader.readAsDataURL(file);
     }
     function viewFullImage() { document.getElementById('full-image-overlay').style.display = 'flex'; }
@@ -127,7 +141,7 @@
     function openColorMenu(e) {
         e.stopPropagation();
         const curr = getComputedStyle(document.documentElement).getPropertyValue('--fc-color').trim();
-        document.getElementById('hexInput').value = curr;
+        document.getElementById('hexInput').value = curr.toUpperCase();
         document.getElementById('colorPicker').value = curr;
         document.getElementById('color-modal').style.display = 'block';
     }
@@ -140,10 +154,10 @@
             document.documentElement.style.setProperty('--fc-color', col);
             localStorage.setItem('fanchantColor', col);
             closeColorMenu();
-        }
+        } else { alert("格式錯誤！"); }
     }
 
-    // --- 核心 logic (簡化版) ---
+    // --- 匯入與標記 ---
     function openImporter(e) {
         if(e) e.stopPropagation();
         document.getElementById('modal-title').innerText = "➕ 匯入新歌詞";
@@ -173,9 +187,14 @@
         let html = "";
         lines.forEach((line, rowIdx) => {
             if (line.trim() === "") return;
-            html += `<div class="line-row" data-row="${rowIdx}" style="margin-bottom:15px;">`;
-            line.split(/\s+/).forEach(w => {
-                if(w) html += `<span onclick="this.classList.toggle('is-fc')" class="word-chip">${w}</span>`;
+            html += `<div class="line-row" data-row="${rowIdx}" style="margin-bottom:15px; border-bottom:1px solid #222;">`;
+            const words = line.split(/\s+/).filter(w => w !== "");
+            let inBracket = false;
+            words.forEach(w => {
+                // 自動識別括號
+                if (/[\(\（\[]/.test(w)) inBracket = true;
+                html += `<span onclick="this.classList.toggle('is-fc')" class="word-chip ${inBracket ? 'is-fc' : ''}">${w}</span>`;
+                if (/[\)\）\]]/.test(w)) inBracket = false;
             });
             html += `</div>`;
         });
@@ -186,7 +205,7 @@
     function saveMarkedData() {
         const rows = document.querySelectorAll('.line-row');
         let newData = [];
-        rows.forEach((row, rowIdx) => {
+        rows.forEach(row => {
             const chips = row.querySelectorAll('.word-chip');
             let currentL = ""; let pendingF = [];
             chips.forEach(chip => {
@@ -199,44 +218,27 @@
                     currentL += chip.innerText + " ";
                 }
             });
-            if (pendingF.length > 0 || currentL.trim()) 
-                newData.push({ l: currentL.trim() || "...", f: pendingF.join(' ') });
+            if (pendingF.length > 0 || currentL.trim()) newData.push({ l: currentL.trim() || "...", f: pendingF.join(' ') });
         });
         songData = newData; index = 0;
         document.getElementById('editor-overlay').style.display = 'none';
         updateUI();
     }
 
+    // --- UI 與 操作 ---
     function handleTap(e) {
         if (isLocked) return;
-        if (e.clientX < window.innerWidth * 0.3) { if (index > 0) index--; }
+        const x = e.clientX || (e.touches && e.touches[0].clientX);
+        if (x < window.innerWidth * 0.3) { if (index > 0) index--; }
         else { if (index < songData.length - 1) index++; else index = 0; }
         updateUI();
     }
 
     function updateUI() {
         const curr = songData[index];
-        document.getElementById('prevLine').innerText = songData[index-1] ? (songData[index-1].l + " " + songData[index-1].f) : "";
+        const format = (item) => item ? `${item.l === "..." ? "" : item.l} <span class="fc-text">${item.f}</span>` : "";
+        document.getElementById('prevLine').innerHTML = format(songData[index-1]);
         document.getElementById('currLyrics').innerText = curr.l;
         document.getElementById('currFanchant').innerText = curr.f;
-        document.getElementById('nextLine').innerText = songData[index+1] ? (songData[index+1].l + " " + songData[index+1].f) : (index === songData.length-1 ? "— 完 —" : "");
-        
-        if (curr.f && navigator.vibrate) navigator.vibrate(50);
-        localStorage.setItem('myConcertData', JSON.stringify(songData));
-    }
-
-    function toggleLock(e) {
-        e.stopPropagation();
-        isLocked = !isLocked;
-        document.getElementById('lockBtn').innerText = isLocked ? "🔒 鎖定中" : "🔓 已解鎖";
-    }
-
-    window.onload = function() {
-        const saved = localStorage.getItem('myConcertData');
-        if (saved) { songData = JSON.parse(saved); updateUI(); }
-        const savedColor = localStorage.getItem('fanchantColor');
-        if (savedColor) document.documentElement.style.setProperty('--fc-color', savedColor);
-    };
-</script>
-</body>
-</html>
+        document.getElementById('nextLine').innerHTML = songData[index+1] ? format(songData[index+1]) : (index === songData.length-1 ? "— 完 —" : "");
+        if (curr
