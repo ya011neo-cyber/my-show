@@ -540,7 +540,9 @@ async function loadSpecificSong(docId) {
                 name: data.name,
                 uploader: data.uploader || '匿名'
             };
-            
+            window.currentSubmittingData = { name: firebaseData.name };
+
+            closeModal();
             index = 0;
             updateUI(); // 這裡會觸發新的 localStorage 儲存邏輯
         }
