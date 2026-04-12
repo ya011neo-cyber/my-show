@@ -126,6 +126,7 @@
         <div class="side-lyrics" id="nextLine"></div>
     </div> -->
 <div id="lyrics-window" style="
+    
     height: 350px; 
     width: 100%; 
     overflow-y: auto; 
@@ -969,29 +970,43 @@ async function deletePending(docId, songName) {
     //     else { if (index < songData.length - 1) index++; else index = 0; }
     //     updateUI();
     // }
-  function handleTap(e) {
+ function handleTap(e) {
     if (isLocked) return;
 
-    // 1. 如果點擊嘅係歌詞本身 (有 lyric-line class)，我哋唔行 Tap 轉頁，交畀 onclick 自己處理
-    if (e.target.closest('.lyric-line')) return;
-
-    // 2. 獲取手指/滑鼠嘅 Y 座標 (垂直位置)
+    // 獲取點擊座標
+    const x = e.clientX || (e.touches && e.touches[0].clientX);
     const y = e.clientY || (e.touches && e.touches[0].clientY);
-    const screenHeight = window.innerHeight;
+    const w = window.innerWidth;
+    const h = window.innerHeight;
 
-    // 3. 判斷點擊區域：上下觸發，中間唔理
-    if (y < screenHeight * 0.3) {
-        // 點擊畫面頂部 30% 區域 -> 上一句
+    // 定義區域比例
+    const sideWidth = w * 0.3;   // 左右兩側各佔 30% 闊度
+    const topHeight = h * 0.3;   // 頂部佔 30% 高度
+    const bottomHeight = h * 0.7; // 底部佔 30% 高度 (即 1 - 0.3)
+
+    // 1. 先判斷係咪點中咗「最中間」嘅歌詞互動區
+    // 條件：高度喺中間 40% 且 闊度喺中間 40%
+    if (y >= topHeight && y <= bottomHeight && x >= sideWidth && x <= (w - sideWidth)) {
+        // 呢個區域係「歌詞互動區」
+        // 如果點中咗具體某一行歌詞，由該行的 onclick 處理，呢度直接 return
+        if (e.target.closest('.lyric-line')) return;
+        
+        // 如果點中咗空白位，就當係捲動操作，唔觸發跳頁
+        return;
+    }
+
+    // 2. 否則，其餘所有地方都係「上一句/下一句」判定
+    if (y < topHeight || x < sideWidth) {
+        // 點擊「上半部」或者「左側」-> 上一句
         if (index > 0) index--;
         updateUI();
     } 
-    else if (y > screenHeight * 0.7) {
-        // 點擊畫面底部 30% 區域 -> 下一句
+    else if (y > bottomHeight || x > (w - sideWidth)) {
+        // 點擊「下半部」或者「右側」-> 下一句
         if (index < songData.length - 1) index++; 
-        else index = 0; // 循環到第一句
+        else index = 0; 
         updateUI();
     }
-    // 中間 40% 嘅區域就算點擊/滑動，都唔會觸發跳頁，防止誤觸！
 }
 
 function handleLineClick(targetIndex) {
