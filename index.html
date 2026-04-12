@@ -973,36 +973,44 @@ async function deletePending(docId, songName) {
  function handleTap(e) {
     if (isLocked) return;
 
-    // 獲取點擊座標
     const x = e.clientX || (e.touches && e.touches[0].clientX);
     const y = e.clientY || (e.touches && e.touches[0].clientY);
     const w = window.innerWidth;
     const h = window.innerHeight;
 
-    // 定義區域比例
-    const sideWidth = w * 0.3;   // 左右兩側各佔 30% 闊度
-    const topHeight = h * 0.3;   // 頂部佔 30% 高度
-    const bottomHeight = h * 0.7; // 底部佔 30% 高度 (即 1 - 0.3)
+    const sideWidth = w * 0.3;   // 左右 30%
+    const topHeight = h * 0.3;   // 頂部 30%
+    const bottomHeight = h * 0.7; // 底部 30%
 
-    // 1. 先判斷係咪點中咗「最中間」嘅歌詞互動區
-    // 條件：高度喺中間 40% 且 闊度喺中間 40%
-    if (y >= topHeight && y <= bottomHeight && x >= sideWidth && x <= (w - sideWidth)) {
-        // 呢個區域係「歌詞互動區」
-        // 如果點中咗具體某一行歌詞，由該行的 onclick 處理，呢度直接 return
-        if (e.target.closest('.lyric-line')) return;
-        
-        // 如果點中咗空白位，就當係捲動操作，唔觸發跳頁
+    // 判斷係咪點中咗「最中心互動區」 (中間 40% x 中間 40%)
+    const isInCenterWidth = (x >= sideWidth && x <= (w - sideWidth));
+    const isInCenterHeight = (y >= topHeight && y <= bottomHeight);
+
+    if (isInCenterWidth && isInCenterHeight) {
+        // 🎯 只有喺呢度，先會嘗試「對焦跳轉」
+        const targetLine = e.target.closest('.lyric-line');
+        if (targetLine) {
+            // 點中咗邊行就跳去邊行
+            const lineId = targetLine.id; // 例如 "line-5"
+            const newIndex = parseInt(lineId.replace('line-', ''));
+            if (!isNaN(newIndex)) {
+                index = newIndex;
+                updateUI();
+                return; // 跳轉咗就唔好再行下面嘅上一句/下一句
+            }
+        }
+        // 如果點中中心區但冇點中字，就當係捲動，咩都唔做
         return;
     }
 
-    // 2. 否則，其餘所有地方都係「上一句/下一句」判定
+    // 🚀 其餘所有地方 (包括中間 40% 高度嘅左右兩側) 執行跳頁
     if (y < topHeight || x < sideWidth) {
-        // 點擊「上半部」或者「左側」-> 上一句
+        // 上一句區域 (頂部 或 左側)
         if (index > 0) index--;
         updateUI();
     } 
     else if (y > bottomHeight || x > (w - sideWidth)) {
-        // 點擊「下半部」或者「右側」-> 下一句
+        // 下一句區域 (底部 或 右側)
         if (index < songData.length - 1) index++; 
         else index = 0; 
         updateUI();
@@ -1019,19 +1027,25 @@ function handleLineClick(targetIndex) {
     updateUI();
 }
 function updateUI() {
-const list = document.getElementById('lyrics-list');
+    const list = document.getElementById('lyrics-list');
     if (!list) return;
 
     list.innerHTML = songData.map((line, i) => {
         const isCurrent = (i === index);
         return `
             <div id="line-${i}" 
-                 class="lyric-line"
-                 onclick="index=${i}; updateUI();" 
-                 style="padding: 12px 10px; text-align: center; transition: all 0.3s ease; 
-                        opacity: ${isCurrent ? 1 : 0.3}; 
-                        transform: scale(${isCurrent ? 1.15 : 0.95});
-                        cursor: pointer;">
+                 class="lyric-line" 
+                 style="
+                    padding: 12px 10px; 
+                    text-align: center; 
+                    transition: all 0.3s ease; 
+                    opacity: ${isCurrent ? 1 : 0.3}; 
+                    transform: scale(${isCurrent ? 1.15 : 0.95});
+                    cursor: pointer;
+                    /* ✨ 關鍵修改：限制闊度並置中，讓出左右 30% 給點擊區域 */
+                    width: 40%; 
+                    margin: 0 auto;
+                 ">
                 
                 <div style="font-size: 1.3rem; font-weight: bold; color: ${isCurrent ? '#fff' : '#aaa'}; line-height: 1.3;">
                     ${line.l}
@@ -1049,6 +1063,7 @@ const list = document.getElementById('lyrics-list');
             activeLine.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
     }, 50);
+
     // --- Footer 處理 (保留你原本的) ---
     const footerName = document.getElementById('display-song-name');
     const footerUpload = document.getElementById('display-upload-info');
