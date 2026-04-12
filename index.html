@@ -123,6 +123,8 @@
     
     <input type="file" id="refInput" accept="image/*" style="display:none" onchange="previewRefImage(event)">
 </div>
+<div id="public-songs-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:2000; padding:20px; box-sizing:border-box; overflow-y:auto;">
+    </div>
 
 <div id="editor-overlay">
     <div style="position: sticky; top: 0; background: #111; z-index: 1000; padding: 10px 0; border-bottom: 1px solid #333; margin-bottom: 20px;">
@@ -480,7 +482,7 @@ async function fetchPublicSongs(e) {
 }
     
 function showSongGroupList(groupedData) {
-    let html = '<div style="padding:20px;"><h3>選擇歌曲</h3><ul style="list-style:none; padding:0;">';
+    let html = '<div style="padding:20px; color:#fff;"><h3>選擇歌曲</h3><ul style="list-style:none; padding:0;">';
     
     Object.keys(groupedData).forEach(name => {
         const versions = groupedData[name];
@@ -497,10 +499,17 @@ function showSongGroupList(groupedData) {
     
     // 假設你有一個顯示內容的 Modal Container
     const modal = document.getElementById('public-songs-modal'); 
-    modal.innerHTML = html;
-    modal.style.display = 'block';
+    if (modal) {
+        modal.innerHTML = html;
+        modal.style.display = 'block';
+    } else {
+        console.error("找不到 ID 為 public-songs-modal 的元素！");
+    }
 }
-    
+function closeModal() {
+    const modal = document.getElementById('public-songs-modal');
+    if (modal) modal.style.display = 'none';
+}    
 function showVersionSelector(versions) {
     let html = `<div style="padding:20px;"><h3>選擇版本 - ${versions[0].name}</h3><ul style="list-style:none; padding:0;">`;
     
