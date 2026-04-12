@@ -446,17 +446,20 @@ function handleManualSubmit() {
 function startManualMarking(text) {
     const container = document.getElementById('chips-container');
     
-    // --- ✨ 新增：保留 Meta 數據 ---
-    // 確保當前 window 暫存的名能帶入到新生成的數據中
+    // 1. 獲取當前模式 (新增定係編輯)
+    const modalTitle = document.getElementById('modal-title').innerText;
+    const isEditMode = modalTitle.includes("編輯");
+
+    // 2. 處理 Meta 數據 (歌名同作者)
     const currentName = window.currentSubmittingData ? window.currentSubmittingData.name : "";
     const newMeta = {
         name: currentName,
         uploader: "本地編輯"
     };
 
-    // 處理相片按鈕 (保留你原本邏輯)
+    // 3. 處理相片按鈕顯示
     const editorBtn = document.getElementById('editorPhotoBtn');
-    if (tempPhotoData && editorBtn) {
+    if (typeof tempPhotoData !== 'undefined' && tempPhotoData && editorBtn) {
         editorBtn.style.display = 'inline-block';
     } else if (editorBtn) {
         editorBtn.style.display = 'none';
@@ -465,26 +468,31 @@ function startManualMarking(text) {
     const lines = text.split('\n');
     let html = "";
 
-    // 注意：呢度雖然生成 HTML，但你之後 save 嗰陣一定要將 newMeta 塞返入 songData
+    // 4. 開始生成歌詞 Chip
     lines.forEach((line, rowIdx) => {
         if (line.trim() === "") return;
         html += `<div class="line-row" data-row="${rowIdx}" style="margin-bottom:15px; border-bottom:1px solid #222;">`;
         
         const words = line.split(/\s+/).filter(w => w !== "");
         
-        // 搵返原本數據
-        const originalFanchant = (songData[rowIdx] && songData[rowIdx].f) ? songData[rowIdx].f.split(/\s+/) : [];
+        // --- ✨ 核心關鍵：判斷是否需要載入舊應援數據 ---
+        // 如果係編輯模式，先至去攞 songData 嘅舊資料；新增模式就俾個空陣列 []
+        const originalFanchant = (isEditMode && typeof songData !== 'undefined' && songData[rowIdx] && songData[rowIdx].f) 
+                                 ? songData[rowIdx].f.split(/\s+/) 
+                                 : [];
         
-        // ✨ 新增：用一個 Pointer (指針) 嚟記錄對到第幾個應援字
+        // 用 Pointer (指針) 嚟按順序對比，防止重複字誤判
         let fanchantPointer = 0; 
 
         words.forEach(w => {
             let isPreviouslyMarked = false;
             
-            // ✨ 核心修正：唔好用 includes，改為「按順序」核對
-            if (fanchantPointer < originalFanchant.length && w === originalFanchant[fanchantPointer]) {
+            // 只有喺編輯模式，且單字按順序對中時，先會自動 Highlight
+            if (originalFanchant.length > 0 && 
+                fanchantPointer < originalFanchant.length && 
+                w === originalFanchant[fanchantPointer]) {
                 isPreviouslyMarked = true;
-                fanchantPointer++; // 成功對中一個，就將指針移去下一個目標
+                fanchantPointer++; 
             }
             
             html += `<span onclick="this.classList.toggle('is-fc')" class="word-chip ${isPreviouslyMarked ? 'is-fc' : ''}">${w}</span>`;
@@ -494,9 +502,10 @@ function startManualMarking(text) {
     
     container.innerHTML = html;
     
-    // 把 meta 先暫存喺 container 嘅屬性度，或者直接喺 save 嗰陣攞
+    // 儲存 meta 資訊供稍後 saveMarkedData 使用
     container.dataset.meta = JSON.stringify(newMeta); 
 
+    // 5. 顯示編輯介面
     document.getElementById('editor-overlay').style.display = 'block';
 }
 function cancelMarking() {
