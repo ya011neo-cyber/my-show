@@ -970,7 +970,7 @@ async function deletePending(docId, songName) {
     //     else { if (index < songData.length - 1) index++; else index = 0; }
     //     updateUI();
     // }
- function handleTap(e) {
+function handleTap(e) {
     if (isLocked) return;
 
     const x = e.clientX || (e.touches && e.touches[0].clientX);
@@ -978,45 +978,37 @@ async function deletePending(docId, songName) {
     const w = window.innerWidth;
     const h = window.innerHeight;
 
-    const sideWidth = w * 0.3;   // 左右 30%
-    const topHeight = h * 0.3;   // 頂部 30%
-    const bottomHeight = h * 0.7; // 底部 30%
+    const sideWidth = w * 0.3;    // 左右 30% 盲撳區
+    const topHeight = h * 0.3;
+    const bottomHeight = h * 0.7;
 
-    // 判斷係咪點中咗「最中心互動區」 (中間 40% x 中間 40%)
-    const isInCenterWidth = (x >= sideWidth && x <= (w - sideWidth));
-    const isInCenterHeight = (y >= topHeight && y <= bottomHeight);
-
-    if (isInCenterWidth && isInCenterHeight) {
-        // 🎯 只有喺呢度，先會嘗試「對焦跳轉」
-        const targetLine = e.target.closest('.lyric-line');
-        if (targetLine) {
-            // 點中咗邊行就跳去邊行
-            const lineId = targetLine.id; // 例如 "line-5"
-            const newIndex = parseInt(lineId.replace('line-', ''));
-            if (!isNaN(newIndex)) {
-                index = newIndex;
-                updateUI();
-                return; // 跳轉咗就唔好再行下面嘅上一句/下一句
-            }
+    // 1. 判斷係咪點中咗「正中間 40%」嘅「文字內容」
+    // 如果點中咗有 .lyric-content 類別嘅嘢
+    const contentBtn = e.target.closest('.lyric-content');
+    
+    if (contentBtn && x >= w*0.3 && x <= w*0.7 && y >= topHeight && y <= bottomHeight) {
+        // 點中咗文字，攞返佢老竇 (lyric-line) 嘅 ID 嚟跳轉
+        const lineEl = contentBtn.parentElement;
+        const newIndex = parseInt(lineEl.id.replace('line-', ''));
+        if (!isNaN(newIndex)) {
+            index = newIndex;
+            updateUI();
+            return;
         }
-        // 如果點中中心區但冇點中字，就當係捲動，咩都唔做
-        return;
     }
 
-    // 🚀 其餘所有地方 (包括中間 40% 高度嘅左右兩側) 執行跳頁
+    // 2. 其餘區域執行上一句/下一句 (盲撳)
     if (y < topHeight || x < sideWidth) {
-        // 上一句區域 (頂部 或 左側)
         if (index > 0) index--;
         updateUI();
     } 
     else if (y > bottomHeight || x > (w - sideWidth)) {
-        // 下一句區域 (底部 或 右側)
         if (index < songData.length - 1) index++; 
         else index = 0; 
         updateUI();
     }
 }
-
+    
 function handleLineClick(targetIndex) {
     if (isLocked) return;
     
@@ -1036,27 +1028,33 @@ function updateUI() {
             <div id="line-${i}" 
                  class="lyric-line" 
                  style="
-                    padding: 12px 10px; 
+                    width: 100%;             /* ✨ 視覺恢復 100% 闊 */
+                    padding: 12px 0; 
                     text-align: center; 
                     transition: all 0.3s ease; 
                     opacity: ${isCurrent ? 1 : 0.3}; 
                     transform: scale(${isCurrent ? 1.15 : 0.95});
-                    cursor: pointer;
-                    /* ✨ 關鍵修改：限制闊度並置中，讓出左右 30% 給點擊區域 */
-                    width: 40%; 
-                    margin: 0 auto;
+                    /* ✨ 關鍵：外層容器唔好食點擊，讓點擊穿透去底層的 handleTap */
+                    pointer-events: none; 
                  ">
                 
-                <div style="font-size: 1.3rem; font-weight: bold; color: ${isCurrent ? '#fff' : '#aaa'}; line-height: 1.3;">
-                    ${line.l}
+                <div class="lyric-content" style="
+                    display: inline-block;
+                    width: 60%;              /* ✨ 呢度控制你想「幾闊」 */
+                    color: ${isCurrent ? '#fff' : '#aaa'};
+                    /* ✨ 關鍵：只有中間呢舊文字區重新啟動點擊功能 */
+                    pointer-events: auto;
+                ">
+                    <div style="font-size: 1.3rem; font-weight: bold; line-height: 1.3;">
+                        ${line.l}
+                    </div>
+                    ${line.f ? `<div style="font-size: 1.1rem; color: #EAB308; margin-top: 5px;">${line.f}</div>` : ''}
                 </div>
-                
-                ${line.f ? `<div style="font-size: 1.1rem; color: #EAB308; margin-top: 5px;">${line.f}</div>` : ''}
             </div>
         `;
     }).join('');
 
-    // ✨ 自動捲動對準中間
+    // 自動捲動對準中間 (保持不變)
     setTimeout(() => {
         const activeLine = document.getElementById(`line-${index}`);
         if (activeLine) {
@@ -1208,4 +1206,4 @@ async function adminLogin() {
     .admin-del-btn { background: #400; color: #f55; padding: 8px; border-radius: 4px; margin-left: 10px; font-size: 0.8rem; border: 1px solid #600; }
 </style>    
 </body>
-</html>幫我改善這個網站
+</html>幫我改善這個網
