@@ -534,31 +534,34 @@ async function loadSpecificSong(docId) {
         const doc = await db.collection("songs").doc(docId).get();
         if (doc.exists) {
             const data = doc.data();
-            
-            // 1. 更新全域變數
             songData = data.data; 
 
-            // 2. ✨ 重點：手動更新畫面最下方嘅文字 ✨
-            // 確保 ID 'display-song-name' 同 'display-upload-info' 同你 HTML 係一樣嘅
+            // --- 更新 Footer 邏輯 ---
             const nameEl = document.getElementById('display-song-name');
             const infoEl = document.getElementById('display-upload-info');
 
-            console.log("正在載入：", data.name)
-            if (nameEl) nameEl.innerText = data.name || "未命名";
-            if (infoEl) infoEl.innerText = `作者: ${data.uploader || '匿名'}`;
+            // 🔍 檢查點解改唔到
+            console.log("Footer 元素檢查:", { nameEl, infoEl });
 
-            // 3. 儲存目前歌名到暫存，方便下次編輯或上傳時自動填寫
+            if (nameEl) {
+                nameEl.innerText = data.name;
+            } else {
+                console.error("找不到 id='display-song-name' 的元素！");
+            }
+
+            if (infoEl) {
+                infoEl.innerText = `作者: ${data.uploader || '匿名'}`;
+            }
+
+            // 記錄目前數據，方便編輯時使用
             window.currentSubmittingData = { name: data.name };
 
-            // 4. 關閉選單並重置 index 更新畫面
-            closeModal(); // 關閉嗰個分層歌單
+            closeModal();
             index = 0;
-            updateUI(); // 呼叫你原本渲染歌詞嘅 function
-            
+            updateUI();
         }
     } catch (err) {
         console.error("載入失敗", err);
-        alert("載入失敗");
     }
 }
     
