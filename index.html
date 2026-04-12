@@ -540,7 +540,7 @@ async function loadSpecificSong(docId) {
                 name: data.name,
                 uploader: data.uploader || '匿名'
             };
-            window.currentSubmittingData = { name: firebaseData.name };
+            window.currentSubmittingData = { name: data.name };
 
             closeModal();
             index = 0;
