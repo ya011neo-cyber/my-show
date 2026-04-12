@@ -364,16 +364,13 @@ function handleManualSubmit() {
         return;
     }
 
-    // 2. 獲取歌名：
-    // 優先序：如果 modal 標題寫住編輯 -> 嘗試抓取主畫面的歌名 -> 最後才彈 prompt
+    // 2. 獲取歌名邏輯 (保留你原本的)
     const modalTitle = document.getElementById('modal-title').innerText;
     const isEditMode = modalTitle.includes("編輯");
     let name = "";
 
     if (isEditMode) {
-        // 直接從底部的 display-song-name 抓取現有歌名，最準確
         name = document.getElementById('display-song-name').innerText;
-        // 如果抓到的是預設字眼，就還是問一下
         if (name === "應援助手 Fanchant Helper") name = prompt("請輸入[歌名 - 歌手]：");
     } else {
         name = prompt("請輸入[歌名 - 歌手]：");
@@ -384,16 +381,33 @@ function handleManualSubmit() {
     // 3. 儲存數據供稍後上傳使用
     window.currentSubmittingData = { name: name };
 
-    // 4. ✨ 解決問題二：關閉輸入畫面，開啟標記畫面 ✨
-    document.getElementById('import-modal').style.display = 'none'; // 讓輸入框消失
-    startManualMarking(lyricsText); // 讓標記畫面出現
+    // --- ✨ 3.5 新增：強制更新作者資訊為「本地」 ---
+    // 咁樣一陣去到 startManualMarking 並 updateUI 嗰陣，佢就會識變
+    if (typeof songData !== 'undefined') {
+        songData.meta = {
+            name: name,
+            uploader: "本地編輯" // 或者你想寫 "本地"
+        };
+    }
+
+    // 4. 關閉輸入畫面，開啟標記畫面
+    document.getElementById('import-modal').style.display = 'none'; 
+    startManualMarking(lyricsText); 
 }
 
     // --- 標記與儲存 ---
 function startManualMarking(text) {
     const container = document.getElementById('chips-container');
     
-    // 處理相片按鈕
+    // --- ✨ 新增：保留 Meta 數據 ---
+    // 確保當前 window 暫存的名能帶入到新生成的數據中
+    const currentName = window.currentSubmittingData ? window.currentSubmittingData.name : "";
+    const newMeta = {
+        name: currentName,
+        uploader: "本地編輯"
+    };
+
+    // 處理相片按鈕 (保留你原本邏輯)
     const editorBtn = document.getElementById('editorPhotoBtn');
     if (tempPhotoData && editorBtn) {
         editorBtn.style.display = 'inline-block';
@@ -404,25 +418,28 @@ function startManualMarking(text) {
     const lines = text.split('\n');
     let html = "";
 
+    // 注意：呢度雖然生成 HTML，但你之後 save 嗰陣一定要將 newMeta 塞返入 songData
     lines.forEach((line, rowIdx) => {
         if (line.trim() === "") return;
         html += `<div class="line-row" data-row="${rowIdx}" style="margin-bottom:15px; border-bottom:1px solid #222;">`;
         
         const words = line.split(/\s+/).filter(w => w !== "");
         
-        // 搵返原本呢一行嘅應援詞數據 (如果有的話)
+        // 搵返原本數據
         const originalFanchant = (songData[rowIdx] && songData[rowIdx].f) ? songData[rowIdx].f.split(/\s+/) : [];
 
         words.forEach(w => {
-            // 修正邏輯：如果呢粒字喺原本嗰行嘅 f 入面出現過，就預設變色
             const isPreviouslyMarked = originalFanchant.includes(w);
-            
             html += `<span onclick="this.classList.toggle('is-fc')" class="word-chip ${isPreviouslyMarked ? 'is-fc' : ''}">${w}</span>`;
         });
         html += `</div>`;
     });
     
     container.innerHTML = html;
+    
+    // 把 meta 先暫存喺 container 嘅屬性度，或者直接喺 save 嗰陣攞
+    container.dataset.meta = JSON.stringify(newMeta); 
+
     document.getElementById('editor-overlay').style.display = 'block';
 }
 function cancelMarking() {
@@ -456,37 +473,27 @@ function saveMarkedData() {
         if (sourceLink) newData[0].link = sourceLink; 
     }
 
-    // ✨ 只更新本地變數同 UI
+    // --- ✨ 核心改動：更新 meta 數據 ---
+    const info = window.currentSubmittingData || {};
+    
+    // 1. 強制將作者設定為「本地編輯者」，不再保留舊作者
+    newData.meta = {
+        name: info.name || "未命名歌曲",
+        uploader: "本地編輯者"
+    };
+
+    // 2. 更新全局變數
     songData = newData;
     index = 0;
+
+    // 3. 關閉視窗
     document.getElementById('editor-overlay').style.display = 'none';
     closeImporter();
-    updateUI();
-    // ✨ 新增：更新底端的歌名顯示 ✨
-    const info = window.currentSubmittingData || {};
-    if (info.name) {
-        // 1. 更新歌名
-        document.getElementById('display-song-name').innerText = info.name;
-        
-        // 2. 處理作者名 (根據是否有前作者決定點顯示)
-        const uploadInfoEl = document.getElementById('display-upload-info');
-        
-        // 假設 info.uploader 係剛才 prompt 攞到嘅新名 (或者你預設咗係 "本地編輯者")
-        const newEditor = "本地編輯者"; 
-        
-        // 攞返原本顯示緊嘅作者名 (如果有)
-        // 假設原本格式係 "作者: XXX" 或者 "Uploader: XXX"
-        let oldUploader = uploadInfoEl.innerText.replace("作者: ", "").replace("Uploader: ", "").trim();
 
-        if (oldUploader && oldUploader !== "" && oldUploader !== "本地編輯中") {
-            // 如果有舊作者，用 - 連接
-            uploadInfoEl.innerText = `作者: ${oldUploader} - ${newEditor}`;
-        } else {
-            // 如果係全新或者原本冇名，就單獨顯示新編輯者
-            uploadInfoEl.innerText = `作者: ${newEditor}`;
-        }
-    }
-    console.log("本地預覽已更新");
+    // 4. ✨ 呼叫 updateUI，由佢統一處理畫面顯示同埋 localStorage 儲存
+    updateUI();
+
+    console.log("本地預覽已更新：作者已變更為本地編輯者");
 }
     async function sendDiscordNotification(name, source, id) {
     try {
