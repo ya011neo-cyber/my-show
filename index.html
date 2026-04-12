@@ -31,43 +31,8 @@
         .lyrics { font-size: clamp(1rem, 3vh, 2rem); color: #bbb; margin-bottom: 3px; white-space: normal; line-height: 1.2; word-break: break-word; }
         .side-lyrics { font-size: clamp(0.8rem, 2.5vh, 1.5rem); color: #444; min-height: 2vh; transition: all 0.3s ease; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .side-lyrics .fc-text { color: var(--fc-color); filter: brightness(0.5); margin-left: 8px; }
-        /* .btn-group { position: absolute; top: calc(10px + env(safe-area-inset-top)); right: 10px; display: flex; gap: 5px; z-index: 100; flex-wrap: wrap; justify-content: flex-end; }
-        .btn { padding: 8px 12px; background: #222; border-radius: 5px; font-size: 0.7rem; border: 1px solid #444; color: #fff; cursor: pointer; user-select: none; } */
-        .btn-group {
-    position: fixed; /* 鎖死喺畫面，唔會跟住轆 */
-    top: 50%;
-    right: 15px;
-    transform: translateY(-50%); /* 垂直居中 */
-    display: flex;
-    flex-direction: column; /* 變垂直排 */
-    gap: 12px;
-    z-index: 2000; /* 確保喺歌詞面層 */
-    background: rgba(255, 255, 255, 0.1); /* 半透明白 */
-    backdrop-filter: blur(10px); /* 磨砂效果 */
-    padding: 15px 10px;
-    border-radius: 30px; /* 圓角膠囊狀 */
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-}
-
-.btn {
-    width: 40px;
-    height: 40px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 50% !important; /* 變圓形掣 */
-    font-size: 1.2rem;
-    transition: all 0.2s;
-    cursor: pointer;
-    border: none;
-    margin: 0 !important;
-}
-
-.btn:active {
-    transform: scale(0.9);
-    background: rgba(255, 255, 255, 0.3);
-}
+        .btn-group { position: absolute; top: calc(10px + env(safe-area-inset-top)); right: 10px; display: flex; gap: 5px; z-index: 100; flex-wrap: wrap; justify-content: flex-end; }
+        .btn { padding: 8px 12px; background: #222; border-radius: 5px; font-size: 0.7rem; border: 1px solid #444; color: #fff; cursor: pointer; user-select: none; }
         #main-photo-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 2500; justify-content: center; align-items: center; touch-action: none; overflow: hidden; }
         #main-photo-img { max-width: 100%; max-height: 100%; object-fit: contain; transition: transform 0.2s ease-out; pointer-events: none; will-change: transform; }
         .close-photo-btn { position: absolute; top: 20px; right: 20px; font-size: 2rem; color: #fff; background: rgba(0,0,0,0.5); border-radius: 50%; width: 50px; height: 50px; text-align: center; line-height: 50px; cursor: pointer; z-index: 2600; }
@@ -91,44 +56,20 @@
             box-shadow: none;        /* ✨ 移除發光，改用淡淡的邊框色就好 */
         }
         /* 隱藏捲動條但保留功能 (可選) */
-#lyrics-window {
-    height: 380px;                  /* 固定高度，睇到約 5 行 */
-    overflow-y: auto;               /* 垂直捲動 */
-    overflow-x: hidden;             /* ❌ 徹底禁止左右移 */
-    scroll-behavior: smooth;        /* 平滑捲動效果 */
-    position: relative;
-    padding: 140px 0;               /* 上下留白，確保中間嗰行可以對準中心 */
-    margin: 20px 0;
-    -webkit-overflow-scrolling: touch; /* iOS 滑動順暢感 */
-    
-    /* 遮罩效果：令頂部同底部歌詞慢慢變透明（好似 Spotify 咁） */
-    mask-image: linear-gradient(
-        to bottom,
-        transparent 0%,
-        black 20%,
-        black 80%,
-        transparent 100%
-    );
-    -webkit-mask-image: linear-gradient(
-        to bottom,
-        transparent 0%,
-        black 20%,
-        black 80%,
-        transparent 100%
-    );
-}
-
-/* 隱藏核突嘅捲動條 */
-#lyrics-window::-webkit-scrollbar {
-    display: none;
-}
-#lyrics-list {
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center; /* 確保歌詞居中 */
-    box-sizing: border-box;
-}
+        .lyrics-window::-webkit-scrollbar {
+            display: none;
+        }
+        
+        .lyrics-window {
+            mask-image: linear-gradient(
+                to bottom,
+                transparent 0%,
+                black 20%,
+                black 80%,
+                transparent 100%
+            );
+            /* 咁樣頂部同底部嘅歌詞就會慢慢淡出，好似 App 咁 */
+        }
         @media (max-width: 768px) {
             #split-screen-editor > div {
                 flex-direction: column !important; /* 手機變垂直排列 */
@@ -147,7 +88,7 @@
     
 <body>
 <div id="app" onclick="handleTap(event)">
-    <!-- <div class="btn-group">
+    <div class="btn-group">
         <div class="btn" style="background:#444;" onclick="location.reload()">🔄</div>
         <div id="mainViewPhotoBtn" class="btn" style="display:none; background:#444;" onclick="showMainPhoto(event)">🖼️</div>
         <div id="mainViewLinkBtn" class="btn" style="display:none; background:#0055aa;" onclick="openSourceLink(event)">🔗</div>
@@ -157,18 +98,6 @@
         <div class="btn" onclick="uploadSong(event)">☁️</div>
         <div class="btn" onclick="editCurrentSong(event)">✏️</div>
         <div id="lockBtn" class="btn" onclick="toggleLock(event)">🔓</div>
-    </div> -->
-    <div class="btn-group">
-        <div class="btn" style="background:#444;" onclick="location.reload()" title="重整">🔄</div>
-        <div id="mainViewPhotoBtn" class="btn" style="display:none; background:#444;" onclick="showMainPhoto(event)">🖼️</div>
-        <div id="mainViewLinkBtn" class="btn" style="display:none; background:#0055aa;" onclick="openSourceLink(event)">🔗</div>
-        <div class="btn" style="background:#444;" onclick="openColorMenu(event)">🎨</div>
-        <div class="btn" style="background:#444;" onclick="fetchPublicSongs(event)">📂</div>
-        
-        <div style="height: 1px; background: rgba(255,255,255,0.2); margin: 5px 0;"></div> <div class="btn" style="background:#28a745;" onclick="openImporter(false)">➕</div>
-        <div class="btn" style="background:#007bff;" onclick="uploadSong(event)">☁️</div>
-        <div class="btn" style="background:#ffc107; color: #000;" onclick="editCurrentSong(event)">✏️</div>
-        <div id="lockBtn" class="btn" style="background:#dc3545;" onclick="toggleLock(event)">🔓</div>
     </div>
     <!-- <div class="lyrics-container">
         <div class="side-lyrics" id="prevLine"></div>
@@ -178,8 +107,9 @@
         </div>
         <div class="side-lyrics" id="nextLine"></div>
     </div> -->
-    <div id="lyrics-window">
-        <div id="lyrics-list"></div>
+    <div id="lyrics-window" style="height: 380px; overflow-y: auto; scroll-behavior: smooth; position: relative; padding: 120px 0; margin: 20px 0; -webkit-overflow-scrolling: touch;">
+        <div id="lyrics-list">
+            </div>
     </div>
 </div>
 
@@ -1036,153 +966,68 @@ function updateUI() {
     // document.getElementById('currLyrics').innerText = curr.l;
     // document.getElementById('currFanchant').innerText = curr.f;
     // document.getElementById('nextLine').innerHTML = songData[index+1] ? format(songData[index+1]) : (index === songData.length-1 ? "— 完 —" : "");
-  // 喺 updateUI 嘅 map 入面
-    const list = document.getElementById('lyrics-list');
-
+  const list = document.getElementById('lyrics-list');
     if (!list) return;
 
-
-
-    // --- 1. 渲染歌詞列表 ---
-
-    // 我哋要用 .map 遍歷 songData，咁樣先會有 'line' 同 'i'
-
     list.innerHTML = songData.map((line, i) => {
-
         const isCurrent = (i === index);
-
-        
-
-        // 處理應援詞染色邏輯
-
-        const words = line.l.split(/\s+/);
-
-        const fanchantWords = line.f ? line.f.split(/\s+/) : [];
-
-        
-
-        let lineHtml = words.map(w => {
-
-            const isFc = fanchantWords.includes(w);
-
-            return `<span style="color: ${isFc ? '#ffeb3b' : '#fff'}">${w}</span>`;
-
-        }).join(' ');
-
-
-
         return `
-
             <div id="line-${i}" 
-
                  onclick="index=${i}; updateUI();" 
-
-                 style="padding: 25px 0; text-align: center; transition: all 0.3s; 
-
+                 style="padding: 15px 0; text-align: center; transition: all 0.3s; 
                         opacity: ${isCurrent ? 1 : 0.3}; 
-
-                        transform: scale(${isCurrent ? 1.15 : 0.9});">
-
-                <div style="font-size: 1.4rem; font-weight: bold; line-height: 1.4;">${lineHtml}</div>
-
+                        transform: scale(${isCurrent ? 1.1 : 0.9});
+                        color: ${isCurrent ? '#0f0' : '#fff'};">
+                <div style="font-size: 1.3rem; font-weight: bold; line-height: 1.4;">${line.l}</div>
+                <div style="font-size: 1rem; color: #ffeb3b; min-height: 1.1rem;">${line.f || ''}</div>
             </div>
-
         `;
-
     }).join('');
 
-
-
-    // --- 2. 自動對準中間 ---
-
+    // 自動對準中間
     setTimeout(() => {
-
         const activeLine = document.getElementById(`line-${index}`);
-
         if (activeLine) {
-
             activeLine.scrollIntoView({ behavior: 'smooth', block: 'center' });
-
         }
-
     }, 50);
 
-
-
-    // --- 3. 更新底端 Footer 文字 ---
-
-    const footerName = document.getElementById('display-song-name');
-
+    // --- ✨ 新增/加回：更新底端畫面的文字 ---
+   const footerName = document.getElementById('display-song-name');
     const footerUpload = document.getElementById('display-upload-info');
-
     
-
+    // 1. 優先從 songData.meta 攞名
+    // 2. 如果冇，就睇吓 window 暫存 (currentSubmittingData) 仲有冇名
     let currentName = "";
-
     let currentUploader = "";
 
-
-
     if (songData.meta) {
-
         currentName = songData.meta.name;
-
         currentUploader = songData.meta.uploader;
-
     } else if (window.currentSubmittingData && window.currentSubmittingData.name) {
-
         currentName = window.currentSubmittingData.name;
-
         currentUploader = "本地編輯";
-
     }
 
-
-
-    if (footerName && footerUpload) {
-
-        if (currentName) {
-
-            footerName.innerText = currentName;
-
-            footerUpload.innerText = currentUploader ? `Uploaded by: ${currentUploader}` : "";
-
-        } else {
-
-            footerName.innerText = "應援助手 Fanchant Helper";
-
-            footerUpload.innerText = "";
-
-        }
-
+    if (currentName) {
+        footerName.innerText = currentName;
+        footerUpload.innerText = currentUploader ? `Uploaded by: ${currentUploader}` : "";
+    } else {
+        footerName.innerText = "應援助手 Fanchant Helper";
+        footerUpload.innerText = "";
     }
 
-
-
-    // --- 4. 儲存至 localStorage ---
-
+    // --- 儲存邏輯 ---
     try {
-
         const saveObj = {
-
             version: "2.0",
-
-            meta: songData.meta || (currentName ? { name: currentName, uploader: currentUploader } : null),
-
+            meta: songData.meta || (window.currentSubmittingData ? { name: window.currentSubmittingData.name, uploader: '本地' } : null),
             lines: Array.from(songData)
-
         };
-
         localStorage.setItem('myConcertData', JSON.stringify(saveObj));
-
     } catch (e) { console.error("Save Error", e); }
-
     
-
-    // 更新按鈕狀態 (🖼️, 🔗 等)
-
-    if (typeof updateMainViewBtn === 'function') updateMainViewBtn();
-
+    updateMainViewBtn();
 }
     // --- 管理員審核功能 ---
     // 搵返你 HTML 顯示歌詞標題或某個地方，加個 counter
