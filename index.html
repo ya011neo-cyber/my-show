@@ -56,13 +56,19 @@
             box-shadow: none;        /* ✨ 移除發光，改用淡淡的邊框色就好 */
         }
         #lyrics-window {
-            height: 280px;      /* 縮細高度到大約 5 行 */
-            padding: 80px 0;    /* 減少上下留白 */
-            overflow-y: auto;
+            height: 280px !important;       /* 強制縮到 5 行位 */
+            padding: 80px 0 !important;     /* 減少留白 */
+            overflow-y: auto;               /* 淨係准上下轆 */
+            overflow-x: hidden !important;  /* ❌ 徹底鎖死打橫條 Bar */
             scroll-behavior: smooth;
             position: relative;
             margin: 10px 0;
             -webkit-overflow-scrolling: touch;
+        }
+        
+        /* 隱藏核突嘅上下捲動條 (如果想睇落更乾淨) */
+        #lyrics-window::-webkit-scrollbar {
+            display: none;
         }
         @media (max-width: 768px) {
             #split-screen-editor > div {
@@ -937,20 +943,20 @@ async function deletePending(docId, songName) {
     //     else { if (index < songData.length - 1) index++; else index = 0; }
     //     updateUI();
     // }
-   function handleTap(e) {
+  function handleTap(e) {
     if (isLocked) return;
     
-    // ⭕ 淨係排除點擊到「功能掣」嘅情況
+    // 排除點擊到右邊嗰排功能掣
     if (e.target.closest('.btn-group') || e.target.closest('.btn')) return;
 
     const clientX = e.clientX || (e.touches && e.touches[0].clientX);
     const screenWidth = window.innerWidth;
 
-    // 左邊 40% 為「上一句」，右邊 60% 為「下一句」
-    if (clientX < screenWidth * 0.4) { 
+    // 將左邊 Tap 範圍加大到 45%，保證容易撳到
+    if (clientX < screenWidth * 0.45) { 
         if (index > 0) {
             index--;
-            updateUI(); // 呢度會行返你原本嘅 updateUI 染色邏輯
+            updateUI(); // 行返你原本嘅染色同儲存
         }
     } else { 
         if (index < songData.length - 1) {
@@ -958,7 +964,7 @@ async function deletePending(docId, songName) {
         } else {
             index = 0; 
         }
-        updateUI(); // 呢度會行返你原本嘅 updateUI 染色邏輯
+        updateUI(); // 行返你原本嘅染色同儲存
     }
 }
 
