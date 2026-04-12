@@ -55,6 +55,19 @@
             border-color: var(--fc-color); 
             box-shadow: none;        /* ✨ 移除發光，改用淡淡的邊框色就好 */
         }
+        @media (max-width: 768px) {
+            #split-screen-editor > div {
+                flex-direction: column !important; /* 手機變垂直排列 */
+            }
+            #reference-image-container {
+                flex: 0 0 40% !important; /* 圖片佔上方 40% */
+                border-right: none !important;
+                border-bottom: 1px solid #333;
+            }
+            #editor-input-area {
+                flex: 1 !important;
+            }
+        }
     </style>
 </head>
     
@@ -101,11 +114,29 @@
 
 <div id="import-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:1000; padding:20px; box-sizing:border-box; overflow-y:auto;">
     
-    <div style="position: sticky; top: -20px; background: rgba(0,0,0,0.95); z-index: 1100; padding: 15px 0; border-bottom: 1px solid #333; margin-bottom: 15px; margin-top: -20px; text-align: center;">
+    <!-- <div style="position: sticky; top: -20px; background: rgba(0,0,0,0.95); z-index: 1100; padding: 15px 0; border-bottom: 1px solid #333; margin-bottom: 15px; margin-top: -20px; text-align: center;">
         <h3 id="modal-title" style="color:#0f0; margin: 5px 0;">編輯歌詞</h3>
         <div style="display: flex; gap: 10px; justify-content: center; align-items: center;">
             <button id="importViewPhotoBtn" class="btn" style="background:#444; display:none;" onclick="showMainPhoto(event)">🖼️ 睇參考圖</button>
             <button id="importRemovePhotoBtn" class="btn" style="background:#800; display:none; font-size:0.7rem;" onclick="removePhoto()">❌ 移除相片</button>
+        </div>
+    </div> -->
+    <div id="split-screen-editor" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:#000; z-index:3000;">
+        <div style="display: flex; width: 100%; height: 100%;">
+            
+            <div id="reference-image-container" style="flex: 1; overflow-y: auto; border-right: 1px solid #333; background: #111; display: none;">
+                <img id="reference-img" src="" style="width: 100%; height: auto; display: block;">
+            </div>
+    
+            <div id="editor-input-area" style="flex: 1; overflow-y: auto; padding: 20px; box-sizing: border-box;">
+                <h3 style="color:#fff;">編輯歌詞</h3>
+                <textarea id="manualInput" style="width:100%; height:70%; background:#222; color:#fff; border:1px solid #444; padding:10px;"></textarea>
+                <div style="margin-top: 15px;">
+                    <button class="btn" onclick="saveSplitEditor()">儲存</button>
+                    <button class="btn" onclick="closeSplitEditor()" style="background:#444;">取消</button>
+                </div>
+            </div>
+    
         </div>
     </div>
 
@@ -244,7 +275,29 @@ function updateEditPreview() {
         if(importRemoveBtn) importRemoveBtn.style.display = 'none';
     }
 }
+function openSplitEditor(imageSrc = null) {
+    const splitView = document.getElementById('split-screen-editor');
+    const imgContainer = document.getElementById('reference-image-container');
+    const imgTag = document.getElementById('reference-img');
+    const textArea = document.getElementById('manualInput');
 
+    // 如果有相片，顯示左邊
+    if (imageSrc) {
+        imgTag.src = imageSrc;
+        imgContainer.style.display = 'block';
+    } else {
+        imgContainer.style.display = 'none';
+    }
+
+    // 填入現有歌詞 (如果有)
+    textArea.value = songData.map(line => `${line.l || ''},${line.f || ''}`).join('\n');
+
+    splitView.style.display = 'block';
+}
+
+function closeSplitEditor() {
+    document.getElementById('split-screen-editor').style.display = 'none';
+}
     // 處理上傳相片 (Base64)
 // --- 強化版：自動壓縮相片，解決手機 LocalStorage 爆容量問題 ---
 function previewRefImage(event) {
