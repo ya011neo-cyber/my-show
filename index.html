@@ -13,26 +13,23 @@
     color: #fff; 
     font-family: sans-serif; 
     height: 100vh; 
-    
-    /* ❌ 原本係 overflow: hidden; 改為下面咁樣 */
-    overflow-x: hidden;      /* ✨ 鎖死左右，解決你話「向左拖到」嘅問題 */
-    overflow-y: hidden;      /* 保持 Body 本身唔好轆，淨係畀歌詞 window 轆 */
-    
-    /* ❌ 原本係 touch-action: none; 呢句係罪魁禍首，一定要改 */
-    touch-action: pan-y;     /* ✨ 允許垂直方向嘅觸控操作，咁你先轆到歌詞 */
-    
+    overflow-x: hidden;      /* ✨ 鎖死左右拖動 */
+    overflow-y: hidden;      /* 防止 Body 本身跳動 */
+    touch-action: pan-y;     /* ✨ 核心：允許垂直手勢，咁你先轆到歌詞 */
     padding-top: env(safe-area-inset-top); 
 }
-        #app { 
+
+#app { 
     height: 100%; 
+    width: 100vw;            /* ✨ 確保滿版 */
     display: flex; 
     flex-direction: column; 
     justify-content: center; 
     align-items: center; 
-    padding: 0 !important; /* 強制取消 5% 的左右邊距 */
-    width: 100vw;
-    text-align: center;
-    box-sizing: border-box; /* ✨ 確保 padding 唔會撐開闊度 */
+    padding: 0 !important;   /* ✨ 取消原本 5% 的左右留白 */
+    text-align: center; 
+    box-sizing: border-box; 
+    position: relative;
 }
         .lyrics-container { display: flex; flex-direction: column; gap: 2vh; width: 100%; }
         :root { --fc-color: #0f0; }
@@ -80,14 +77,28 @@
             border-color: var(--fc-color); 
             box-shadow: none;        /* ✨ 移除發光，改用淡淡的邊框色就好 */
         }
+#lyrics-window {
+    height: 380px;           /* 你可以根據相機位再微調高度 */
+    width: 100vw !important;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    /* 隱藏捲軸 */
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
 #lyrics-window::-webkit-scrollbar { display: none; }
-    #lyrics-window { scrollbar-width: none; -ms-overflow-style: none; }
 
-/* 確保歌詞行唔好太闊，亦唔好太厚 */
-.line-item {
-    padding: 15px 0;
-    min-height: 60px;
-    text-align: center;
+/* 呢個係配合 updateUI 入面 pointer-events 嘅關鍵 */
+.lyric-line {
+    width: 100%;
+    pointer-events: none;    /* 讓兩側點擊穿透 */
+}
+.lyric-content {
+    display: inline-block;
+    width: 90%;              /* ✨ 歌詞視覺闊度 */
+    pointer-events: auto;    /* ✨ 只有文字區會觸發對焦 */
 }
         @media (max-width: 768px) {
             #split-screen-editor > div {
@@ -126,21 +137,8 @@
         </div>
         <div class="side-lyrics" id="nextLine"></div>
     </div> -->
-<div id="lyrics-window" style="
-    
-    height: 350px; 
-    width: 100vw !important;
-    left: 0;
-    margin: 10px 0;
-    overflow-y: auto; 
-    overflow-x: hidden; /* ✨ 呢句最重要：鎖死橫向捲動，唔畀左右拖 */
-    box-sizing: border-box; /* ✨ 確保 100% 闊度唔會被 Padding 撐爆 */
-    scroll-behavior: smooth; 
-    -webkit-overflow-scrolling: touch;
-    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 20%, black 80%, transparent 100%);
-    mask-image: linear-gradient(to bottom, transparent 0%, black 20%, black 80%, transparent 100%);
-">
-    <div id="lyrics-list" style="padding: 150px 0;width: 100% !important;"></div>
+<div id="lyrics-window">
+    <div id="lyrics-list" style="padding: 180px 0; width: 100% !important;"></div>
 </div>
 
 <div id="main-photo-overlay">
@@ -981,16 +979,16 @@ function handleTap(e) {
     const w = window.innerWidth;
     const h = window.innerHeight;
 
-    const sideWidth = w * 0.1;    // 左右 30% 盲撳區
-    const topHeight = h * 0.3;
-    const bottomHeight = h * 0.7;
+    // 區域定義
+    const isInLeftSide = (x < w * 0.3);          // 左側 30%
+    const isInRightSide = (x > w * 0.7);         // 右側 30%
+    const isInCenterWidth = (!isInLeftSide && !isInRightSide); // 中間 40%
+    const isUpperHalf = (y < h * 0.5);           // 上半截 50%
+    const isLowerHalf = (y >= h * 0.5);          // 下半截 50%
 
-    // 1. 判斷係咪點中咗「正中間 40%」嘅「文字內容」
-    // 如果點中咗有 .lyric-content 類別嘅嘢
+    // 1. 【優先判定】如果點中中間 40% 嘅「文字內容」 -> 跳轉歌詞
     const contentBtn = e.target.closest('.lyric-content');
-    
-    if (contentBtn && x >= w*0.3 && x <= w*0.7 && y >= topHeight && y <= bottomHeight) {
-        // 點中咗文字，攞返佢老竇 (lyric-line) 嘅 ID 嚟跳轉
+    if (contentBtn && isInCenterWidth) {
         const lineEl = contentBtn.parentElement;
         const newIndex = parseInt(lineEl.id.replace('line-', ''));
         if (!isNaN(newIndex)) {
@@ -1000,18 +998,18 @@ function handleTap(e) {
         }
     }
 
-    // 2. 其餘區域執行上一句/下一句 (盲撳)
-    if (y < topHeight || x < sideWidth) {
-        if (index > 0) index--;
-        updateUI();
-    } 
-    else if (y > bottomHeight || x > (w - sideWidth)) {
-        if (index < songData.length - 1) index++; 
-        else index = 0; 
+    // 2. 【兩側判定】只要喺左右 30% 區域，或者點中中間但冇點中字
+    if (isInLeftSide || isInRightSide || isInCenterWidth) {
+        // 如果係點擊兩側，直接跟「上半截/下半截」行
+        if (isUpperHalf) {
+            if (index > 0) index--;
+        } else {
+            if (index < songData.length - 1) index++; 
+            else index = 0;
+        }
         updateUI();
     }
 }
-    
 function handleLineClick(targetIndex) {
     if (isLocked) return;
     
@@ -1028,39 +1026,24 @@ function updateUI() {
     list.innerHTML = songData.map((line, i) => {
         const isCurrent = (i === index);
         return `
-            <div id="line-${i}" 
-                 class="lyric-line" 
-                 style="
-                    width: 100%;             /* ✨ 撐滿整個螢幕闊度 */
-                    padding: 12px 0; 
-                    text-align: center; 
-                    transition: all 0.3s ease; 
-                    opacity: ${isCurrent ? 1 : 0.3}; 
-                    transform: scale(${isCurrent ? 1.15 : 0.95});
-                    pointer-events: none;    /* ✨ 讓點擊穿透到 handleTap */
-                 ">
-                
-                <div class="lyric-content" style="
-                    display: inline-block;
-                    width: 85%;              /* ✨ 歌詞視覺上佔 85% 闊度 */
-                    color: ${isCurrent ? '#fff' : '#aaa'};
-                    pointer-events: auto;    /* ✨ 只有這 85% 範圍點擊會對焦 */
-                ">
-                    <div style="font-size: 1.35rem; font-weight: bold; line-height: 1.3;">
+            <div id="line-${i}" class="lyric-line" 
+                 style="width: 100%; padding: 15px 0; transition: all 0.3s; 
+                        opacity: ${isCurrent ? 1 : 0.3}; 
+                        transform: scale(${isCurrent ? 1.1 : 0.95});
+                        pointer-events: none;">
+                <div class="lyric-content" style="display: inline-block; width: 90%; pointer-events: auto;">
+                    <div style="font-size: 1.35rem; font-weight: bold; color: ${isCurrent ? '#fff' : '#aaa'};">
                         ${line.l}
                     </div>
-                    ${line.f ? `<div style="font-size: 1.15rem; color: #EAB308; margin-top: 5px;">${line.f}</div>` : ''}
+                    ${line.f ? `<div style="font-size: 1.1rem; color: #EAB308; margin-top: 4px;">${line.f}</div>` : ''}
                 </div>
             </div>
         `;
     }).join('');
 
-    // 自動捲動對準中間
     setTimeout(() => {
         const activeLine = document.getElementById(`line-${index}`);
-        if (activeLine) {
-            activeLine.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
+        if (activeLine) activeLine.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 50);
 
     // --- Footer 處理 (保留你原本的) ---
