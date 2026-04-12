@@ -55,6 +55,21 @@
             border-color: var(--fc-color); 
             box-shadow: none;        /* ✨ 移除發光，改用淡淡的邊框色就好 */
         }
+        /* 隱藏捲動條但保留功能 (可選) */
+        .lyrics-window::-webkit-scrollbar {
+            display: none;
+        }
+        
+        .lyrics-window {
+            mask-image: linear-gradient(
+                to bottom,
+                transparent 0%,
+                black 20%,
+                black 80%,
+                transparent 100%
+            );
+            /* 咁樣頂部同底部嘅歌詞就會慢慢淡出，好似 App 咁 */
+        }
         @media (max-width: 768px) {
             #split-screen-editor > div {
                 flex-direction: column !important; /* 手機變垂直排列 */
@@ -84,13 +99,17 @@
         <div class="btn" onclick="editCurrentSong(event)">✏️</div>
         <div id="lockBtn" class="btn" onclick="toggleLock(event)">🔓</div>
     </div>
-    <div class="lyrics-container">
+    <!-- <div class="lyrics-container">
         <div class="side-lyrics" id="prevLine"></div>
         <div class="main-focus" style="padding: 20px 0; transform: scale(1.1);">
             <div class="lyrics" id="currLyrics">載入中...</div>
             <div class="fanchant" id="currFanchant"></div>
         </div>
         <div class="side-lyrics" id="nextLine"></div>
+    </div> -->
+    <div class="lyrics-window" id="lyricsWindow" style="height: 60vh; overflow-y: scroll; scroll-behavior: smooth; padding: 150px 0; -webkit-overflow-scrolling: touch;">
+        <div class="lyrics-container" id="lyricsList">
+            </div>
     </div>
 </div>
 
@@ -927,14 +946,63 @@ async function deletePending(docId, songName) {
 
 
 function updateUI() {
-    const curr = songData[index];
-    const format = (item) => item ? `${item.l === "..." ? "" : item.l} <span class="fc-text">${item.f}</span>` : "";
+    // const curr = songData[index];
+    // const format = (item) => item ? `${item.l === "..." ? "" : item.l} <span class="fc-text">${item.f}</span>` : "";
     
-    document.getElementById('prevLine').innerHTML = format(songData[index-1]);
-    document.getElementById('currLyrics').innerText = curr.l;
-    document.getElementById('currFanchant').innerText = curr.f;
-    document.getElementById('nextLine').innerHTML = songData[index+1] ? format(songData[index+1]) : (index === songData.length-1 ? "— 完 —" : "");
+    // document.getElementById('prevLine').innerHTML = format(songData[index-1]);
+    // document.getElementById('currLyrics').innerText = curr.l;
+    // document.getElementById('currFanchant').innerText = curr.f;
+    // document.getElementById('nextLine').innerHTML = songData[index+1] ? format(songData[index+1]) : (index === songData.length-1 ? "— 完 —" : "");
+    const listContainer = document.getElementById('lyricsList');
+    if (!listContainer) return;
+
+    // 1. 清空並重新生成歌詞 (每次 show 前後 4 行，加埋中間即係 9 行)
+    let html = "";
+    const range = 4; // 中心點前後各 4 行
     
+    songData.forEach((line, i) => {
+        const isCurrent = (i === index);
+        const distance = Math.abs(i - index);
+        
+        // 只渲染喺顯示範圍內嘅歌詞 (減輕負擔)
+        if (distance <= range) {
+            html += `
+                <div id="line-${i}" 
+                     onclick="index=${i}; updateUI();"
+                     style="
+                        padding: 20px 0;
+                        text-align: center;
+                        transition: all 0.4s;
+                        opacity: ${isCurrent ? 1 : 0.3};
+                        transform: scale(${isCurrent ? 1.2 : 1});
+                        color: ${isCurrent ? '#0f0' : '#fff'};
+                        cursor: pointer;
+                     ">
+                    <div style="font-size: 1.5rem; font-weight: bold;">${line.l}</div>
+                    <div style="font-size: 1.2rem; color: #ffeb3b;">${line.f || ''}</div>
+                </div>
+            `;
+        } else {
+            // 佔位符，保持捲動條長度
+            html += `<div id="line-${i}" style="height: 80px;"></div>`;
+        }
+    });
+
+    listContainer.innerHTML = html;
+
+    // 2. ✨ 自動對準中間
+    setTimeout(() => {
+        const activeLine = document.getElementById(`line-${index}`);
+        if (activeLine) {
+            activeLine.scrollIntoView({
+                behavior: 'smooth',
+                block: 'center'
+            });
+        }
+    }, 50);
+
+    // ... 原本處理 Footer 嘅 Code ...
+}
     // --- ✨ 新增/加回：更新底端畫面的文字 ---
    const footerName = document.getElementById('display-song-name');
     const footerUpload = document.getElementById('display-upload-info');
