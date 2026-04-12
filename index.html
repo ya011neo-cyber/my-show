@@ -474,9 +474,19 @@ function startManualMarking(text) {
         
         // 搵返原本數據
         const originalFanchant = (songData[rowIdx] && songData[rowIdx].f) ? songData[rowIdx].f.split(/\s+/) : [];
+        
+        // ✨ 新增：用一個 Pointer (指針) 嚟記錄對到第幾個應援字
+        let fanchantPointer = 0; 
 
         words.forEach(w => {
-            const isPreviouslyMarked = originalFanchant.includes(w);
+            let isPreviouslyMarked = false;
+            
+            // ✨ 核心修正：唔好用 includes，改為「按順序」核對
+            if (fanchantPointer < originalFanchant.length && w === originalFanchant[fanchantPointer]) {
+                isPreviouslyMarked = true;
+                fanchantPointer++; // 成功對中一個，就將指針移去下一個目標
+            }
+            
             html += `<span onclick="this.classList.toggle('is-fc')" class="word-chip ${isPreviouslyMarked ? 'is-fc' : ''}">${w}</span>`;
         });
         html += `</div>`;
