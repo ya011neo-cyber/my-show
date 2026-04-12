@@ -2,218 +2,90 @@
 <html lang="zh-HK">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
-    <title>應援助手 Cloud Pro · 智慧應援詞編輯器</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>應援助手 Cloud Pro</title>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
     <style>
-        * {
-            box-sizing: border-box;
-            user-select: none; /* 避免拖曳干擾，但保留文字選擇可手動 */
+        body { margin: 0; background: #000; color: #fff; font-family: sans-serif; height: 100vh; overflow: hidden; touch-action: none; padding-top: env(safe-area-inset-top); }
+        #app { height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 0 5%; text-align: center; }
+        .lyrics-container { display: flex; flex-direction: column; gap: 2vh; width: 100%; }
+        :root { --fc-color: #0f0; }
+        .fanchant { 
+            /* 縮小字體：最高由 4.5rem 減至 3rem，最低由 1.5rem 減至 1.2rem */
+            font-size: clamp(1.2rem, 5vh, 3rem); 
+            
+            /* 減輕粗細：由 900 (極粗) 改為 700 (粗) 或 600 */
+            font-weight: 700; 
+            
+            color: var(--fc-color); 
+            
+            /* 減弱發光效果：只保留淡淡的陰影，唔好重疊幾層 shadow */
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.8); 
+            
+            white-space: normal; 
+            line-height: 1.2;      /* 稍微增加行高，唔好咁迫 */
+            display: block; 
+            letter-spacing: 0px;   /* 恢復正常字距，唔好負數縮埋一齊 */
         }
-        body {
-            margin: 0;
-            background: #000;
-            color: #e0e0e0;
-            font-family: system-ui, 'Segoe UI', 'Helvetica Neue', sans-serif;
-            height: 100vh;
-            overflow: hidden;
-            touch-action: pan-y pinch-zoom; /* 保留垂直滑動，避免整頁縮放干擾 */
-            padding-top: env(safe-area-inset-top);
-            padding-bottom: env(safe-area-inset-bottom);
+        .lyrics { font-size: clamp(1rem, 3vh, 2rem); color: #bbb; margin-bottom: 3px; white-space: normal; line-height: 1.2; word-break: break-word; }
+        .side-lyrics { font-size: clamp(0.8rem, 2.5vh, 1.5rem); color: #444; min-height: 2vh; transition: all 0.3s ease; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .side-lyrics .fc-text { color: var(--fc-color); filter: brightness(0.5); margin-left: 8px; }
+        .btn-group { position: fixed; top: calc(10px + env(safe-area-inset-top)); right: 10px; display: flex; gap: 5px; z-index: 100; flex-wrap: wrap; justify-content: flex-end; background: #000;}
+        .btn { padding: 8px 12px; background: #222; border-radius: 5px; font-size: 0.7rem; border: 1px solid #444; color: #fff; cursor: pointer; user-select: none; }
+        #main-photo-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 2500; justify-content: center; align-items: center; touch-action: none; overflow: hidden; }
+        #main-photo-img { max-width: 100%; max-height: 100%; object-fit: contain; transition: transform 0.2s ease-out; pointer-events: none; will-change: transform; }
+        .close-photo-btn { position: absolute; top: 20px; right: 20px; font-size: 2rem; color: #fff; background: rgba(0,0,0,0.5); border-radius: 50%; width: 50px; height: 50px; text-align: center; line-height: 50px; cursor: pointer; z-index: 2600; }
+        #editor-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #111; z-index: 999; padding: 20px; box-sizing: border-box; overflow-y: auto; display: none; }
+        .word-chip { 
+            display: inline-block; 
+            padding: 6px 10px;      /* 縮細少少 padding */
+            margin: 4px;            /* 稍微減少 margin */
+            border: 1px solid #333; 
+            border-radius: 4px; 
+            cursor: pointer; 
+            color: #999;            /* 未選中時顏色暗啲 */
+            font-size: 0.9rem;      /* 固定大細，唔好太大 */
         }
-        #app {
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            position: relative;
+        
+        .word-chip.is-fc { 
+            background: transparent; /* ✨ 改用透明背景 */
+            color: var(--fc-color);  /* ✨ 文字變綠色就好 */
+            font-weight: bold; 
+            border-color: var(--fc-color); 
+            box-shadow: none;        /* ✨ 移除發光，改用淡淡的邊框色就好 */
         }
-        :root {
-            --fc-color: #0f0;
-            --glass-bg: rgba(20,20,30,0.7);
-        }
-        /* 歌詞視窗 - 流暢滾動 + 精確視覺 */
-        #lyrics-window {
-            width: 100%;
-            height: 100%;
-            overflow-y: auto;
-            scroll-behavior: smooth;
-            -webkit-overflow-scrolling: touch;
-            padding: 20vh 0 20vh 0;  /* 上下預留足夠空間，點擊任一行都能置中 */
-            margin: 0;
-            scroll-snap-type: y proximity;
-        }
-        #lyrics-list {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 1.2rem;
-            width: 100%;
-            padding: 0 1rem;
-        }
-        .line-item {
-            width: 100%;
-            max-width: 700px;
-            margin: 0 auto;
-            text-align: center;
-            padding: 1rem 0.5rem;
-            border-radius: 28px;
-            transition: all 0.2s ease;
-            scroll-snap-align: center;
-            cursor: pointer;
-            background: rgba(0,0,0,0.4);
-            backdrop-filter: blur(2px);
-        }
-        .line-item:active {
-            transform: scale(0.98);
-            background: rgba(30,30,40,0.6);
-        }
-        .line-item > div:first-child {
-            font-size: clamp(1rem, 4vh, 1.8rem);
-            color: #ccc;
-            font-weight: 500;
-            letter-spacing: 0.02em;
-            line-height: 1.4;
-            word-break: break-word;
-            white-space: pre-wrap;
-        }
-        .line-item > div:last-child {
-            font-size: clamp(1.3rem, 5.5vh, 2.6rem);
-            font-weight: 700;
-            color: var(--fc-color);
-            text-shadow: 0 0 5px rgba(0,255,0,0.3);
-            margin-top: 0.5rem;
-            letter-spacing: 0.02em;
-            word-break: break-word;
-        }
-        /* 按鈕群組更乾淨 */
-        .btn-group {
-            position: fixed;
-            top: calc(12px + env(safe-area-inset-top));
-            right: 12px;
-            display: flex;
-            gap: 8px;
-            z-index: 200;
-            flex-wrap: wrap;
-            justify-content: flex-end;
-            background: transparent;
-            pointer-events: none;
-        }
-        .btn-group .btn {
-            pointer-events: auto;
-            background: rgba(0,0,0,0.75);
-            backdrop-filter: blur(8px);
-            border: 1px solid #3a3a4a;
-            color: #eee;
-            padding: 6px 12px;
-            border-radius: 40px;
-            font-size: 0.75rem;
-            font-weight: 500;
-            cursor: pointer;
-            transition: 0.1s linear;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-        }
-        .btn-group .btn:active { transform: scale(0.94); background: #2a2a2a; }
-        /* 模態框通用美學 */
-        .modal-glass {
-            background: rgba(8,8,12,0.96);
-            backdrop-filter: blur(12px);
-            border-radius: 28px;
-            border: 1px solid #2c2c3a;
-            box-shadow: 0 20px 35px rgba(0,0,0,0.6);
-        }
-        .word-chip {
-            display: inline-block;
-            padding: 8px 14px;
-            margin: 6px;
-            border: 1px solid #3a3a44;
-            border-radius: 48px;
-            cursor: pointer;
-            color: #ccc;
-            font-size: 0.95rem;
-            font-weight: 500;
-            background: #111;
-            transition: 0.07s linear;
-        }
-        .word-chip.is-fc {
-            background: rgba(0,255,0,0.18);
-            color: var(--fc-color);
-            border-color: var(--fc-color);
-            box-shadow: 0 0 4px var(--fc-color);
-        }
-        #editor-overlay {
-            background: #0a0a0e;
-        }
-        /* 分屏編輯器: 現代適應 */
-        #editor-layout {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 18px;
-        }
-        @media (max-width: 720px) {
-            #editor-layout { flex-direction: column; }
-            #reference-image-container { max-height: 200px; }
-        }
-        #reference-image-container {
-            flex: 1;
-            background: #000;
-            border-radius: 24px;
-            overflow: hidden;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-        #reference-img {
-            max-width: 100%;
-            max-height: 260px;
-            object-fit: contain;
-        }
-        textarea, input {
-            font-family: 'SF Mono', monospace;
-        }
-        #footer-info {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            padding: 10px 0 18px;
-            background: linear-gradient(to top, #000000dd, transparent);
-            text-align: center;
-            font-size: 0.7rem;
-            color: #aaa;
-            pointer-events: auto;
-            z-index: 60;
-        }
-        #lyrics-window::-webkit-scrollbar {
-            width: 4px;
-        }
-        #lyrics-window::-webkit-scrollbar-track {
-            background: #111;
-        }
-        #lyrics-window::-webkit-scrollbar-thumb {
-            background: var(--fc-color);
-            border-radius: 10px;
-        }
-        .btn-danger {
-            background: #a00;
-            border-color: #d44;
-        }
-        .btn-success {
-            background: #0a4a0a;
-            border-color: #0f0;
-            color: #cfc;
+#lyrics-window::-webkit-scrollbar { display: none; }
+    #lyrics-window { scrollbar-width: none; -ms-overflow-style: none; }
+
+/* 確保歌詞行唔好太闊，亦唔好太厚 */
+.line-item {
+    padding: 15px 0;
+    min-height: 60px;
+    text-align: center;
+}
+        @media (max-width: 768px) {
+            #split-screen-editor > div {
+                flex-direction: column !important; /* 手機變垂直排列 */
+            }
+            #reference-image-container {
+                flex: 0 0 40% !important; /* 圖片佔上方 40% */
+                border-right: none !important;
+                border-bottom: 1px solid #333;
+            }
+            #editor-input-area {
+                flex: 1 !important;
+            }
         }
     </style>
 </head>
+    
 <body>
-<div id="app" onclick="handleGlobalTap(event)">
+<div id="app" onclick="handleTap(event)">
     <div class="btn-group">
-        <div class="btn" onclick="location.reload()">⟳</div>
-        <div id="mainViewPhotoBtn" class="btn" style="display:none;" onclick="showMainPhoto(event)">🖼️</div>
-        <div id="mainViewLinkBtn" class="btn" style="display:none;" onclick="openSourceLink(event)">🔗</div>
+        <div class="btn" style="background:#444;" onclick="location.reload()">🔄</div>
+        <div id="mainViewPhotoBtn" class="btn" style="display:none; background:#444;" onclick="showMainPhoto(event)">🖼️</div>
+        <div id="mainViewLinkBtn" class="btn" style="display:none; background:#0055aa;" onclick="openSourceLink(event)">🔗</div>
         <div class="btn" onclick="openColorMenu(event)">🎨</div>
         <div class="btn" onclick="fetchPublicSongs(event)">📂</div>
         <div class="btn" onclick="openImporter(false)">➕</div>
@@ -221,429 +93,1064 @@
         <div class="btn" onclick="editCurrentSong(event)">✏️</div>
         <div id="lockBtn" class="btn" onclick="toggleLock(event)">🔓</div>
     </div>
-    <div id="lyrics-window">
-        <div id="lyrics-list"></div>
+    <!-- <div class="lyrics-container">
+        <div class="side-lyrics" id="prevLine"></div>
+        <div class="main-focus" style="padding: 20px 0; transform: scale(1.1);">
+            <div class="lyrics" id="currLyrics">載入中...</div>
+            <div class="fanchant" id="currFanchant"></div>
+        </div>
+        <div class="side-lyrics" id="nextLine"></div>
+    </div> -->
+<div id="lyrics-window" style="
+    height: 350px; 
+    width: 100%; 
+    overflow-y: auto; 
+    scroll-behavior: smooth; 
+    -webkit-overflow-scrolling: touch;
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 20%, black 80%, transparent 100%);
+    mask-image: linear-gradient(to bottom, transparent 0%, black 20%, black 80%, transparent 100%);
+">
+    <div id="lyrics-list" style="padding: 150px 0;"></div>
+</div>
+</div>
+
+<div id="main-photo-overlay">
+    <div class="close-photo-btn" onclick="hideMainPhoto()">×</div>
+    <img id="main-photo-img" src="" alt="應援參考圖">
+</div>
+
+<div id="color-modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:#222; padding:20px; border-radius:15px; z-index:2000; border:1px solid #444; width:250px; text-align:center;">
+    <h4 style="margin:0 0 15px 0;">自定義顏色</h4>
+    <input type="color" id="colorPicker" onchange="updateHexInput(this.value)" style="width:100%; height:40px; border:none; background:none; cursor:pointer;">
+    <div style="margin:15px 0;">
+        <label style="font-size:0.8rem; color:#888;">HEX Code:</label>
+        <input type="text" id="hexInput" style="width:100%; background:#111; color:#fff; border:1px solid #555; padding:8px; border-radius:5px; margin-top:5px; text-align:center; font-family:monospace;">
     </div>
-</div>
-
-<!-- 圖片全屏瀏覽器 -->
-<div id="main-photo-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:black; z-index:3000; justify-content:center; align-items:center; touch-action:pan-x pan-y;">
-    <div class="close-photo-btn" style="position:absolute; top:25px; right:25px; font-size:2.2rem; background:rgba(0,0,0,0.6); width:48px; height:48px; border-radius:30px; text-align:center; line-height:48px; cursor:pointer; z-index:3001;" onclick="hideMainPhoto()">✕</div>
-    <img id="main-photo-img" style="max-width:95%; max-height:95%; object-fit:contain; transition:transform 0.1s;" src="">
-</div>
-
-<!-- 顏色選單 -->
-<div id="color-modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:#1e1e2a; padding:20px; border-radius:32px; z-index:2100; width:260px; text-align:center; border:1px solid #4a4a5a;">
-    <h4 style="margin:0 0 12px 0;">應援色自訂</h4>
-    <input type="color" id="colorPicker" onchange="updateHexInput(this.value)" style="width:100%; height:44px; border-radius:12px;">
-    <input type="text" id="hexInput" style="width:100%; margin:12px 0; background:#111; border:1px solid #555; padding:8px; border-radius:20px; text-align:center; color:#0f0;">
     <div style="display:flex; gap:10px;">
-        <button class="btn" style="flex:1; background:#0f0; color:#000;" onclick="saveCustomColor()">套用</button>
+        <button class="btn" style="flex:1; background:#0f0; color:#000; font-weight:bold;" onclick="saveCustomColor()">套用</button>
         <button class="btn" style="flex:1;" onclick="closeColorMenu()">取消</button>
     </div>
 </div>
-
-<!-- 匯入/編輯 模態 (分屏改進) -->
-<div id="import-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.96); z-index:1500; padding:20px; overflow-y:auto;">
-    <div style="max-width:800px; margin:0 auto;">
-        <div style="background:#111; border-radius:32px; padding:20px; margin-top:20px;">
-            <h3 id="modal-title" style="color:#0f0; margin-top:0;">編輯歌詞</h3>
-            <div id="editor-layout">
-                <div id="reference-image-container" style="display:none;">
-                    <img id="reference-img" src="">
-                </div>
-                <div style="flex:2">
-                    <textarea id="manualInput" rows="6" style="width:100%; background:#1a1a24; border:1px solid #333; border-radius:20px; padding:16px; color:white; font-size:1rem;" placeholder="每行一句，應援詞用括號 () 包住會自動標記"></textarea>
-                    <input type="text" id="sourceLinkInput" style="width:100%; margin-top:12px; background:#1a1a24; border:1px solid #333; border-radius:30px; padding:12px; color:#0f0;" placeholder="🔗 參考來源連結 (YouTube/歌詞網)">
-                </div>
-            </div>
-            <div style="display:flex; gap:12px; margin-top:24px; flex-wrap:wrap;">
-                <button class="btn btn-success" style="flex:2; padding:12px;" onclick="handleManualSubmit()">✅ 確認並標記應援詞</button>
-                <button class="btn" style="flex:1;" onclick="document.getElementById('refInput').click()">📷 附參考圖</button>
-                <button class="btn" style="background:#333;" onclick="closeImporter()">取消</button>
-            </div>
-            <input type="file" id="refInput" accept="image/*" style="display:none" onchange="previewRefImage(event)">
-            <div style="margin-top:12px; font-size:0.7rem; text-align:center; color:#666;">💡 提示：點擊單詞即可切換應援色標記</div>
+<div id="import-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:1000; padding:20px; box-sizing:border-box; overflow-y:auto;">
+    
+    <div style="position: sticky; top: -20px; background: rgba(0,0,0,0.95); z-index: 1100; padding: 15px 0; border-bottom: 1px solid #333; margin-bottom: 15px; margin-top: -20px; text-align: center;">
+        <h3 id="modal-title" style="color:#0f0; margin: 5px 0;">編輯歌詞</h3>
+        <div style="display: flex; gap: 10px; justify-content: center; align-items: center;">
+            <button id="importViewPhotoBtn" class="btn" style="background:#444; display:none;" onclick="showMainPhoto(event)">🖼️ 睇參考圖</button>
+            <button id="importRemovePhotoBtn" class="btn" style="background:#800; display:none; font-size:0.7rem;" onclick="removePhoto()">❌ 移除相片</button>
         </div>
     </div>
-</div>
 
-<!-- 公開歌單面板 -->
-<div id="public-songs-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.97); z-index:1800; padding:20px; overflow-y:auto;"></div>
+    <div id="editor-layout" style="display: flex; gap: 15px; width: 100%; min-height: 60vh;">
+        
+        <div id="reference-image-container" style="flex: 1.2; overflow-y: auto; background: #111; border: 1px solid #333; border-radius: 10px; display: none;">
+            <img id="reference-img" src="" style="width: 100%; height: auto; display: block;">
+        </div>
 
-<!-- 標記編輯器 -->
-<div id="editor-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:#0b0b10; z-index:2200; overflow-y:auto; padding:20px;">
-    <div style="max-width:700px; margin:0 auto;">
-        <div style="background:#121217; border-radius:28px; padding:20px;">
-            <h2 style="text-align:center; color:#0f0;">✏️ 點擊詞彙設為應援詞</h2>
-            <div id="chips-container" style="text-align:center; margin:25px 0;"></div>
-            <div style="display:flex; gap:16px; justify-content:center;">
-                <button class="btn btn-success" style="padding:12px 28px;" onclick="saveMarkedData()">✅ 完成生成</button>
-                <button class="btn" style="background:#333;" onclick="cancelMarking()">取消</button>
+        <div id="input-container" style="flex: 1; display: flex; flex-direction: column;">
+            <textarea id="manualInput" style="width:100%; flex-grow: 1; background:#111; color:#fff; border:1px solid #444; padding:15px; border-radius:10px; font-size:1rem; box-sizing:border-box; font-family: monospace;" placeholder="括號 () 內文字會自動變應援色..."></textarea>
+            
+            <div style="margin: 15px 0;">
+                <input type="text" id="sourceLinkInput" style="width:100%; background:#111; color:#0f0; border:1px solid #444; padding:12px; border-radius:5px; box-sizing:border-box; font-size:0.8rem;" placeholder="🔗 貼上來源網址 (YouTube/歌詞網)...">
             </div>
         </div>
     </div>
-</div>
 
-<div id="footer-info" onclick="handleAdminTrigger()">
-    <div id="display-song-name" style="font-weight:600;">應援助手 Cloud Pro</div>
-    <div id="display-upload-info" style="font-size:0.6rem;"></div>
+    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top: 20px; padding-bottom: 30px;">
+        <button class="btn" style="flex:2; padding:15px; background:#0f0; color:#000; font-weight:bold;" onclick="handleManualSubmit()">✅ 確認並標記</button>
+        <button class="btn" style="flex:1; padding:15px;" onclick="document.getElementById('refInput').click()">📷 附相</button>
+        <button class="btn" style="flex:1; padding:15px; background:#444;" onclick="closeImporter()">取消</button>
+    </div>
+    
+    <input type="file" id="refInput" accept="image/*" style="display:none" onchange="previewRefImage(event)">
 </div>
+<div id="public-songs-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:2000; padding:20px; box-sizing:border-box; overflow-y:auto;">
+    </div>
 
+<div id="editor-overlay">
+    <div style="position: sticky; top: 0; background: #111; z-index: 1000; padding: 10px 0; border-bottom: 1px solid #333; margin-bottom: 20px;">
+        <h2 style="text-align:center; margin: 0 0 10px 0; font-size: 1.2rem;">點擊【應援詞】使其變色</h2>
+        <div style="text-align:center;">
+            <button id="editorPhotoBtn" class="btn" style="background:#444; display:none; padding: 10px 20px;" onclick="showMainPhoto(event)">🖼️ 睇參考圖</button>
+        </div>
+    </div>
+    
+    <div id="chips-container" style="text-align:center;"></div>
+    
+    <div style="text-align:center; margin-top:30px; padding-bottom:50px;">
+        <button class="btn" style="font-size: 1.2rem; padding: 15px 30px; background:#0f0; color:#000;" onclick="saveMarkedData()">✅ 完成生成</button>
+        <button class="btn" style="font-size: 1.2rem; padding: 15px 30px; background:#444;" onclick="cancelMarking()">❌ 取消</button>
+    </div>
+</div>
+    
+<div id="footer-info" onclick="handleAdminTrigger()" style="position: fixed; bottom: env(safe-area-inset-bottom); left: 0; width: 100%; padding: 15px 0; background: linear-gradient(transparent, rgba(0,0,0,0.9) 70%); color: #555; font-size: 0.8rem; text-align: center; z-index: 50; user-select: none;">
+    <div id="display-song-name" style="font-weight: bold; color: #666;">應援助手 Fanchant Helper</div>
+    <div id="display-upload-info" style="font-size: 0.65rem; margin-top: 3px; color: #444;"></div>
+</div>
 <script>
-    // Firebase 初始化
+    // --- 原有 Firebase 配置 (請保持原樣) ---
     const firebaseConfig = { apiKey: "AIzaSyCOnH-KJfJqe6VGn7qG2TU1rIaT5OEL9JU", authDomain: "fanchartpro.firebaseapp.com", projectId: "fanchartpro", storageBucket: "fanchartpro.firebasestorage.app", messagingSenderId: "94013254919", appId: "1:94013254919:web:929fff5cd2c71067b269a2" };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
-    // 核心數據
-    let songData = [{ l: "👋 歡迎使用應援助手", f: "Cloud Pro" }];
+    let songData = [{ l: "歡迎使用應援助手", f: "開始" }];
     let index = 0;
     let isLocked = false;
-    let tempPhotoData = "";      // 暫存圖片 base64
-    let currentEditingMeta = { name: "", uploader: "本地編輯者" };
+    let tempPhotoData = ""; // 用來編輯時臨時儲存相片
 
-    // --- 工具函數 ---
-    function getFirstLineData() { return songData[0] || {}; }
-    function updateMainViewBtn() {
-        const curr = getFirstLineData();
-        const photoBtn = document.getElementById('mainViewPhotoBtn');
-        const linkBtn = document.getElementById('mainViewLinkBtn');
-        if(photoBtn) photoBtn.style.display = (curr && curr.photo) ? 'inline-block' : 'none';
-        if(linkBtn) linkBtn.style.display = (curr && curr.link) ? 'inline-block' : 'none';
+    // --- 相片顯示與縮放 (修復 Chrome & Samsung) ---
+    let scale = 1, posX = 0, posY = 0, isDragging = false, startX, startY;
+
+function showMainPhoto(e) {
+    if(e) e.stopPropagation();
+    
+    // 優先：讀取匯入/編輯時嘅臨時相片 (tempPhotoData)
+    // 次之：讀取當前歌曲第一行嘅相片
+    let photoToShow = tempPhotoData;
+    if (!photoToShow) {
+        const currSong = getFirstLineData();
+        if (currSong && currSong.photo) photoToShow = currSong.photo;
     }
 
-    // 儲存本地 + 更新UI (核心)
-    function updateUI() {
-        const listDiv = document.getElementById('lyrics-list');
-        if(!listDiv) return;
-        listDiv.innerHTML = songData.map((line, i) => {
-            const active = (i === index);
-            return `<div id="line-${i}" class="line-item" style="opacity: ${active ? 1 : 0.45}; transform: ${active ? 'scale(1.02)' : 'scale(0.98)'}; transition:0.2s;" onclick="event.stopPropagation(); goToLine(${i});">
-                        <div>${escapeHtml(line.l || '⋯')}</div>
-                        <div>${escapeHtml(line.f || '')}</div>
-                    </div>`;
-        }).join('');
-        // 自動滾動至中間
-        const activeElem = document.getElementById(`line-${index}`);
-        if(activeElem) activeElem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if(!photoToShow) {
+        alert("未附上相片或相片未載入。");
+        return;
+    }
+    
+    scale = 1; posX = 0; posY = 0;
+    const img = document.getElementById('main-photo-img');
+    img.src = photoToShow; // 載入啱嘅相
+    img.style.transform = `translate(0px, 0px) scale(1)`;
+    document.getElementById('main-photo-overlay').style.display = 'flex';
+}
+
+    function hideMainPhoto() { document.getElementById('main-photo-overlay').style.display = 'none'; }
+
+    // 獲取當前歌曲嘅「元數據」（例如相片）
+    function getFirstLineData() { return songData[0]; }
+
+    // 手勢監聽器
+    const overlay = document.getElementById('main-photo-overlay');
+    overlay.addEventListener('touchstart', (e) => { if (e.touches.length === 1) { isDragging = true; startX = e.touches[0].clientX - posX; startY = e.touches[0].clientY - posY; } }, { passive: false });
+    overlay.addEventListener('touchmove', (e) => { if (!isDragging) return; if (scale > 1) e.preventDefault(); posX = e.touches[0].clientX - startX; posY = e.touches[0].clientY - startY; document.getElementById('main-photo-img').style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`; }, { passive: false });
+    overlay.addEventListener('touchend', (e) => { isDragging = false; const currentTime = new Date().getTime(); const tapLength = currentTime - (window.lastTap || 0); if (tapLength < 300 && tapLength > 0) { scale = (scale === 1) ? 2.5 : 1; if (scale === 1) { posX = 0; posY = 0; } document.getElementById('main-photo-img').style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`; e.preventDefault(); } window.lastTap = currentTime; });
+
+    // --- 編輯與圖片處理 ---
+   function openImporter(isEdit = false) {
+    const modal = document.getElementById('import-modal');
+    const title = document.getElementById('modal-title');
+    const input = document.getElementById('manualInput');
+    const linkInput = document.getElementById('sourceLinkInput');
+    const refContainer = document.getElementById('reference-image-container');
+    const refImg = document.getElementById('reference-img');
+
+    if (!modal || !input) return;
+
+    if (isEdit) {
+        title.innerText = "✏️ 編輯現有歌詞";
+        // 載入歌詞內容
+        input.value = songData.map(item => {
+            let line = "";
+            if (item.l && item.l !== "...") line += item.l + " ";
+            if (item.f) line += item.f; 
+            return line.trim();
+        }).join('\n');
+
+        // 載入 Link (對應你原本嘅邏輯)
+        const currSong = (typeof getFirstLineData === 'function') ? getFirstLineData() : {};
+        if (linkInput) linkInput.value = currSong.link || "";
         
-        // 更新底部 meta
-        const metaName = songData.meta?.name || currentEditingMeta.name || "未命名歌曲";
-        const metaUploader = songData.meta?.uploader || currentEditingMeta.uploader || "本地";
-        document.getElementById('display-song-name').innerText = metaName;
-        document.getElementById('display-upload-info').innerText = metaUploader ? `上載：${metaUploader}` : "";
-        updateMainViewBtn();
-        // 持久化至 localStorage (新版)
-        try {
-            localStorage.setItem('myConcertData', JSON.stringify({
-                version: "2.1",
-                meta: { name: metaName, uploader: metaUploader },
-                lines: songData
-            }));
-        } catch(e) {}
+        // 載入相片暫存
+        tempPhotoData = currSong.photo || localStorage.getItem('myConcertPhoto') || "";
+    } else {
+        title.innerText = "➕ 匯入新歌詞";
+        input.value = "";
+        if (linkInput) linkInput.value = "";
+        tempPhotoData = "";
     }
 
-    function escapeHtml(str) { return str.replace(/[&<>]/g, function(m){if(m==='&') return '&amp;'; if(m==='<') return '&lt;'; if(m==='>') return '&gt;'; return m;}); }
-    function goToLine(idx) { if(!isLocked && idx>=0 && idx<songData.length) { index = idx; updateUI(); } }
-
-    // 全域點擊左右換行 (但避開歌詞區內部)
-    function handleGlobalTap(e) {
-        if(isLocked) return;
-        if(e.target.closest('#lyrics-window') || e.target.closest('.btn') || e.target.closest('.line-item')) return;
-        const x = e.clientX ?? (e.touches?.[0]?.clientX ?? 0);
-        const w = window.innerWidth;
-        if(x < w * 0.4) { if(index > 0) index--; }
-        else { if(index < songData.length-1) index++; else index = 0; }
-        updateUI();
+    // --- ✨ 呢度就係分屏功能嘅靈魂 ---
+    const photoToShow = isEdit ? tempPhotoData : localStorage.getItem('myConcertPhoto');
+    if (photoToShow && refContainer && refImg) {
+        refImg.src = photoToShow;
+        refContainer.style.display = 'block'; // 顯示左邊分屏
+    } else if (refContainer) {
+        refContainer.style.display = 'none';  // 冇相就收埋左邊
     }
 
-    // 編輯 / 匯入邏輯 (加強)
-    function openImporter(isEdit = false) {
-        const modal = document.getElementById('import-modal');
-        const textarea = document.getElementById('manualInput');
-        const linkInput = document.getElementById('sourceLinkInput');
-        const refContainer = document.getElementById('reference-image-container');
-        const refImg = document.getElementById('reference-img');
-        const title = document.getElementById('modal-title');
-        if(isEdit) {
-            title.innerText = "✏️ 編輯現有歌詞";
-            let fullText = songData.map(line => `${line.l || ''} (${line.f || ''})`.trim().replace(/\(\)/g, '')).join('\n');
-            textarea.value = fullText;
-            const currMeta = getFirstLineData();
-            linkInput.value = currMeta.link || "";
-            tempPhotoData = currMeta.photo || "";
-        } else {
-            title.innerText = "➕ 匯入新歌詞";
-            textarea.value = "";
-            linkInput.value = "";
-            tempPhotoData = "";
-        }
-        if(tempPhotoData && refImg) {
-            refImg.src = tempPhotoData;
-            refContainer.style.display = 'flex';
-        } else refContainer.style.display = 'none';
-        modal.style.display = 'block';
+    modal.style.display = 'block';
+}
+    function editCurrentSong(e) {
+        if (e) e.stopPropagation();
+        // 唔好喺度寫一大堆 style.display，直接叫 openImporter 做嘢！
+        openImporter(true); 
     }
     function closeImporter() { document.getElementById('import-modal').style.display = 'none'; }
-    
-    // 圖片壓縮上傳 (品質再降)
-    function previewRefImage(event) {
-        const file = event.target.files[0];
-        if(!file) return;
-        const reader = new FileReader();
-        reader.onload = function(ev) {
-            const img = new Image();
-            img.onload = function() {
-                const canvas = document.createElement('canvas');
-                let w = img.width, h = img.height;
-                const maxSide = 1000;
-                if(w > maxSide) { h = (h * maxSide) / w; w = maxSide; }
-                if(h > maxSide) { w = (w * maxSide) / h; h = maxSide; }
-                canvas.width = w; canvas.height = h;
-                canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-                tempPhotoData = canvas.toDataURL('image/jpeg', 0.65);
-                const refImg = document.getElementById('reference-img');
-                if(refImg) { refImg.src = tempPhotoData; document.getElementById('reference-image-container').style.display = 'flex'; }
-            };
-            img.src = ev.target.result;
-        };
-        reader.readAsDataURL(file);
+
+    // 編輯時預覽圖片
+// 編輯/匯入時預覽圖片
+function updateEditPreview() {
+    const importPhotoBtn = document.getElementById('importViewPhotoBtn');
+    const importRemoveBtn = document.getElementById('importRemovePhotoBtn');
+
+    if (tempPhotoData) { 
+        // 有相時：顯示「睇參考圖」同「移除」掣
+        if(importPhotoBtn) importPhotoBtn.style.display = 'inline-block';
+        if(importRemoveBtn) importRemoveBtn.style.display = 'inline-block';
+    } else { 
+        // 冇相時：全部隱藏
+        if(importPhotoBtn) importPhotoBtn.style.display = 'none';
+        if(importRemoveBtn) importRemoveBtn.style.display = 'none';
+    }
+}
+function openSplitEditor(imageSrc = null) {
+    const splitView = document.getElementById('split-screen-editor');
+    const imgContainer = document.getElementById('reference-image-container');
+    const imgTag = document.getElementById('reference-img');
+    const textArea = document.getElementById('manualInput');
+
+    // 如果有相片，顯示左邊
+    if (imageSrc) {
+        imgTag.src = imageSrc;
+        imgContainer.style.display = 'block';
+    } else {
+        imgContainer.style.display = 'none';
     }
 
-    function handleManualSubmit() {
-        const raw = document.getElementById('manualInput').value;
-        if(!raw.trim()) { alert("請輸入歌詞內容"); return; }
-        const lines = raw.split('\n').filter(l => l.trim() !== "");
-        const newData = [];
-        for(let line of lines) {
-            let l = "", f = "";
-            const fcRegex = /\(([^)]+)\)/g;
-            let lastIdx = 0, match;
-            let plainParts = [], fcParts = [];
-            while((match = fcRegex.exec(line)) !== null) {
-                plainParts.push(line.substring(lastIdx, match.index));
-                fcParts.push(match[1]);
-                lastIdx = match.index + match[0].length;
+    // 填入現有歌詞 (如果有)
+    textArea.value = songData.map(line => `${line.l || ''},${line.f || ''}`).join('\n');
+
+    splitView.style.display = 'block';
+}
+
+function closeSplitEditor() {
+    document.getElementById('split-screen-editor').style.display = 'none';
+}
+    // 處理上傳相片 (Base64)
+// --- 強化版：自動壓縮相片，解決手機 LocalStorage 爆容量問題 ---
+function previewRefImage(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const img = new Image();
+        img.onload = function() {
+            // 建立畫布進行壓縮
+            const canvas = document.createElement('canvas');
+            let width = img.width;
+            let height = img.height;
+
+            // 如果張相太大，限制最大寬度為 1200px (貓紙夠睇有餘)
+            const max_size = 1200;
+            if (width > height) {
+                if (width > max_size) {
+                    height *= max_size / width;
+                    width = max_size;
+                }
+            } else {
+                if (height > max_size) {
+                    width *= max_size / height;
+                    height = max_size;
+                }
             }
-            plainParts.push(line.substring(lastIdx));
-            let finalL = plainParts.join('').trim();
-            let finalF = fcParts.join(' ').trim();
-            newData.push({ l: finalL || "...", f: finalF });
-        }
-        if(newData.length === 0) return;
-        const sourceLink = document.getElementById('sourceLinkInput').value.trim();
-        if(tempPhotoData) newData[0].photo = tempPhotoData;
-        if(sourceLink) newData[0].link = sourceLink;
-        // 彈窗拿歌名
-        let songName = prompt("請輸入 [歌名 - 歌手] ：", currentEditingMeta.name || "未命名");
-        if(!songName) songName = "未命名歌曲";
-        currentEditingMeta = { name: songName, uploader: "本地編輯者" };
-        newData.meta = currentEditingMeta;
-        songData = newData;
-        index = 0;
-        closeImporter();
-        updateUI();
-        // 開啟標記模式更直觀：直接進階微調 (也可不開，但維持傳統體驗可選擇打開標記)
-        startManualMarkingFromCurrent(); 
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+
+            // 輸出壓縮後的 Base64 (質量設為 0.7)
+            tempPhotoData = canvas.toDataURL('image/jpeg', 0.7); 
+            
+            // 更新編輯器預覽
+            updateEditPreview();
+            console.log("相片已壓縮，宜家大細約:", Math.round(tempPhotoData.length / 1024), "KB");
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+    // 移除圖片
+    function removePhoto() { tempPhotoData = ""; updateEditPreview(); }
+
+
+function handleManualSubmit() {
+    // 1. 抓取歌詞
+    const lyricsText = document.getElementById('manualInput').value;
+    if (!lyricsText || lyricsText.trim() === "") {
+        alert("請先輸入歌詞！");
+        return;
     }
-    
-    function startManualMarkingFromCurrent() {
-        // 將現有 songData 轉換成標記模式
-        const container = document.getElementById('chips-container');
-        let html = "";
-        songData.forEach((line, rowIdx) => {
-            if(!line.l && !line.f) return;
-            const wordsL = (line.l || "").split(/\s+/).filter(w=>w);
-            const wordsF = (line.f || "").split(/\s+/).filter(w=>w);
-            const allUniqueWords = [...new Set([...wordsL, ...wordsF])];
-            html += `<div class="line-row" data-row="${rowIdx}" style="margin-bottom:20px; border-bottom:1px solid #222; padding-bottom:10px;">`;
-            allUniqueWords.forEach(w => {
-                const isFc = wordsF.includes(w);
-                html += `<span onclick="this.classList.toggle('is-fc')" class="word-chip ${isFc ? 'is-fc' : ''}">${escapeHtml(w)}</span>`;
-            });
-            html += `</div>`;
-        });
-        container.innerHTML = html;
-        document.getElementById('editor-overlay').style.display = 'block';
+
+    // 2. 獲取歌名邏輯 (保留你原本的)
+    const modalTitle = document.getElementById('modal-title').innerText;
+    const isEditMode = modalTitle.includes("編輯");
+    let name = "";
+
+    if (isEditMode) {
+        name = document.getElementById('display-song-name').innerText;
+        if (name === "應援助手 Fanchant Helper") name = prompt("請輸入[歌名 - 歌手]：");
+    } else {
+        name = prompt("請輸入[歌名 - 歌手]：");
     }
+
+    if (!name) return;
+
+    // 3. 儲存數據供稍後上傳使用
+    window.currentSubmittingData = { name: name };
+
+    // --- ✨ 3.5 新增：強制更新作者資訊為「本地」 ---
+    // 咁樣一陣去到 startManualMarking 並 updateUI 嗰陣，佢就會識變
+    if (typeof songData !== 'undefined') {
+        songData.meta = {
+            name: name,
+            uploader: "本地編輯" // 或者你想寫 "本地"
+        };
+    }
+
+    // 4. 關閉輸入畫面，開啟標記畫面
+    document.getElementById('import-modal').style.display = 'none'; 
+    startManualMarking(lyricsText); 
+}
+
+    // --- 標記與儲存 ---
+function startManualMarking(text) {
+    const container = document.getElementById('chips-container');
     
-    function cancelMarking() { document.getElementById('editor-overlay').style.display = 'none'; }
-    
-    function saveMarkedData() {
-        const rows = document.querySelectorAll('.line-row');
-        let newLyrics = [];
-        rows.forEach(row => {
-            const chips = row.querySelectorAll('.word-chip');
-            let normal = [], fc = [];
-            chips.forEach(chip => {
-                if(chip.classList.contains('is-fc')) fc.push(chip.innerText);
-                else normal.push(chip.innerText);
-            });
-            newLyrics.push({ l: normal.join(' ') || "...", f: fc.join(' ') });
+    // --- ✨ 新增：保留 Meta 數據 ---
+    // 確保當前 window 暫存的名能帶入到新生成的數據中
+    const currentName = window.currentSubmittingData ? window.currentSubmittingData.name : "";
+    const newMeta = {
+        name: currentName,
+        uploader: "本地編輯"
+    };
+
+    // 處理相片按鈕 (保留你原本邏輯)
+    const editorBtn = document.getElementById('editorPhotoBtn');
+    if (tempPhotoData && editorBtn) {
+        editorBtn.style.display = 'inline-block';
+    } else if (editorBtn) {
+        editorBtn.style.display = 'none';
+    }
+
+    const lines = text.split('\n');
+    let html = "";
+
+    // 注意：呢度雖然生成 HTML，但你之後 save 嗰陣一定要將 newMeta 塞返入 songData
+    lines.forEach((line, rowIdx) => {
+        if (line.trim() === "") return;
+        html += `<div class="line-row" data-row="${rowIdx}" style="margin-bottom:15px; border-bottom:1px solid #222;">`;
+        
+        const words = line.split(/\s+/).filter(w => w !== "");
+        
+        // 搵返原本數據
+        const originalFanchant = (songData[rowIdx] && songData[rowIdx].f) ? songData[rowIdx].f.split(/\s+/) : [];
+
+        words.forEach(w => {
+            const isPreviouslyMarked = originalFanchant.includes(w);
+            html += `<span onclick="this.classList.toggle('is-fc')" class="word-chip ${isPreviouslyMarked ? 'is-fc' : ''}">${w}</span>`;
         });
-        if(newLyrics.length) {
-            if(tempPhotoData && !newLyrics[0].photo) newLyrics[0].photo = tempPhotoData;
-            const linkVal = document.getElementById('sourceLinkInput')?.value;
-            if(linkVal && !newLyrics[0].link) newLyrics[0].link = linkVal;
-            newLyrics.meta = currentEditingMeta;
-            songData = newLyrics;
+        html += `</div>`;
+    });
+    
+    container.innerHTML = html;
+    
+    // 把 meta 先暫存喺 container 嘅屬性度，或者直接喺 save 嗰陣攞
+    container.dataset.meta = JSON.stringify(newMeta); 
+
+    document.getElementById('editor-overlay').style.display = 'block';
+}
+function cancelMarking() {
+    // 直接隱藏標記畫面，唔執行 saveMarkedData，所以原本嘅數據唔會被覆蓋
+    document.getElementById('editor-overlay').style.display = 'none';
+}
+    
+function saveMarkedData() {
+    const rows = document.querySelectorAll('.line-row');
+    const sourceLink = document.getElementById('sourceLinkInput').value.trim(); 
+    let newData = [];
+
+    rows.forEach(row => {
+        const chips = row.querySelectorAll('.word-chip');
+        let currentL = ""; let pendingF = [];
+        chips.forEach(chip => {
+            if (chip.classList.contains('is-fc')) { pendingF.push(chip.innerText); }
+            else {
+                if (pendingF.length > 0) {
+                    newData.push({ l: currentL.trim() || "...", f: pendingF.join(' ') });
+                    currentL = ""; pendingF = [];
+                }
+                currentL += chip.innerText + " ";
+            }
+        });
+        if (pendingF.length > 0 || currentL.trim()) newData.push({ l: currentL.trim() || "...", f: pendingF.join(' ') });
+    });
+
+    if (newData.length > 0) {
+        if (tempPhotoData) newData[0].photo = tempPhotoData;
+        if (sourceLink) newData[0].link = sourceLink; 
+    }
+
+    // --- ✨ 核心改動：更新 meta 數據 ---
+    const info = window.currentSubmittingData || {};
+    
+    // 1. 強制將作者設定為「本地編輯者」，不再保留舊作者
+    newData.meta = {
+        name: info.name || "未命名歌曲",
+        uploader: "本地編輯者"
+    };
+
+    // 2. 更新全局變數
+    songData = newData;
+    index = 0;
+
+    // 3. 關閉視窗
+    document.getElementById('editor-overlay').style.display = 'none';
+    closeImporter();
+
+    // 4. ✨ 呼叫 updateUI，由佢統一處理畫面顯示同埋 localStorage 儲存
+    updateUI();
+
+    console.log("本地預覽已更新：作者已變更為本地編輯者");
+}
+    async function sendDiscordNotification(name, source, id) {
+    try {
+        const adminDoc = await db.collection("admin_config").doc("security").get();
+        const webhookURL = adminDoc.data().discord_webhook;
+        if (!webhookURL) return;
+
+        fetch(webhookURL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                username: "應援助手投稿機",
+                embeds: [{
+                    title: "🆕 收到新歌投稿/編輯！",
+                    color: 65280,
+                    fields: [
+                        { name: "歌名", value: name, inline: true },
+                        { name: "來源", value: source || "無", inline: false }
+                    ],
+                    footer: { text: `ID: ${id}` }
+                }]
+            })
+        });
+    } catch (e) { console.error("Discord 通知失敗", e); }
+}
+    // --- 核心邏輯 ---
+async function fetchPublicSongs(e) {
+    if (e) e.stopPropagation();
+    
+    try {
+        // 抓取所有已公開的歌，按時間倒序排
+        const snapshot = await db.collection("songs")
+            .where("status", "==", "public")
+            .orderBy("createdAt", "desc")
+            .get();
+
+        const songsGroupedByName = {};
+
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            const name = data.name;
+            if (!songsGroupedByName[name]) {
+                songsGroupedByName[name] = [];
+            }
+            songsGroupedByName[name].push({ id: doc.id, ...data });
+        });
+
+        // 呼叫顯示歌單的 UI，傳入分組後的資料
+        showSongGroupList(songsGroupedByName);
+
+    } catch (err) {
+        console.error("抓取歌單失敗", err);
+        alert("無法載入歌單");
+    }
+}
+    
+function showSongGroupList(groupedData) {
+    let html = '<div style="padding:20px; color:#fff;"><h3>選擇歌曲</h3><ul style="list-style:none; padding:0;">';
+    
+    Object.keys(groupedData).forEach(name => {
+        const versions = groupedData[name];
+        // 點擊後跳到第二層選單，傳入該歌名的所有版本
+        html += `
+            <li onclick='showVersionSelector(${JSON.stringify(versions).replace(/'/g, "&apos;")})' 
+                style="padding:15px; border-bottom:1px solid #333; cursor:pointer; display:flex; justify-content:space-between;">
+                <span>${name}</span>
+                <span style="color:#666; font-size:0.8rem;">${versions.length} 個版本 ></span>
+            </li>`;
+    });
+    
+    html += '</ul><button class="btn" onclick="closeModal()">關閉</button></div>';
+    
+    // 假設你有一個顯示內容的 Modal Container
+    const modal = document.getElementById('public-songs-modal'); 
+    if (modal) {
+        modal.innerHTML = html;
+        modal.style.display = 'block';
+    } else {
+        console.error("找不到 ID 為 public-songs-modal 的元素！");
+    }
+}
+function closeModal() {
+    const modal = document.getElementById('public-songs-modal');
+    if (modal) modal.style.display = 'none';
+}    
+function showVersionSelector(versions) {
+    let html = `<div style="padding:20px;"><h3>選擇版本 - ${versions[0].name}</h3><ul style="list-style:none; padding:0;">`;
+    
+    // 已經在 fetch 嗰陣按 createdAt 排咗序，所以直接顯示就係倒序
+    versions.forEach(v => {
+        const date = v.createdAt ? new Date(v.createdAt.seconds * 1000).toLocaleDateString() : "未知日期";
+        html += `
+            <li onclick="loadSpecificSong('${v.id}')" 
+                style="padding:15px; border-bottom:1px solid #444; cursor:pointer;">
+                <div style="color:#0f0;">作者: ${v.uploader || '匿名'}</div>
+                <div style="font-size:0.7rem; color:#666;">上傳日期: ${date}</div>
+            </li>`;
+    });
+    
+    html += `</ul><button class="btn" onclick="fetchPublicSongs()"> < 返回歌曲列表</button></div>`;
+    
+    document.getElementById('public-songs-modal').innerHTML = html;
+}
+    
+async function loadSpecificSong(docId) {
+    try {
+        const doc = await db.collection("songs").doc(docId).get();
+        if (doc.exists) {
+            // --- 更新 Footer 邏輯 ---
+            const data = doc.data();
+            songData = data.data; // 這是歌詞 Array
+            songData.meta = {
+                name: data.name,
+                uploader: data.uploader || '匿名'
+            };
+            window.currentSubmittingData = { name: data.name };
+
+            closeModal();
             index = 0;
-            updateUI();
+            updateUI(); // 這裡會觸發新的 localStorage 儲存邏輯
         }
-        document.getElementById('editor-overlay').style.display = 'none';
+    } catch (err) {
+        console.error("載入失敗", err);
     }
+}
     
-    function editCurrentSong(e) {
-        if(e) e.stopPropagation();
-        openImporter(true);
+    
+function closeSongList() {
+    document.getElementById('song-list-overlay').style.display = 'none';
+}
+// 點擊歌名載入歌曲
+async function selectSong(docId) {
+    try {
+        const doc = await db.collection("songs").doc(docId).get();
+        const selected = doc.data();
+        
+        songData = selected.data;
+        songData.meta = {
+            name: selected.name,
+            uploader: selected.uploader || "匿名用戶"
+        };
+        index = 0; 
+        updateUI();
+        closeSongList();
+    } catch (e) {
+        alert("載入歌曲失敗");
     }
-    
-    // 公開歌單擷取 (優化顯示)
-    async function fetchPublicSongs(e) {
-        if(e) e.stopPropagation();
-        try {
-            const snapshot = await db.collection("songs").where("status", "==", "public").orderBy("createdAt", "desc").get();
-            const groups = {};
-            snapshot.forEach(doc => {
-                const data = doc.data();
-                const name = data.name || "佚名";
-                if(!groups[name]) groups[name] = [];
-                groups[name].push({ id: doc.id, ...data });
-            });
-            let html = `<div style="max-width:600px; margin:0 auto; background:#111; border-radius:28px; padding:20px;"><h2 style="color:#0f0;">📀 公開應援歌單</h2><ul style="list-style:none; padding:0;">`;
-            for(let name in groups) {
-                html += `<li style="margin:10px 0; background:#1a1a1a; border-radius:20px;"><div style="padding:14px; font-weight:bold; cursor:pointer;" onclick='showVersionSelector(${JSON.stringify(groups[name])})'>📌 ${name} <span style="color:#6f6;font-size:0.7rem;">(${groups[name].length}版)</span></div></li>`;
+}
+
+// 點擊垃圾桶刪除（管理員用）
+async function adminDeletePublic(docId, songName) {
+    const pw = prompt(`確定要刪除「${songName}」嗎？\n請輸入管理員密碼：`);
+    if (pw === null) return;
+
+    try {
+        // 1. 從 Database 讀取所有安全設定 (密碼同 Discord Link)
+        const adminDoc = await db.collection("admin_config").doc("security").get();
+        const adminData = adminDoc.data();
+        const correctPw = adminData.password;
+        const webhookURL = adminData.discord_webhook; // ✨ 喺 Database 攞 Link
+
+        if (pw === correctPw) {
+            await db.collection("songs").doc(docId).delete();
+            alert("🗑️ 該歌曲已永久刪除。");
+            fetchPublicSongs();
+        } else {
+            const reason = prompt("密碼不正確。如果您想建議刪除此歌，請輸入原因：");
+            
+            if (reason && reason.trim() !== "") {
+                // 儲存紀錄
+                await db.collection("delete_requests").add({
+                    songId: docId,
+                    songName: songName,
+                    reason: reason,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                // 2. ✨ 檢查有無 Webhook URL 先至發送
+                if (webhookURL) {
+                    const discordMsg = {
+                        username: "應援助手管理員",
+                        embeds: [{
+                            title: "🚨 收到刪除建議！",
+                            color: 16711680,
+                            fields: [
+                                { name: "歌曲名稱", value: songName, inline: true },
+                                { name: "建議原因", value: reason, inline: false }
+                            ]
+                        }]
+                    };
+
+                    fetch(webhookURL, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(discordMsg)
+                    });
+                }
+
+                alert("感謝您的意見！通知已發送。");
             }
-            html += `<button class="btn" onclick="closePublicModal()" style="margin-top:20px;">關閉</button></div>`;
-            const modalDiv = document.getElementById('public-songs-modal');
-            modalDiv.innerHTML = html;
-            modalDiv.style.display = 'block';
-        } catch(err) { alert("載入失敗"); }
+        }
+    } catch (e) {
+        console.error(e);
+        alert("操作失敗。");
     }
-    window.showVersionSelector = (versions) => {
-        let html = `<div style="max-width:600px; margin:0 auto; background:#121212; border-radius:28px; padding:20px;"><h3>選擇版本</h3>`;
-        versions.forEach(v => {
-            const date = v.createdAt ? new Date(v.createdAt.seconds*1000).toLocaleDateString() : "未知";
-            html += `<div style="background:#1f1f2a; margin:10px 0; padding:12px; border-radius:18px; cursor:pointer;" onclick="loadSpecificSong('${v.id}')">
-                        <div><b>${v.name}</b></div><div style="font-size:0.7rem;">作者: ${v.uploader || '匿名'} · ${date}</div>
-                    </div>`;
+}
+async function uploadSong(e) {
+    e.stopPropagation();
+    if (songData.length < 1 || songData[0].f === "開始") { 
+        alert("請先匯入歌詞！"); 
+        return; 
+    }
+    
+    // ✨ 改進：嘗試攞返之前入過嘅歌名，如果冇就用現時底端顯示嘅名
+    const defaultName = window.currentSubmittingData?.name || document.getElementById('display-song-name').innerText;
+    
+    // 第一個 prompt 依家會預填個名 (第二個參數就係預填內容)
+    const songName = prompt("【第一步】填寫格式：歌名 - 歌手", defaultName);
+    if (!songName) return;
+    
+    const uploaderName = prompt("【第二步】你的暱稱 (會顯示喺底端)：");
+    if (!uploaderName) return;
+
+    try {
+        const docRef = await db.collection("songs").add({ 
+            name: songName, 
+            uploader: uploaderName, 
+            data: songData, 
+            status: "pending", 
+            createdAt: firebase.firestore.FieldValue.serverTimestamp() 
         });
-        html += `<button class="btn" onclick="fetchPublicSongs(event)">← 返回</button></div>`;
-        document.getElementById('public-songs-modal').innerHTML = html;
-    };
-    window.loadSpecificSong = async (docId) => {
-        try {
-            const docSnap = await db.collection("songs").doc(docId).get();
-            if(docSnap.exists) {
-                const data = docSnap.data();
-                songData = data.data;
-                songData.meta = { name: data.name, uploader: data.uploader || "雲端" };
-                currentEditingMeta = { name: data.name, uploader: data.uploader };
-                index = 0;
-                updateUI();
-                closePublicModal();
-            }
-        } catch(e) { alert("載入錯誤"); }
-    };
-    function closePublicModal() { document.getElementById('public-songs-modal').style.display = 'none'; }
-    
-    // 上傳歌曲 (改善)
-    async function uploadSong(e) {
-        e.stopPropagation();
-        if(!songData.length || (songData.length===1 && songData[0].f==="Cloud Pro" && songData[0].l.includes("歡迎"))) { alert("請先匯入或編輯歌詞"); return; }
-        const songTitle = prompt("歌名 - 歌手 :", currentEditingMeta.name);
-        if(!songTitle) return;
-        const uploaderNick = prompt("你的暱稱 (顯示於底部)", currentEditingMeta.uploader);
-        if(!uploaderNick) return;
-        try {
-            const docRef = await db.collection("songs").add({
-                name: songTitle, uploader: uploaderNick, data: songData,
-                status: "pending", createdAt: firebase.firestore.FieldValue.serverTimestamp()
+
+        alert("投稿成功！請等候管理員審核。");
+
+        // 發送 Discord 通知
+        sendDiscordNotification(songName, uploaderName, docRef.id);
+
+    } catch (e) {
+        console.error(e);
+        alert("投稿失敗。");
+    }
+}
+// ------------------------------------------------
+// 抽離出嚟嘅 Discord 通知 Function (放喺 script 任何地方都得)
+// ------------------------------------------------
+async function sendDiscordNotification(songName, uploader, docId) {
+    try {
+        // 從資料庫攞返之前收埋嘅 Webhook URL
+        const adminDoc = await db.collection("admin_config").doc("security").get();
+        const webhookURL = adminDoc.data().discord_webhook;
+
+        if (webhookURL) {
+            fetch(webhookURL, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    username: "應援助手投稿機",
+                    embeds: [{
+                        title: "🆕 收到新歌投稿！",
+                        color: 65280, // 綠色
+                        fields: [
+                            { name: "歌曲名稱", value: songName, inline: true },
+                            { name: "投稿者", value: uploader, inline: true },
+                            { name: "Firebase ID", value: docId, inline: false }
+                        ],
+                        footer: { text: "請進入管理後台審核" },
+                        timestamp: new Date().toISOString()
+                    }]
+                })
             });
-            alert("投稿成功！待管理員審核");
-            sendDiscordNotify(songTitle, uploaderNick, docRef.id);
-        } catch(err) { alert("上傳失敗"); }
+        }
+    } catch (err) {
+        console.error("Discord 通知發送失敗", err);
     }
-    async function sendDiscordNotify(name, uploader, id) {
-        try {
-            const adminDoc = await db.collection("admin_config").doc("security").get();
-            const webhook = adminDoc.data()?.discord_webhook;
-            if(webhook) fetch(webhook, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ username:"應援投稿", embeds:[{ title:"新歌待審", color:65280, fields:[{name:"歌名",value:name},{name:"投稿者",value:uploader}] }]}) });
-        } catch(e) {}
-    }
-    
+}
     function openSourceLink(e) {
         e.stopPropagation();
-        const link = getFirstLineData().link;
-        if(link) window.open(link.startsWith('http')?link:'https://'+link, '_blank');
-        else alert("無來源連結");
-    }
-    
-    // 圖片全屏手勢
-    function showMainPhoto(e) {
-        if(e) e.stopPropagation();
-        const photoSrc = tempPhotoData || getFirstLineData().photo;
-        if(!photoSrc) { alert("無參考圖片"); return; }
-        const img = document.getElementById('main-photo-img');
-        img.src = photoSrc;
-        document.getElementById('main-photo-overlay').style.display = 'flex';
-    }
-    function hideMainPhoto() { document.getElementById('main-photo-overlay').style.display = 'none'; }
-    
-    // 顏色功能
-    function openColorMenu(e) { e.stopPropagation(); const cur = getComputedStyle(document.documentElement).getPropertyValue('--fc-color').trim(); document.getElementById('hexInput').value = cur; document.getElementById('colorPicker').value = cur; document.getElementById('color-modal').style.display = 'block'; }
-    function closeColorMenu() { document.getElementById('color-modal').style.display = 'none'; }
-    function updateHexInput(val) { document.getElementById('hexInput').value = val; }
-    function saveCustomColor() { let col = document.getElementById('hexInput').value.trim(); if(!col.startsWith('#')) col = '#'+col; if(/^#[0-9A-F]{6}$/i.test(col)) { document.documentElement.style.setProperty('--fc-color', col); localStorage.setItem('fanchantColor', col); closeColorMenu(); } else alert("無效色碼"); }
-    function toggleLock(e) { e.stopPropagation(); isLocked = !isLocked; document.getElementById('lockBtn').innerHTML = isLocked ? "🔒" : "🔓"; }
-    
-    // 管理員簡易入口
-    let adminClicks=0;
-    function handleAdminTrigger() { adminClicks++; if(adminClicks>=5) { adminClicks=0; adminLogin(); } setTimeout(()=>{adminClicks=0;},3000); }
-    async function adminLogin() {
-        const pwd = prompt("管理金鑰：");
-        if(!pwd) return;
-        const doc = await db.collection("admin_config").doc("security").get();
-        if(doc.exists && doc.data().password === pwd) showAdminPanel();
-        else alert("權限不足");
-    }
-    async function showAdminPanel() {
-        const snap = await db.collection("songs").where("status","==","pending").get();
-        if(snap.empty) { alert("無待審歌曲"); return; }
-        let list = [];
-        snap.forEach(d=>list.push({id:d.id, name:d.data().name}));
-        let idx = prompt(list.map((s,i)=>`${i+1}. ${s.name}`).join("\n")+"\n輸入編號預覽:");
-        if(idx && list[parseInt(idx)-1]) {
-            const doc = await db.collection("songs").doc(list[parseInt(idx)-1].id).get();
-            songData = doc.data().data; songData.meta = { name: doc.data().name, uploader: doc.data().uploader };
-            index=0; updateUI();
-            if(confirm(`審核「${doc.data().name}」公開嗎？`)) await db.collection("songs").doc(list[parseInt(idx)-1].id).update({status:"public"});
+        const currSong = getFirstLineData();
+        if (currSong && currSong.link) {
+            // 如果條 link 冇 http，幫佢加返費事 error
+            let url = currSong.link;
+            if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+            window.open(url, '_blank');
         }
     }
-    
-    // 啟動載入本地數據
-    window.onload = function() {
-        const saved = localStorage.getItem('myConcertData');
-        if(saved) {
-            try {
-                const parsed = JSON.parse(saved);
-                if(parsed.version && parsed.lines) {
-                    songData = parsed.lines;
-                    songData.meta = parsed.meta || { name: "本地歌曲", uploader: "本地" };
-                    currentEditingMeta = songData.meta;
-                } else if(Array.isArray(parsed)) { songData = parsed; songData.meta = { name: "舊版匯入", uploader: "本地" }; }
-                else songData = [{ l: "應援助手", f: "Cloud Pro 載入完成" }];
-            } catch(e) {}
+async function showAdminPanel() {
+    try {
+        const snapshot = await db.collection("songs")
+                                 .where("status", "==", "pending")
+                                 .get();
+        
+        if (snapshot.empty) {
+            alert("暫時冇待審核嘅歌。");
+            return;
         }
-        const savedColor = localStorage.getItem('fanchantColor');
-        if(savedColor) document.documentElement.style.setProperty('--fc-color', savedColor);
-        index = 0;
-        updateUI();
+
+        let listText = "【待審核清單】\n";
+        let pendingSongs = [];
+        
+        let i = 0; // 手動加個計數器
+        snapshot.forEach((doc) => {
+            const data = doc.data();
+            pendingSongs.push({ id: doc.id, name: data.name, data: data.data, uploader: data.uploader });
+            listText += `${i + 1}. ${data.name}\n`;
+            i++; // 每次加 1
+        });
+        const choice = prompt(listText + "\n輸入編號進行預覽：");
+        const selected = pendingSongs[choice - 1];
+
+        if (selected) {
+            // 1. 載入數據到 UI
+            songData = selected.data; 
+            songData.meta = { 
+                name: selected.name, 
+                uploader: selected.uploader || "未知" 
+            };
+            index = 0;
+            updateUI(); 
+            
+            // 2. 唔好用 confirm，改為顯示一個自定義嘅審核工具列
+            showAuditBar(selected.id, selected.name);
+        }
+    } catch (e) {
+        alert("讀取失敗。");
+    }
+}
+function showAuditBar(docId, songName) {
+    const oldBar = document.getElementById('audit-bar');
+    if (oldBar) oldBar.remove();
+
+    const bar = document.createElement('div');
+    bar.id = 'audit-bar';
+    
+    // 設定初始樣式，加入 cursor: move
+    bar.style = `
+        position: fixed; top: 10px; left: 10px; right: 10px;
+        background: rgba(0, 50, 0, 0.95); color: white; 
+        padding: 10px; text-align: center; z-index: 5000;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+        display: flex; align-items: center; justify-content: space-between; gap: 10px;
+        backdrop-filter: blur(5px); border-radius: 8px; border: 1px solid #0f0;
+        cursor: move; touch-action: none;
+    `;
+    
+    bar.innerHTML = `
+        <div style="font-size:0.8rem; margin-left:10px; flex-grow:1; text-align:left; pointer-events:none;">
+            ⣿ 審核：<b>${songName}</b>
+        </div>
+        <div style="display:flex; gap:8px;">
+            <button class="btn" style="background:#0f0; color:#000; padding:5px 12px; font-size:0.75rem;" onclick="finalizeApproval('${docId}', '${songName}')">公開</button>
+            <button class="btn" style="background:#f00; color:#fff; padding:5px 12px; font-size:0.75rem;" onclick="deletePending('${docId}', '${songName}')">刪除</button>
+            <button class="btn" style="background:#444; color:#fff; padding:5px 10px; font-size:0.75rem;" onclick="document.getElementById('audit-bar').remove()">❌</button>
+        </div>
+    `;
+
+    document.body.appendChild(bar);
+
+    // --- ✨ 加入簡易拖動邏輯 ✨ ---
+    let isDragging = false;
+    let offsetTop = 0;
+
+    const startDrag = (e) => {
+        // 如果撳中按鈕就唔好觸發拖動
+        if (e.target.tagName === 'BUTTON') return;
+        isDragging = true;
+        const clientY = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
+        offsetTop = clientY - bar.getBoundingClientRect().top;
+        bar.style.transition = 'none'; // 拖動時關閉動畫，避免延遲
     };
-    // 補上全域方法
-    window.goToLine = goToLine;
-    window.editCurrentSong = editCurrentSong;
+
+    const onDrag = (e) => {
+        if (!isDragging) return;
+        const clientY = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY;
+        let newTop = clientY - offsetTop;
+        
+        // 限制唔好拖出畫面頂部同底部
+        newTop = Math.max(0, Math.min(window.innerHeight - bar.offsetHeight, newTop));
+        bar.style.top = newTop + 'px';
+    };
+
+    const stopDrag = () => {
+        isDragging = false;
+        bar.style.transition = 'top 0.2s'; // 放手後加返少少彈性
+    };
+
+    // 支援滑鼠同手指觸控
+    bar.addEventListener('mousedown', startDrag);
+    window.addEventListener('mousemove', onDrag);
+    window.addEventListener('mouseup', stopDrag);
+
+    bar.addEventListener('touchstart', startDrag);
+    window.addEventListener('touchmove', onDrag);
+    window.addEventListener('touchend', stopDrag);
+}
+
+// 執行公開
+async function finalizeApproval(docId, songName) {
+    if (confirm(`確定公開「${songName}」？`)) {
+        await db.collection("songs").doc(docId).update({ status: "public" });
+        alert("已公開！");
+        document.getElementById('audit-bar').remove();
+    }
+}
+
+// 執行刪除 (可選：如果係垃圾投稿可以直接刪)
+async function deletePending(docId, songName) {
+    if (confirm(`確定要刪除「${songName}」？此動作不能撤銷。`)) {
+        await db.collection("songs").doc(docId).delete();
+        alert("已刪除！");
+        document.getElementById('audit-bar').remove();
+    }
+}
+    // 獨立出來的批准 function
+    async function approveSong(docId, songName) {
+        try {
+            await db.collection("songs").doc(docId).update({
+                status: "public"
+            });
+            alert(`✅ 「${songName}」已正式公開！`);
+        } catch (e) {
+            alert("批准失敗，請檢查權限。");
+        }
+    }
+    // function handleTap(e) {
+    //     if (isLocked) return;
+    //     const x = e.clientX || (e.touches && e.touches[0].clientX);
+    //     if (x < window.innerWidth * 0.3) { if (index > 0) index--; }
+    //     else { if (index < songData.length - 1) index++; else index = 0; }
+    //     updateUI();
+    // }
+  function handleTap(e) {
+    if (isLocked) return;
+
+    // 1. 如果點擊嘅係歌詞本身 (有 lyric-line class)，我哋唔行 Tap 轉頁，交畀 onclick 自己處理
+    if (e.target.closest('.lyric-line')) return;
+
+    // 2. 獲取手指/滑鼠嘅 Y 座標 (垂直位置)
+    const y = e.clientY || (e.touches && e.touches[0].clientY);
+    const screenHeight = window.innerHeight;
+
+    // 3. 判斷點擊區域：上下觸發，中間唔理
+    if (y < screenHeight * 0.3) {
+        // 點擊畫面頂部 30% 區域 -> 上一句
+        if (index > 0) index--;
+        updateUI();
+    } 
+    else if (y > screenHeight * 0.7) {
+        // 點擊畫面底部 30% 區域 -> 下一句
+        if (index < songData.length - 1) index++; 
+        else index = 0; // 循環到第一句
+        updateUI();
+    }
+    // 中間 40% 嘅區域就算點擊/滑動，都唔會觸發跳頁，防止誤觸！
+}
+
+function handleLineClick(targetIndex) {
+    if (isLocked) return;
+    
+    // 直接將 index 變做你點擊嗰行嘅編號
+    index = targetIndex;
+    
+    // 即時更新畫面，觸發 scrollIntoView
+    updateUI();
+}
+function updateUI() {
+const list = document.getElementById('lyrics-list');
+    if (!list) return;
+
+    list.innerHTML = songData.map((line, i) => {
+        const isCurrent = (i === index);
+        return `
+            <div id="line-${i}" 
+                 class="lyric-line"
+                 onclick="index=${i}; updateUI();" 
+                 style="padding: 12px 10px; text-align: center; transition: all 0.3s ease; 
+                        opacity: ${isCurrent ? 1 : 0.3}; 
+                        transform: scale(${isCurrent ? 1.15 : 0.95});
+                        cursor: pointer;">
+                
+                <div style="font-size: 1.3rem; font-weight: bold; color: ${isCurrent ? '#fff' : '#aaa'}; line-height: 1.3;">
+                    ${line.l}
+                </div>
+                
+                ${line.f ? `<div style="font-size: 1.1rem; color: #EAB308; margin-top: 5px;">${line.f}</div>` : ''}
+            </div>
+        `;
+    }).join('');
+
+    // ✨ 自動捲動對準中間
+    setTimeout(() => {
+        const activeLine = document.getElementById(`line-${index}`);
+        if (activeLine) {
+            activeLine.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }, 50);
+    // --- Footer 處理 (保留你原本的) ---
+    const footerName = document.getElementById('display-song-name');
+    const footerUpload = document.getElementById('display-upload-info');
+    let currentName = "";
+    let currentUploader = "";
+
+    if (songData.meta) {
+        currentName = songData.meta.name;
+        currentUploader = songData.meta.uploader;
+    } else if (window.currentSubmittingData && window.currentSubmittingData.name) {
+        currentName = window.currentSubmittingData.name;
+        currentUploader = "本地編輯者";
+    }
+
+    if (footerName && footerUpload) {
+        footerName.innerText = currentName || "應援助手 Fanchant Helper";
+        footerUpload.innerText = currentUploader ? `Uploaded by: ${currentUploader}` : "";
+    }
+
+    // --- 儲存邏輯 (保留你原本的) ---
+    try {
+        const saveObj = {
+            version: "2.0",
+            meta: songData.meta || (currentName ? { name: currentName, uploader: currentUploader } : null),
+            lines: Array.from(songData)
+        };
+        localStorage.setItem('myConcertData', JSON.stringify(saveObj));
+    } catch (e) { console.error("Save Error", e); }
+    
+    if (typeof updateMainViewBtn === 'function') updateMainViewBtn();
+}
+    // --- 管理員審核功能 ---
+    // 搵返你 HTML 顯示歌詞標題或某個地方，加個 counter
+let adminClickCount = 0;
+
+function handleAdminTrigger() {
+    adminClickCount++;
+    if (adminClickCount >= 5) {
+        adminClickCount = 0; // reset
+        adminLogin();
+    }
+    // 3秒後自動重設次數，費事平時誤觸
+    setTimeout(() => { adminClickCount = 0; }, 3000);
+}
+async function adminLogin() {
+    const userInput = prompt("請輸入管理員金鑰：");
+    if (!userInput) return;
+
+    try {
+        // 嘗試去 Firebase 讀取那個名為 security 的文件
+        const doc = await db.collection("admin_config").doc("security").get();
+        
+        if (doc.exists) {
+            const correctPassword = doc.data().password;
+
+            if (userInput === correctPassword) {
+                showAdminPanel(); // 密碼正確，進入審核面板
+            } else {
+                alert("金鑰無效！");
+            }
+        } else {
+            alert("系統設定錯誤，請檢查 Firebase 資料。");
+        }
+    } catch (error) {
+        console.error(error);
+        alert("權限不足或連線失敗");
+    }
+}   
+    // 更新主畫面「🖼️」掣
+    function updateMainViewBtn() {
+        const currSong = getFirstLineData();
+        // 處理相片掣
+        const mainPhotoBtn = document.getElementById('mainViewPhotoBtn');
+        mainPhotoBtn.style.display = (currSong && currSong.photo) ? 'block' : 'none';
+        
+        // --- 新增：處理 Link 掣 ---
+        const mainLinkBtn = document.getElementById('mainViewLinkBtn');
+        mainLinkBtn.style.display = (currSong && currSong.link) ? 'block' : 'none';
+    }
+
+    // --- 顏色功能與 Lock (保持原樣) ---
+    function openColorMenu(e) { e.stopPropagation(); const curr = getComputedStyle(document.documentElement).getPropertyValue('--fc-color').trim(); document.getElementById('hexInput').value = curr.toUpperCase(); document.getElementById('colorPicker').value = curr; document.getElementById('color-modal').style.display = 'block'; }
+    function closeColorMenu() { document.getElementById('color-modal').style.display = 'none'; }
+    function updateHexInput(val) { document.getElementById('hexInput').value = val.toUpperCase(); }
+    function saveCustomColor() { let col = document.getElementById('hexInput').value.trim(); if (!col.startsWith('#')) col = '#' + col; if (/^#[0-9A-F]{6}$/i.test(col)) { document.documentElement.style.setProperty('--fc-color', col); localStorage.setItem('fanchantColor', col); closeColorMenu(); } else { alert("格式錯誤！"); } }
+    function toggleLock(e) { e.stopPropagation(); isLocked = !isLocked; document.getElementById('lockBtn').innerText = isLocked ? "🔒" : "🔓"; document.getElementById('lockBtn').style.borderColor = isLocked ? "red" : "#444"; }
+
+    // --- 修改 window.onload：統一讀取 myConcertData ---
+    window.onload = function() {
+    // 1. ✨ 讀取上次儲存的數據 (支援新舊格式)
+    const savedDataRaw = localStorage.getItem('myConcertData');
+    if (savedDataRaw) { 
+        const parsed = JSON.parse(savedDataRaw);
+        
+        // 檢查係咪新格式 (含有 version 2.0 或者 meta 屬性)
+        if (parsed.version === "2.0" || parsed.meta) {
+            // 新格式：從 lines 攞歌詞，從 meta 攞名
+            songData = parsed.lines || [];
+            songData.meta = parsed.meta;
+        } else {
+            // 舊格式：直接就是陣列
+            songData = parsed;
+        }
+
+        index = 0;
+        updateUI(); // 入面會處理相片按鈕同埋底端文字
+    } else {
+        // 如果冇數據，初始化介面
+        updateMainViewBtn();
+    }
+    
+    // 2. 讀取上次設定的應援顏色 (呢度唔使改)
+    const savedColor = localStorage.getItem('fanchantColor');
+    if (savedColor) {
+        document.documentElement.style.setProperty('--fc-color', savedColor);
+    }
+};
 </script>
+<div id="song-list-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:4000; padding:20px; box-sizing:border-box; overflow-y:auto;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+        <h3 style="color:#0f0; margin:0;">📜 公開歌單</h3>
+        <button class="btn" onclick="closeSongList()">關閉</button>
+    </div>
+    <div id="list-container">
+        </div>
+</div>
+
+<style>
+    .song-item {
+        background: #222;
+        padding: 15px;
+        margin-bottom: 10px;
+        border-radius: 8px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border: 1px solid #333;
+    }
+    .song-info { flex: 1; cursor: pointer; }
+    .song-name { color: #fff; font-size: 1.1rem; font-weight: bold; }
+    .song-uploader { color: #888; font-size: 0.8rem; margin-top: 4px; }
+    .admin-del-btn { background: #400; color: #f55; padding: 8px; border-radius: 4px; margin-left: 10px; font-size: 0.8rem; border: 1px solid #600; }
+</style>    
 </body>
-</html>
+</html>幫我改善這個網站
