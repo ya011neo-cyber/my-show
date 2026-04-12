@@ -55,21 +55,41 @@
             border-color: var(--fc-color); 
             box-shadow: none;        /* ✨ 移除發光，改用淡淡的邊框色就好 */
         }
+/* 1. 歌詞外框：控制 5 行高度，隱藏捲軸 */
 #lyrics-window {
-    height: 320px;            /* 固定高度，大約 5 行 */
-    padding: 130px 0;         /* 關鍵：等第一句可以轆到中間 */
-    margin: 0 50px;           /* 👈 左右留 50px 空白位畀你 Tap */
-    overflow-y: auto;         /* 開啟捲動 */
-    overflow-x: hidden;
+    height: 320px;            /* 縮細少少，5 行啱啱好 */
+    overflow-y: auto;
+    position: relative;
+    margin: 10px auto;
+    padding: 140px 0;         /* 頂部留白，等第一句可以轆到中間 */
     scroll-behavior: smooth;
-    -webkit-overflow-scrolling: touch;
+    -webkit-overflow-scrolling: touch; /* 確保手機轆得順 */
+    
+    /* 隱藏捲軸 */
+    scrollbar-width: none;    /* Firefox */
+    -ms-overflow-style: none; /* IE/Edge */
+}
+#lyrics-window::-webkit-scrollbar {
+    display: none;            /* Chrome/Safari */
 }
 
-/* 確保歌詞行唔好太闊，亦唔好太厚 */
-.line-item {
-    padding: 15px 0;
-    min-height: 60px;
-    text-align: center;
+/* 2. 加上下淡出遮罩 */
+.lyrics-mask {
+    position: relative;
+}
+.lyrics-mask::before, .lyrics-mask::after {
+    content: "";
+    position: absolute;
+    left: 0; right: 0; height: 80px; z-index: 10;
+    pointer-events: none;     /* 唔好阻住點擊 */
+}
+.lyrics-mask::before {
+    top: 0;
+    background: linear-gradient(to bottom, rgba(0,0,0,1), transparent);
+}
+.lyrics-mask::after {
+    bottom: 0;
+    background: linear-gradient(to top, rgba(0,0,0,1), transparent);
 }
         @media (max-width: 768px) {
             #split-screen-editor > div {
@@ -947,15 +967,15 @@ async function deletePending(docId, songName) {
   function handleTap(e) {
     if (isLocked) return;
 
-    // 💡 如果點緊歌詞窗口入面，我哋唔行 handleTap，交畀歌詞自己嘅 onclick 同 scroll
-    if (e.target.closest('#lyrics-window')) return;
+    // 🔍 如果點擊嘅地方係歌詞視窗，我哋優先俾佢捲動，唔行 handleTap
+    if (e.target.closest('#lyrics-window')) {
+        // 除非點得好快，否則唔好跳 index
+        return; 
+    }
 
     const x = e.clientX || (e.touches && e.touches[0].clientX);
-    if (x < window.innerWidth * 0.4) { // 左邊 40%
-        if (index > 0) index--;
-    } else { // 右邊 60%
-        if (index < songData.length - 1) index++; else index = 0;
-    }
+    if (x < window.innerWidth * 0.3) { if (index > 0) index--; }
+    else { if (index < songData.length - 1) index++; else index = 0; }
     updateUI();
 }
 
@@ -972,53 +992,31 @@ function updateUI() {
 const list = document.getElementById('lyrics-list');
     if (!list) return;
 
-    // 生成所有歌詞
     list.innerHTML = songData.map((line, i) => {
         const isCurrent = (i === index);
         return `
-            <div id="line-${i}" onclick="index=${i}; updateUI();" class="line-item" 
-                 style="opacity: ${isCurrent ? 1 : 0.3}; transition: 0.3s;">
-                <div>${line.l}</div>
-                <div style="color: gold;">${line.f || ''}</div>
+            <div id="line-${i}" 
+                 onclick="index=${i}; updateUI();" 
+                 style="padding: 12px 0; text-align: center; transition: all 0.3s; 
+                        opacity: ${isCurrent ? 1 : 0.2}; 
+                        transform: scale(${isCurrent ? 1.1 : 0.95});">
+                
+                <div style="font-size: 1.25rem; font-weight: bold; color: #fff; line-height: 1.3;">
+                    ${line.l}
+                </div>
+                
+                ${line.f ? `<div style="font-size: 1rem; color: #EAB308; margin-top: 4px;">${line.f}</div>` : ''}
             </div>
         `;
     }).join('');
 
-    // ✨ 核心動作：自動對準
-    const activeLine = document.getElementById(`line-${index}`);
-    if (activeLine) {
-        activeLine.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-    // --- Footer 處理 (保留你原本的) ---
-    const footerName = document.getElementById('display-song-name');
-    const footerUpload = document.getElementById('display-upload-info');
-    let currentName = "";
-    let currentUploader = "";
-
-    if (songData.meta) {
-        currentName = songData.meta.name;
-        currentUploader = songData.meta.uploader;
-    } else if (window.currentSubmittingData && window.currentSubmittingData.name) {
-        currentName = window.currentSubmittingData.name;
-        currentUploader = "本地編輯者";
-    }
-
-    if (footerName && footerUpload) {
-        footerName.innerText = currentName || "應援助手 Fanchant Helper";
-        footerUpload.innerText = currentUploader ? `Uploaded by: ${currentUploader}` : "";
-    }
-
-    // --- 儲存邏輯 (保留你原本的) ---
-    try {
-        const saveObj = {
-            version: "2.0",
-            meta: songData.meta || (currentName ? { name: currentName, uploader: currentUploader } : null),
-            lines: Array.from(songData)
-        };
-        localStorage.setItem('myConcertData', JSON.stringify(saveObj));
-    } catch (e) { console.error("Save Error", e); }
-    
-    if (typeof updateMainViewBtn === 'function') updateMainViewBtn();
+    // 自動對準中間
+    setTimeout(() => {
+        const activeLine = document.getElementById(`line-${index}`);
+        if (activeLine) {
+            activeLine.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }, 50);
 }
     // --- 管理員審核功能 ---
     // 搵返你 HTML 顯示歌詞標題或某個地方，加個 counter
