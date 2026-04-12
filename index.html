@@ -814,20 +814,35 @@ async function deletePending(docId, songName) {
     }
 
 
- function updateUI() {
+function updateUI() {
     const curr = songData[index];
     const format = (item) => item ? `${item.l === "..." ? "" : item.l} <span class="fc-text">${item.f}</span>` : "";
+    
     document.getElementById('prevLine').innerHTML = format(songData[index-1]);
     document.getElementById('currLyrics').innerText = curr.l;
     document.getElementById('currFanchant').innerText = curr.f;
     document.getElementById('nextLine').innerHTML = songData[index+1] ? format(songData[index+1]) : (index === songData.length-1 ? "— 完 —" : "");
     
-    // --- 更新底端資訊 --
+    // --- ✨ 新增/加回：更新底端畫面的文字 ---
+    const footerName = document.getElementById('display-song-name');
+    const footerUpload = document.getElementById('display-upload-info');
+    
+    if (footerName && footerUpload) {
+        if (songData.meta) {
+            footerName.innerText = songData.meta.name;
+            footerUpload.innerText = `Uploaded by: ${songData.meta.uploader}`;
+        } else {
+            footerName.innerText = "應援助手 Fanchant Helper";
+            footerUpload.innerText = "";
+        }
+    }
+
+    // --- 儲存邏輯 (保留你原本寫的) ---
      try {
         const saveObj = {
-            version: "2.0", // 標記版本，方便以後升級
+            version: "2.0",
             meta: songData.meta || null,
-            lines: Array.from(songData) // 確保只取陣列內容
+            lines: Array.from(songData)
         };
         localStorage.setItem('myConcertData', JSON.stringify(saveObj));
     } catch (e) { console.error("Save Error", e); }
