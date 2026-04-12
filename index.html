@@ -58,10 +58,27 @@
         #main-photo-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 2500; justify-content: center; align-items: center; touch-action: none; overflow: hidden; }
         #main-photo-img { max-width: 100%; max-height: 100%; object-fit: contain; transition: transform 0.2s ease-out; pointer-events: none; will-change: transform; }
         .close-photo-btn { position: absolute; top: 20px; right: 20px; font-size: 2rem; color: #fff; background: rgba(0,0,0,0.5); border-radius: 50%; width: 50px; height: 50px; text-align: center; line-height: 50px; cursor: pointer; z-index: 2600; }
-        #editor-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #111; z-index: 999; padding: 20px; box-sizing: border-box; overflow-y: auto; display: none; 
-                        /* ... 你原本的設定 ... */
-    touch-action: none; /* 阻止手勢穿透（如果只需上下點擊，可改回 auto 但配合 stopPropagation） */
-    overscroll-behavior: contain;}
+       #editor-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #111;
+    z-index: 999;
+    padding: 20px;
+    box-sizing: border-box;
+
+    /* ✨ 確保呢度係 auto 或者 scroll */
+    overflow-y: auto; 
+    
+    /* ✨ 核心修正：唔好用 none！
+       pan-y 代表允許垂直方向的手勢捲動，但防止縮放或左右亂跳 */
+    touch-action: pan-y; 
+    
+    /* 防止滾動傳遞到底層 */
+    overscroll-behavior: contain; 
+}
         
         .word-chip { 
             display: inline-block; 
@@ -518,10 +535,12 @@ function cancelMarking() {
 }
 function toggleChip(el, event) {
     if (event) {
-        event.stopPropagation(); // ✨ 關鍵：阻止點擊事件傳到下一層（底層歌詞）
+        // 剩係阻止冒泡就好，唔好阻止 Default，咁樣先轆到畫面
+        event.stopPropagation(); 
     }
+    
     el.classList.toggle('is-fc');
-}    
+}
 function saveMarkedData() {
     const rows = document.querySelectorAll('.line-row');
     const sourceLink = document.getElementById('sourceLinkInput').value.trim(); 
