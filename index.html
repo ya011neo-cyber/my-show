@@ -199,6 +199,7 @@ function showMainPhoto(e) {
         if(e) e.stopPropagation();
         document.getElementById('modal-title').innerText = "➕ 匯入新歌詞";
         document.getElementById('manualInput').value = ""; 
+        document.getElementById('sourceLinkInput').value = ""; 
         tempPhotoData = ""; // 清空臨時圖片
         updateEditPreview();
         document.getElementById('import-modal').style.display = 'block';
