@@ -537,28 +537,15 @@ async function loadSpecificSong(docId) {
             songData = data.data; 
 
             // --- 更新 Footer 邏輯 ---
-            const nameEl = document.getElementById('display-song-name');
-            const infoEl = document.getElementById('display-upload-info');
-
-            // 🔍 檢查點解改唔到
-            console.log("Footer 元素檢查:", { nameEl, infoEl });
-
-            if (nameEl) {
-                nameEl.innerText = data.name;
-            } else {
-                console.error("找不到 id='display-song-name' 的元素！");
-            }
-
-            if (infoEl) {
-                infoEl.innerText = `作者: ${data.uploader || '匿名'}`;
-            }
-
-            // 記錄目前數據，方便編輯時使用
-            window.currentSubmittingData = { name: data.name };
-
-            closeModal();
+            const data = doc.data();
+            songData = data.data; // 這是歌詞 Array
+            songData.meta = {
+                name: data.name,
+                uploader: data.uploader || '匿名'
+            };
+            
             index = 0;
-            updateUI();
+            updateUI(); // 這裡會觸發新的 localStorage 儲存邏輯
         }
     } catch (err) {
         console.error("載入失敗", err);
@@ -836,22 +823,16 @@ async function deletePending(docId, songName) {
     document.getElementById('currFanchant').innerText = curr.f;
     document.getElementById('nextLine').innerHTML = songData[index+1] ? format(songData[index+1]) : (index === songData.length-1 ? "— 完 —" : "");
     
-    // --- 更新底端資訊 ---
-    const footerName = document.getElementById('display-song-name');
-    const footerUpload = document.getElementById('display-upload-info');
-    
-    if (songData.meta) {
-        footerName.innerText = songData.meta.name;
-        footerUpload.innerText = `Uploaded by: ${songData.meta.uploader}`;
-    } else {
-        footerName.innerText = "應援助手 Fanchant Helper";
-        footerUpload.innerText = "";
-    }
-
-    if (curr.f && navigator.vibrate) navigator.vibrate(50);
-    try {
-        localStorage.setItem('myConcertData', JSON.stringify(songData));
+    // --- 更新底端資訊 --
+     try {
+        const saveObj = {
+            version: "2.0", // 標記版本，方便以後升級
+            meta: songData.meta || null,
+            lines: Array.from(songData) // 確保只取陣列內容
+        };
+        localStorage.setItem('myConcertData', JSON.stringify(saveObj));
     } catch (e) { console.error("Save Error", e); }
+    
     updateMainViewBtn();
 }
     // --- 管理員審核功能 ---
@@ -912,23 +893,34 @@ async function adminLogin() {
 
     // --- 修改 window.onload：統一讀取 myConcertData ---
     window.onload = function() {
-        // 1. 讀取上次儲存的歌詞數據 (內含圖片)
-        const savedData = localStorage.getItem('myConcertData');
-        if (savedData) { 
-            songData = JSON.parse(savedData); 
-            index = 0;
-            updateUI(); // 入面會自動處理相片按鈕
-        } else {
-            // 如果冇數據，初始化介面
-            updateMainViewBtn();
-        }
+    // 1. ✨ 讀取上次儲存的數據 (支援新舊格式)
+    const savedDataRaw = localStorage.getItem('myConcertData');
+    if (savedDataRaw) { 
+        const parsed = JSON.parse(savedDataRaw);
         
-        // 2. 讀取上次設定的應援顏色
-        const savedColor = localStorage.getItem('fanchantColor');
-        if (savedColor) {
-            document.documentElement.style.setProperty('--fc-color', savedColor);
+        // 檢查係咪新格式 (含有 version 2.0 或者 meta 屬性)
+        if (parsed.version === "2.0" || parsed.meta) {
+            // 新格式：從 lines 攞歌詞，從 meta 攞名
+            songData = parsed.lines || [];
+            songData.meta = parsed.meta;
+        } else {
+            // 舊格式：直接就是陣列
+            songData = parsed;
         }
-    };
+
+        index = 0;
+        updateUI(); // 入面會處理相片按鈕同埋底端文字
+    } else {
+        // 如果冇數據，初始化介面
+        updateMainViewBtn();
+    }
+    
+    // 2. 讀取上次設定的應援顏色 (呢度唔使改)
+    const savedColor = localStorage.getItem('fanchantColor');
+    if (savedColor) {
+        document.documentElement.style.setProperty('--fc-color', savedColor);
+    }
+};
 </script>
 <div id="song-list-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:4000; padding:20px; box-sizing:border-box; overflow-y:auto;">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
