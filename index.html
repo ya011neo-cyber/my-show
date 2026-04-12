@@ -533,9 +533,6 @@ async function loadSpecificSong(docId) {
     try {
         const doc = await db.collection("songs").doc(docId).get();
         if (doc.exists) {
-            const data = doc.data();
-            songData = data.data; 
-
             // --- 更新 Footer 邏輯 ---
             const data = doc.data();
             songData = data.data; // 這是歌詞 Array
