@@ -58,7 +58,11 @@
         #main-photo-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 2500; justify-content: center; align-items: center; touch-action: none; overflow: hidden; }
         #main-photo-img { max-width: 100%; max-height: 100%; object-fit: contain; transition: transform 0.2s ease-out; pointer-events: none; will-change: transform; }
         .close-photo-btn { position: absolute; top: 20px; right: 20px; font-size: 2rem; color: #fff; background: rgba(0,0,0,0.5); border-radius: 50%; width: 50px; height: 50px; text-align: center; line-height: 50px; cursor: pointer; z-index: 2600; }
-        #editor-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #111; z-index: 999; padding: 20px; box-sizing: border-box; overflow-y: auto; display: none; }
+        #editor-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #111; z-index: 999; padding: 20px; box-sizing: border-box; overflow-y: auto; display: none; 
+                        /* ... 你原本的設定 ... */
+    touch-action: none; /* 阻止手勢穿透（如果只需上下點擊，可改回 auto 但配合 stopPropagation） */
+    overscroll-behavior: contain;}
+        
         .word-chip { 
             display: inline-block; 
             padding: 6px 10px;      /* 縮細少少 padding */
@@ -494,8 +498,8 @@ function startManualMarking(text) {
                 isPreviouslyMarked = true;
                 fanchantPointer++; 
             }
-            
-            html += `<span onclick="this.classList.toggle('is-fc')" class="word-chip ${isPreviouslyMarked ? 'is-fc' : ''}">${w}</span>`;
+            html += `<span onclick="toggleChip(this, event)" class="word-chip ${isPreviouslyMarked ? 'is-fc' : ''}">${w}</span>`;
+            // html += `<span onclick="this.classList.toggle('is-fc')" class="word-chip ${isPreviouslyMarked ? 'is-fc' : ''}">${w}</span>`;
         });
         html += `</div>`;
     });
@@ -512,7 +516,12 @@ function cancelMarking() {
     // 直接隱藏標記畫面，唔執行 saveMarkedData，所以原本嘅數據唔會被覆蓋
     document.getElementById('editor-overlay').style.display = 'none';
 }
-    
+function toggleChip(el, event) {
+    if (event) {
+        event.stopPropagation(); // ✨ 關鍵：阻止點擊事件傳到下一層（底層歌詞）
+    }
+    el.classList.toggle('is-fc');
+}    
 function saveMarkedData() {
     const rows = document.querySelectorAll('.line-row');
     const sourceLink = document.getElementById('sourceLinkInput').value.trim(); 
@@ -1042,24 +1051,20 @@ function updateUI() {
     const list = document.getElementById('lyrics-list');
     if (!list) return;
 
-    list.innerHTML = songData.map((line, i) => {
-        const isCurrent = (i === index);
-        return `
-            <div id="line-${i}" class="lyric-line" 
-                 style="width: 100%; padding: 15px 0; transition: all 0.3s; 
-                        opacity: ${isCurrent ? 1 : 0.3}; 
-                        transform: scale(${isCurrent ? 1.1 : 0.95});
-                        pointer-events: none;">
-                <div class="lyric-content" style="display: inline-block; width: 90%; pointer-events: auto;">
-                    <div style="font-size: 1.35rem; font-weight: bold; color: ${isCurrent ? '#fff' : '#aaa'};">
-                        ${line.l}
-                    </div>
-                    ${line.f ? `<div style="font-size: 1.1rem; color: #EAB308; margin-top: 4px;">${line.f}</div>` : ''}
-                </div>
-            </div>
-        `;
-    }).join('');
+    // 更新內容 (保留)
+    list.innerHTML = songData.map((line, i) => { ... }).join('');
 
+    // ✨ 核心修正：檢查編輯器係咪開緊
+    const editorOverlay = document.getElementById('editor-overlay');
+    const isEditing = editorOverlay && (editorOverlay.style.display === 'block');
+
+    if (isEditing) {
+        // 如果喺編輯模式，更新完 HTML 就停，唔好做捲動動作
+        console.log("正在編輯，已阻斷背景捲動");
+        return; 
+    }
+
+    // 正常播放模式才捲動
     setTimeout(() => {
         const activeLine = document.getElementById(`line-${index}`);
         if (activeLine) activeLine.scrollIntoView({ behavior: 'smooth', block: 'center' });
