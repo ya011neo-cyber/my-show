@@ -451,36 +451,96 @@ function saveMarkedData() {
     // --- 核心邏輯 ---
 async function fetchPublicSongs(e) {
     if (e) e.stopPropagation();
+    
     try {
-        const snapshot = await db.collection("songs").where("status", "==", "public").get();
-        if (snapshot.empty) { alert("暫時未有公開歌單。"); return; }
-        
-        const container = document.getElementById('list-container');
-        container.innerHTML = ""; // 清空舊內容
+        // 抓取所有已公開的歌，按時間倒序排
+        const snapshot = await db.collection("songs")
+            .where("status", "==", "public")
+            .orderBy("createdAt", "desc")
+            .get();
 
-        snapshot.forEach((doc) => {
-            const d = doc.data();
-            const songDiv = document.createElement('div');
-            songDiv.className = 'song-item';
-            
-            // 構建歌單 HTML
-            songDiv.innerHTML = `
-                <div class="song-info" onclick="selectSong('${doc.id}')">
-                    <div class="song-name">${d.name}</div>
-                    <div class="song-uploader">By: ${d.uploader || "匿名"}</div>
-                </div>
-                <button class="admin-del-btn" onclick="adminDeletePublic('${doc.id}', '${d.name}')">🗑️</button>
-            `;
-            container.appendChild(songDiv);
+        const songsGroupedByName = {};
+
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            const name = data.name;
+            if (!songsGroupedByName[name]) {
+                songsGroupedByName[name] = [];
+            }
+            songsGroupedByName[name].push({ id: doc.id, ...data });
         });
 
-        document.getElementById('song-list-overlay').style.display = 'block';
-    } catch (error) {
-        console.error(error);
-        alert("讀取歌單失敗");
+        // 呼叫顯示歌單的 UI，傳入分組後的資料
+        showSongGroupList(songsGroupedByName);
+
+    } catch (err) {
+        console.error("抓取歌單失敗", err);
+        alert("無法載入歌單");
     }
 }
-
+    
+function showSongGroupList(groupedData) {
+    let html = '<div style="padding:20px;"><h3>選擇歌曲</h3><ul style="list-style:none; padding:0;">';
+    
+    Object.keys(groupedData).forEach(name => {
+        const versions = groupedData[name];
+        // 點擊後跳到第二層選單，傳入該歌名的所有版本
+        html += `
+            <li onclick='showVersionSelector(${JSON.stringify(versions).replace(/'/g, "&apos;")})' 
+                style="padding:15px; border-bottom:1px solid #333; cursor:pointer; display:flex; justify-content:space-between;">
+                <span>${name}</span>
+                <span style="color:#666; font-size:0.8rem;">${versions.length} 個版本 ></span>
+            </li>`;
+    });
+    
+    html += '</ul><button class="btn" onclick="closeModal()">關閉</button></div>';
+    
+    // 假設你有一個顯示內容的 Modal Container
+    const modal = document.getElementById('public-songs-modal'); 
+    modal.innerHTML = html;
+    modal.style.display = 'block';
+}
+    
+function showVersionSelector(versions) {
+    let html = `<div style="padding:20px;"><h3>選擇版本 - ${versions[0].name}</h3><ul style="list-style:none; padding:0;">`;
+    
+    // 已經在 fetch 嗰陣按 createdAt 排咗序，所以直接顯示就係倒序
+    versions.forEach(v => {
+        const date = v.createdAt ? new Date(v.createdAt.seconds * 1000).toLocaleDateString() : "未知日期";
+        html += `
+            <li onclick="loadSpecificSong('${v.id}')" 
+                style="padding:15px; border-bottom:1px solid #444; cursor:pointer;">
+                <div style="color:#0f0;">作者: ${v.uploader || '匿名'}</div>
+                <div style="font-size:0.7rem; color:#666;">上傳日期: ${date}</div>
+            </li>`;
+    });
+    
+    html += `</ul><button class="btn" onclick="fetchPublicSongs()"> < 返回歌曲列表</button></div>`;
+    
+    document.getElementById('public-songs-modal').innerHTML = html;
+}
+    
+async function loadSpecificSong(docId) {
+    try {
+        const doc = await db.collection("songs").doc(docId).get();
+        if (doc.exists) {
+            const data = doc.data();
+            songData = data.data; // 更新本地歌詞數據
+            
+            // 更新 UI 底部資訊
+            document.getElementById('display-song-name').innerText = data.name;
+            document.getElementById('display-upload-info').innerText = `作者: ${data.uploader || '匿名'}`;
+            
+            // 關閉選單並更新畫面
+            closeModal();
+            index = 0;
+            updateUI();
+        }
+    } catch (err) {
+        alert("載入失敗");
+    }
+}
+    
 function closeSongList() {
     document.getElementById('song-list-overlay').style.display = 'none';
 }
