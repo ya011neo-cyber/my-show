@@ -543,6 +543,7 @@ async function loadSpecificSong(docId) {
             const nameEl = document.getElementById('display-song-name');
             const infoEl = document.getElementById('display-upload-info');
 
+            console.log("正在載入：", data.name)
             if (nameEl) nameEl.innerText = data.name || "未命名";
             if (infoEl) infoEl.innerText = `作者: ${data.uploader || '匿名'}`;
 
@@ -553,6 +554,7 @@ async function loadSpecificSong(docId) {
             closeModal(); // 關閉嗰個分層歌單
             index = 0;
             updateUI(); // 呼叫你原本渲染歌詞嘅 function
+            
         }
     } catch (err) {
         console.error("載入失敗", err);
