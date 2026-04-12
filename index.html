@@ -929,31 +929,41 @@ function updateUI() {
     document.getElementById('nextLine').innerHTML = songData[index+1] ? format(songData[index+1]) : (index === songData.length-1 ? "— 完 —" : "");
     
     // --- ✨ 新增/加回：更新底端畫面的文字 ---
-    const footerName = document.getElementById('display-song-name');
+   const footerName = document.getElementById('display-song-name');
     const footerUpload = document.getElementById('display-upload-info');
     
-    if (footerName && footerUpload) {
-        if (songData.meta) {
-            footerName.innerText = songData.meta.name;
-            footerUpload.innerText = `Uploaded by: ${songData.meta.uploader}`;
-        } else {
-            footerName.innerText = "應援助手 Fanchant Helper";
-            footerUpload.innerText = "";
-        }
+    // 1. 優先從 songData.meta 攞名
+    // 2. 如果冇，就睇吓 window 暫存 (currentSubmittingData) 仲有冇名
+    let currentName = "";
+    let currentUploader = "";
+
+    if (songData.meta) {
+        currentName = songData.meta.name;
+        currentUploader = songData.meta.uploader;
+    } else if (window.currentSubmittingData && window.currentSubmittingData.name) {
+        currentName = window.currentSubmittingData.name;
+        currentUploader = "本地編輯";
     }
 
-    // --- 儲存邏輯 (保留你原本寫的) ---
-     try {
+    if (currentName) {
+        footerName.innerText = currentName;
+        footerUpload.innerText = currentUploader ? `Uploaded by: ${currentUploader}` : "";
+    } else {
+        footerName.innerText = "應援助手 Fanchant Helper";
+        footerUpload.innerText = "";
+    }
+
+    // --- 儲存邏輯 ---
+    try {
         const saveObj = {
             version: "2.0",
-            meta: songData.meta || null,
+            meta: songData.meta || (window.currentSubmittingData ? { name: window.currentSubmittingData.name, uploader: '本地' } : null),
             lines: Array.from(songData)
         };
         localStorage.setItem('myConcertData', JSON.stringify(saveObj));
     } catch (e) { console.error("Save Error", e); }
     
     updateMainViewBtn();
-}
     // --- 管理員審核功能 ---
     // 搵返你 HTML 顯示歌詞標題或某個地方，加個 counter
 let adminClickCount = 0;
