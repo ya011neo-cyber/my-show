@@ -31,7 +31,7 @@
         .lyrics { font-size: clamp(1rem, 3vh, 2rem); color: #bbb; margin-bottom: 3px; white-space: normal; line-height: 1.2; word-break: break-word; }
         .side-lyrics { font-size: clamp(0.8rem, 2.5vh, 1.5rem); color: #444; min-height: 2vh; transition: all 0.3s ease; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .side-lyrics .fc-text { color: var(--fc-color); filter: brightness(0.5); margin-left: 8px; }
-        .btn-group { position: absolute; top: calc(10px + env(safe-area-inset-top)); right: 10px; display: flex; gap: 5px; z-index: 100; flex-wrap: wrap; justify-content: flex-end; }
+        .btn-group { position: fixed; top: calc(10px + env(safe-area-inset-top)); right: 10px; display: flex; gap: 5px; z-index: 100; flex-wrap: wrap; justify-content: flex-end; background: #000;}
         .btn { padding: 8px 12px; background: #222; border-radius: 5px; font-size: 0.7rem; border: 1px solid #444; color: #fff; cursor: pointer; user-select: none; }
         #main-photo-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 2500; justify-content: center; align-items: center; touch-action: none; overflow: hidden; }
         #main-photo-img { max-width: 100%; max-height: 100%; object-fit: contain; transition: transform 0.2s ease-out; pointer-events: none; will-change: transform; }
@@ -55,20 +55,15 @@
             border-color: var(--fc-color); 
             box-shadow: none;        /* ✨ 移除發光，改用淡淡的邊框色就好 */
         }
-        /* 隱藏捲動條但保留功能 (可選) */
-        .lyrics-window::-webkit-scrollbar {
-            display: none;
+        #lyrics-window {
+            overflow-x: hidden !important; /* 徹底禁止左右郁 */
+            width: 100vw;                 /* 確保闊度啱啱好係畫面闊 */
+            box-sizing: border-box;
         }
         
-        .lyrics-window {
-            mask-image: linear-gradient(
-                to bottom,
-                transparent 0%,
-                black 20%,
-                black 80%,
-                transparent 100%
-            );
-            /* 咁樣頂部同底部嘅歌詞就會慢慢淡出，好似 App 咁 */
+        /* 隱藏捲軸但保留轆嘅功能 */
+        #lyrics-window::-webkit-scrollbar {
+            display: none;
         }
         @media (max-width: 768px) {
             #split-screen-editor > div {
