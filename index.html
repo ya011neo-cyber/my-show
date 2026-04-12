@@ -1051,26 +1051,41 @@ function updateUI() {
     const list = document.getElementById('lyrics-list');
     if (!list) return;
 
-    // 更新內容 (保留)
-    list.innerHTML = songData.map((line, i) => { ... }).join('');
+    // 1. 這裡要用返你原本生成歌詞 HTML 嘅邏輯，唔好用 { ... }
+    list.innerHTML = songData.map((line, i) => {
+        const isCurrent = (i === index);
+        return `
+            <div id="line-${i}" class="lyric-line" 
+                 style="width: 100%; padding: 15px 0; transition: all 0.3s; 
+                        opacity: ${isCurrent ? 1 : 0.3}; 
+                        transform: scale(${isCurrent ? 1.1 : 0.95});
+                        pointer-events: none;">
+                <div class="lyric-content" style="display: inline-block; width: 90%; pointer-events: auto;">
+                    <div style="font-size: 1.35rem; font-weight: bold; color: ${isCurrent ? '#fff' : '#aaa'};">
+                        ${line.l}
+                    </div>
+                    ${line.f ? `<div style="font-size: 1.1rem; color: #EAB308; margin-top: 4px;">${line.f}</div>` : ''}
+                </div>
+            </div>
+        `;
+    }).join('');
 
-    // ✨ 核心修正：檢查編輯器係咪開緊
+    // 2. ✨ 核心修正：檢查編輯器係咪開緊
     const editorOverlay = document.getElementById('editor-overlay');
     const isEditing = editorOverlay && (editorOverlay.style.display === 'block');
 
     if (isEditing) {
-        // 如果喺編輯模式，更新完 HTML 就停，唔好做捲動動作
+        // 如果喺編輯模式，更新完 HTML（確保文字有變）就停，唔好做捲動動作
         console.log("正在編輯，已阻斷背景捲動");
-        return; 
+    } else {
+        // 正常播放模式才捲動
+        setTimeout(() => {
+            const activeLine = document.getElementById(`line-${index}`);
+            if (activeLine) activeLine.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 50);
     }
 
-    // 正常播放模式才捲動
-    setTimeout(() => {
-        const activeLine = document.getElementById(`line-${index}`);
-        if (activeLine) activeLine.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, 50);
-
-    // --- Footer 處理 (保留你原本的) ---
+    // --- Footer 處理 (保留) ---
     const footerName = document.getElementById('display-song-name');
     const footerUpload = document.getElementById('display-upload-info');
     let currentName = "";
@@ -1089,7 +1104,7 @@ function updateUI() {
         footerUpload.innerText = currentUploader ? `Uploaded by: ${currentUploader}` : "";
     }
 
-    // --- 儲存邏輯 (保留你原本的) ---
+    // --- 儲存邏輯 (保留) ---
     try {
         const saveObj = {
             version: "2.0",
@@ -1214,4 +1229,4 @@ async function adminLogin() {
     .admin-del-btn { background: #400; color: #f55; padding: 8px; border-radius: 4px; margin-left: 10px; font-size: 0.8rem; border: 1px solid #600; }
 </style>    
 </body>
-</html>幫我改善這個網
+</html>幫我改善這個
