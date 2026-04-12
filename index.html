@@ -56,14 +56,13 @@
             box-shadow: none;        /* ✨ 移除發光，改用淡淡的邊框色就好 */
         }
         #lyrics-window {
-            overflow-x: hidden !important; /* 徹底禁止左右郁 */
-            width: 100vw;                 /* 確保闊度啱啱好係畫面闊 */
-            box-sizing: border-box;
-        }
-        
-        /* 隱藏捲軸但保留轆嘅功能 */
-        #lyrics-window::-webkit-scrollbar {
-            display: none;
+            height: 280px;      /* 縮細高度到大約 5 行 */
+            padding: 80px 0;    /* 減少上下留白 */
+            overflow-y: auto;
+            scroll-behavior: smooth;
+            position: relative;
+            margin: 10px 0;
+            -webkit-overflow-scrolling: touch;
         }
         @media (max-width: 768px) {
             #split-screen-editor > div {
@@ -939,31 +938,29 @@ async function deletePending(docId, songName) {
     //     updateUI();
     // }
    function handleTap(e) {
-        if (isLocked) return;
+    if (isLocked) return;
     
-        // 1. 排除點擊到「按鈕」嘅情況 (避免撳掣變咗跳下一句)
-        if (e.target.closest('.btn') || e.target.closest('.btn-group')) return;
-    
-        const clientX = e.clientX || (e.touches && e.touches[0].clientX);
-        const screenWidth = window.innerWidth;
-    
-        // 2. 左右判定
-        if (clientX < screenWidth * 0.4) { 
-            // 左邊 40%：上一句
-            if (index > 0) {
-                index--;
-                updateUI();
-            }
-        } else { 
-            // 右邊 60%：下一句
-            if (index < songData.length - 1) {
-                index++;
-            } else {
-                index = 0; 
-            }
-            updateUI();
+    // ⭕ 淨係排除點擊到「功能掣」嘅情況
+    if (e.target.closest('.btn-group') || e.target.closest('.btn')) return;
+
+    const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+    const screenWidth = window.innerWidth;
+
+    // 左邊 40% 為「上一句」，右邊 60% 為「下一句」
+    if (clientX < screenWidth * 0.4) { 
+        if (index > 0) {
+            index--;
+            updateUI(); // 呢度會行返你原本嘅 updateUI 染色邏輯
         }
+    } else { 
+        if (index < songData.length - 1) {
+            index++;
+        } else {
+            index = 0; 
+        }
+        updateUI(); // 呢度會行返你原本嘅 updateUI 染色邏輯
     }
+}
 
 
 function updateUI() {
