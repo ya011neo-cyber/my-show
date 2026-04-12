@@ -79,7 +79,7 @@
         <div id="mainViewLinkBtn" class="btn" style="display:none; background:#0055aa;" onclick="openSourceLink(event)">🔗</div>
         <div class="btn" onclick="openColorMenu(event)">🎨</div>
         <div class="btn" onclick="fetchPublicSongs(event)">📂</div>
-        <div class="btn" onclick="openImporter(event)">➕</div>
+        <div class="btn" onclick="openImporter(false)">➕</div>
         <div class="btn" onclick="uploadSong(event)">☁️</div>
         <div class="btn" onclick="editCurrentSong(event)">✏️</div>
         <div id="lockBtn" class="btn" onclick="toggleLock(event)">🔓</div>
@@ -217,67 +217,53 @@ function showMainPhoto(e) {
 
     // --- 編輯與圖片處理 ---
    function openImporter(isEdit = false) {
-        const modal = document.getElementById('import-modal');
-        const title = document.getElementById('modal-title');
-        
-        // ✨ 這裡要對應你 HTML 裡的 ID
-        const refContainer = document.getElementById('reference-image-container'); 
-        const refImg = document.getElementById('reference-img');
-        const viewBtn = document.getElementById('importViewPhotoBtn');
-        const removeBtn = document.getElementById('importRemovePhotoBtn');
-    
-        if (title) {
-            title.innerText = isEdit ? "編輯現有歌詞" : "匯入新歌詞";
-        }
-    
-        // 檢查 localStorage 裡面有沒有相
-        const currentPhoto = localStorage.getItem('myConcertPhoto');
-        
-        if (currentPhoto) {
-            // 顯示分屏圖片
-            if (refContainer && refImg) {
-                refImg.src = currentPhoto;
-                refContainer.style.display = 'block'; // 👈 之前報錯可能就是因為找不到 refSide
-            }
-            // 顯示頂部按鈕
-            if (viewBtn) viewBtn.style.display = 'inline-block';
-            if (removeBtn) removeBtn.style.display = 'inline-block';
-        } else {
-            // 隱藏分屏區域
-            if (refContainer) {
-                refContainer.style.display = 'none';
-            }
-            if (viewBtn) viewBtn.style.display = 'none';
-            if (removeBtn) removeBtn.style.display = 'none';
-        }
-    
-        const input = document.getElementById('manualInput');
-        if (input) {
-            input.value = isEdit ? songData.map(line => `${line.l || ''},${line.f || ''}`).join('\n') : "";
-        }
-    
-        modal.style.display = 'block';
-    }
-    function editCurrentSong(e) {
-        e.stopPropagation();
-        document.getElementById('modal-title').innerText = "✏️ 編輯現有歌詞";
-    
-        let text = songData.map(item => {
+    const modal = document.getElementById('import-modal');
+    const title = document.getElementById('modal-title');
+    const input = document.getElementById('manualInput');
+    const linkInput = document.getElementById('sourceLinkInput');
+    const refContainer = document.getElementById('reference-image-container');
+    const refImg = document.getElementById('reference-img');
+
+    if (!modal || !input) return;
+
+    if (isEdit) {
+        title.innerText = "✏️ 編輯現有歌詞";
+        // 載入歌詞內容
+        input.value = songData.map(item => {
             let line = "";
             if (item.l && item.l !== "...") line += item.l + " ";
             if (item.f) line += item.f; 
             return line.trim();
         }).join('\n');
-    
-        document.getElementById('manualInput').value = text;
+
+        // 載入 Link (對應你原本嘅邏輯)
+        const currSong = (typeof getFirstLineData === 'function') ? getFirstLineData() : {};
+        if (linkInput) linkInput.value = currSong.link || "";
         
-        // --- 新增：讀取 Link ---
-        const currSong = getFirstLineData();
-        document.getElementById('sourceLinkInput').value = currSong.link || "";
-        
-        tempPhotoData = currSong.photo || "";
-        updateEditPreview();
-        document.getElementById('import-modal').style.display = 'block';
+        // 載入相片暫存
+        tempPhotoData = currSong.photo || localStorage.getItem('myConcertPhoto') || "";
+    } else {
+        title.innerText = "➕ 匯入新歌詞";
+        input.value = "";
+        if (linkInput) linkInput.value = "";
+        tempPhotoData = "";
+    }
+
+    // --- ✨ 呢度就係分屏功能嘅靈魂 ---
+    const photoToShow = isEdit ? tempPhotoData : localStorage.getItem('myConcertPhoto');
+    if (photoToShow && refContainer && refImg) {
+        refImg.src = photoToShow;
+        refContainer.style.display = 'block'; // 顯示左邊分屏
+    } else if (refContainer) {
+        refContainer.style.display = 'none';  // 冇相就收埋左邊
+    }
+
+    modal.style.display = 'block';
+}
+    function editCurrentSong(e) {
+        if (e) e.stopPropagation();
+        // 唔好喺度寫一大堆 style.display，直接叫 openImporter 做嘢！
+        openImporter(true); 
     }
     function closeImporter() { document.getElementById('import-modal').style.display = 'none'; }
 
