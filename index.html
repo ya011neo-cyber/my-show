@@ -216,43 +216,48 @@ function showMainPhoto(e) {
     overlay.addEventListener('touchend', (e) => { isDragging = false; const currentTime = new Date().getTime(); const tapLength = currentTime - (window.lastTap || 0); if (tapLength < 300 && tapLength > 0) { scale = (scale === 1) ? 2.5 : 1; if (scale === 1) { posX = 0; posY = 0; } document.getElementById('main-photo-img').style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`; e.preventDefault(); } window.lastTap = currentTime; });
 
     // --- 編輯與圖片處理 ---
-    function openImporter(isEdit = false) {
+   function openImporter(isEdit = false) {
         const modal = document.getElementById('import-modal');
         const title = document.getElementById('modal-title');
-        const input = document.getElementById('manualInput');
-        const refSide = document.getElementById('reference-side');
-        const refImg = document.getElementById('reference-img-split');
         
-        // 解決報錯：確保 title 存在
+        // ✨ 這裡要對應你 HTML 裡的 ID
+        const refContainer = document.getElementById('reference-image-container'); 
+        const refImg = document.getElementById('reference-img');
+        const viewBtn = document.getElementById('importViewPhotoBtn');
+        const removeBtn = document.getElementById('importRemovePhotoBtn');
+    
         if (title) {
             title.innerText = isEdit ? "編輯現有歌詞" : "匯入新歌詞";
         }
     
-        // 檢查目前有冇相片
+        // 檢查 localStorage 裡面有沒有相
         const currentPhoto = localStorage.getItem('myConcertPhoto');
+        
         if (currentPhoto) {
-            // 如果有相，自動開啟左邊分屏
-            refImg.src = currentPhoto;
-            refSide.style.display = 'block';
-            
-            // 同步顯示你原本嗰兩個控制掣
-            document.getElementById('importViewPhotoBtn').style.display = 'inline-block';
-            document.getElementById('importRemovePhotoBtn').style.display = 'inline-block';
+            // 顯示分屏圖片
+            if (refContainer && refImg) {
+                refImg.src = currentPhoto;
+                refContainer.style.display = 'block'; // 👈 之前報錯可能就是因為找不到 refSide
+            }
+            // 顯示頂部按鈕
+            if (viewBtn) viewBtn.style.display = 'inline-block';
+            if (removeBtn) removeBtn.style.display = 'inline-block';
         } else {
-            refSide.style.display = 'none';
-            document.getElementById('importViewPhotoBtn').style.display = 'none';
-            document.getElementById('importRemovePhotoBtn').style.display = 'none';
+            // 隱藏分屏區域
+            if (refContainer) {
+                refContainer.style.display = 'none';
+            }
+            if (viewBtn) viewBtn.style.display = 'none';
+            if (removeBtn) removeBtn.style.display = 'none';
         }
     
-        if (isEdit) {
-            input.value = songData.map(line => `${line.l || ''},${line.f || ''}`).join('\n');
-        } else {
-            input.value = "";
+        const input = document.getElementById('manualInput');
+        if (input) {
+            input.value = isEdit ? songData.map(line => `${line.l || ''},${line.f || ''}`).join('\n') : "";
         }
     
         modal.style.display = 'block';
     }
-
     function editCurrentSong(e) {
         e.stopPropagation();
         document.getElementById('modal-title').innerText = "✏️ 編輯現有歌詞";
