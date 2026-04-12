@@ -56,23 +56,20 @@
             box-shadow: none;        /* ✨ 移除發光，改用淡淡的邊框色就好 */
         }
 #lyrics-window {
-    /* 1. 設定高度：大約 5 行歌詞嘅高度 (1 行約 60-70px) */
-    height: 320px; 
-    
-    /* 2. 設定 Padding：等第一句同最後一句都可以「轆」到畫面正中間 */
-    padding: 140px 0; 
-    
-    overflow-y: auto;
+    height: 320px;            /* 固定高度，大約 5 行 */
+    padding: 130px 0;         /* 關鍵：等第一句可以轆到中間 */
+    margin: 0 50px;           /* 👈 左右留 50px 空白位畀你 Tap */
+    overflow-y: auto;         /* 開啟捲動 */
     overflow-x: hidden;
     scroll-behavior: smooth;
-    position: relative;
-    margin: 10px 0;
     -webkit-overflow-scrolling: touch;
 }
 
-/* 隱藏 scrollbar 令畫面乾淨啲 */
-#lyrics-window::-webkit-scrollbar {
-    display: none;
+/* 確保歌詞行唔好太闊，亦唔好太厚 */
+.line-item {
+    padding: 15px 0;
+    min-height: 60px;
+    text-align: center;
 }
         @media (max-width: 768px) {
             #split-screen-editor > div {
@@ -950,14 +947,14 @@ async function deletePending(docId, songName) {
   function handleTap(e) {
     if (isLocked) return;
 
-    // ✨ 新增：如果點擊嘅係歌詞範圍內，就交畀 handleLineClick，呢度唔好郁
-    if (e.target.closest('#lyrics-list')) return;
+    // 💡 如果點緊歌詞窗口入面，我哋唔行 handleTap，交畀歌詞自己嘅 onclick 同 scroll
+    if (e.target.closest('#lyrics-window')) return;
 
     const x = e.clientX || (e.touches && e.touches[0].clientX);
-    if (x < window.innerWidth * 0.3) { 
-        if (index > 0) index--; 
-    } else { 
-        if (index < songData.length - 1) index++; else index = 0; 
+    if (x < window.innerWidth * 0.4) { // 左邊 40%
+        if (index > 0) index--;
+    } else { // 右邊 60%
+        if (index < songData.length - 1) index++; else index = 0;
     }
     updateUI();
 }
@@ -972,45 +969,26 @@ function handleLineClick(targetIndex) {
     updateUI();
 }
 function updateUI() {
-
-    const list = document.getElementById('lyrics-list');
+const list = document.getElementById('lyrics-list');
     if (!list) return;
 
+    // 生成所有歌詞
     list.innerHTML = songData.map((line, i) => {
         const isCurrent = (i === index);
         return `
-            <div id="line-${i}" 
-                 onclick="handleLineClick(${i})" 
-                 style="
-                    padding: 30px 20px; /* 👈 加厚 Padding，令點擊空間變大 */
-                    text-align: center; 
-                    transition: all 0.3s ease;
-                    /* 當前句係白色，其他係深灰色 */
-                    color: ${isCurrent ? '#ffffff' : '#555555'};
-                    /* 當前句放大少少 */
-                    transform: scale(${isCurrent ? '1.15' : '0.95'});
-                    cursor: pointer;
-                 ">
-                <div style="font-size: 1.4rem; font-weight: bold;">${line.l}</div>
-                <div style="font-size: 1.1rem; color: #EAB308; margin-top: 5px; min-height: 1.2rem;">
-                    ${line.f || ''}
-                </div>
+            <div id="line-${i}" onclick="index=${i}; updateUI();" class="line-item" 
+                 style="opacity: ${isCurrent ? 1 : 0.3}; transition: 0.3s;">
+                <div>${line.l}</div>
+                <div style="color: gold;">${line.f || ''}</div>
             </div>
         `;
     }).join('');
 
-    // ✨ 自動對準中心
-    // 加少少 delay 確保 DOM 渲染好先行捲動
-    setTimeout(() => {
-        const activeLine = document.getElementById(`line-${index}`);
-        if (activeLine) {
-            activeLine.scrollIntoView({
-                behavior: 'smooth',
-                block: 'center'
-            });
-        }
-    }, 50);
-
+    // ✨ 核心動作：自動對準
+    const activeLine = document.getElementById(`line-${index}`);
+    if (activeLine) {
+        activeLine.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
     // --- Footer 處理 (保留你原本的) ---
     const footerName = document.getElementById('display-song-name');
     const footerUpload = document.getElementById('display-upload-info');
