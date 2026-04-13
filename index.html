@@ -135,6 +135,28 @@
                 flex: 1 !important;
             }
         }
+        /* 當視窗非常窄時 (例如彈出式小視窗) */
+@media screen and (max-width: 450px) {
+    /* 隱藏頂部按鈕組 */
+    .btn-group, 
+    #admin-tools,
+    .top-nav { 
+        display: none !important; 
+    }
+
+    /* 隱藏底部歌名資訊欄 */
+    .footer-info, 
+    #display-song-name, 
+    #display-upload-info {
+        display: none !important;
+    }
+
+    /* 調整歌詞顯示區域，填滿空間 */
+    #lyrics-list {
+        height: 100vh !important;
+        padding-bottom: 0 !important;
+    }
+}
     </style>
 </head>
     
