@@ -183,14 +183,15 @@ body.focus-mode #display-upload-info {
 <body>
 <div id="app" onclick="handleTap(event)">
     <div class="btn-group">
-        <div class="btn" style="background:#444;" onclick="location.reload()">🔄</div>
+        <div class="btn" style="background:#0055aa;" onclick="location.reload()">🔄</div>
         <div id="mainViewPhotoBtn" class="btn" style="display:none; background:#444;" onclick="showMainPhoto(event)">🖼️</div>
-        <div id="mainViewLinkBtn" class="btn" style="display:none; background:#0055aa;" onclick="openSourceLink(event)">🔗</div>
+        <div id="mainViewLinkBtn" class="btn" style="display:none; background:#444;" onclick="openSourceLink(event)">🔗</div>
+        <div id="mainViewVideoBtn" class="btn" style="display:none; background:#444;" onclick="openVideoLink(event)">🎬</div>
         <div class="btn" onclick="openColorMenu(event)">🎨</div>
         <div class="btn" onclick="fetchPublicSongs(event)">📂</div>
         <div class="btn" onclick="openImporter(false)">➕</div>
         <div class="btn" onclick="uploadSong(event)">☁️</div>
-        <div class="btn" onclick="editCurrentSong(event)">✏️</div>
+        <div class="btn" style="background:#444;" onclick="editCurrentSong(event)">✏️</div>
         <div id="lockBtn" class="btn" onclick="toggleLock(event)">🔓</div>
     </div>
     <div class="focus-controls">
@@ -245,6 +246,7 @@ body.focus-mode #display-upload-info {
             
             <div style="margin: 15px 0;">
                 <input type="text" id="sourceLinkInput" style="width:100%; background:#111; color:#0f0; border:1px solid #444; padding:12px; border-radius:5px; box-sizing:border-box; font-size:0.8rem;" placeholder="🔗 貼上來源網址 (YouTube/歌詞網)...">
+                <input type="text" id="videoLinkInput" style="width:100%; background:#111; color:#ff0000; border:1px solid #444; padding:12px; border-radius:5px; box-sizing:border-box; font-size:0.8rem;" placeholder="🎬 貼上參考影片網址 (YouTube/Fancam)...">
             </div>
         </div>
     </div>
@@ -347,6 +349,7 @@ function showMainPhoto(e) {
     const title = document.getElementById('modal-title');
     const input = document.getElementById('manualInput');
     const linkInput = document.getElementById('sourceLinkInput');
+    const videoLinkInput = document.getElementById('videoLinkInput');
     const refContainer = document.getElementById('reference-image-container');
     const refImg = document.getElementById('reference-img');
 
@@ -365,13 +368,15 @@ function showMainPhoto(e) {
         // 載入 Link (對應你原本嘅邏輯)
         const currSong = (typeof getFirstLineData === 'function') ? getFirstLineData() : {};
         if (linkInput) linkInput.value = currSong.link || "";
+        if (videoLinkInput) videoLinkInput.value = currSong.video || "";
         
         // 載入相片暫存
         tempPhotoData = currSong.photo || localStorage.getItem('myConcertPhoto') || "";
     } else {
         title.innerText = "➕ 匯入新歌詞";
         input.value = "";
-        if (linkInput) linkInput.value = "";
+        linkInput.value = "";
+        videoLinkInput.value = "";
         tempPhotoData = "";
     }
 
@@ -619,6 +624,7 @@ function toggleChip(el, event) {
 function saveMarkedData() {
     const rows = document.querySelectorAll('.line-row');
     const sourceLink = document.getElementById('sourceLinkInput').value.trim(); 
+    const videoLink = document.getElementById('videoLinkInput').value.trim(); 
     let newData = [];
 
     rows.forEach(row => {
@@ -640,6 +646,7 @@ function saveMarkedData() {
     if (newData.length > 0) {
         if (tempPhotoData) newData[0].photo = tempPhotoData;
         if (sourceLink) newData[0].link = sourceLink; 
+        if (sourceLink) newData[0].video = videoLink; 
     }
 
     // --- ✨ 核心改動：更新 meta 數據 ---
@@ -959,6 +966,16 @@ async function sendDiscordNotification(songName, uploader, docId) {
             window.open(url, '_blank');
         }
     }
+function openVideoLink(e) {
+    if (e) e.stopPropagation();
+    const currSong = (typeof getFirstLineData === 'function') ? getFirstLineData() : {};
+    const url = currSong.video;
+    if (url) {
+        window.open(url, '_blank');
+    } else {
+        alert("呢首歌暫時冇參考影片網址啊");
+    }
+}
 async function showAdminPanel() {
     try {
         const snapshot = await db.collection("songs")
@@ -1263,6 +1280,9 @@ async function adminLogin() {
         // --- 新增：處理 Link 掣 ---
         const mainLinkBtn = document.getElementById('mainViewLinkBtn');
         mainLinkBtn.style.display = (currSong && currSong.link) ? 'block' : 'none';
+        
+        const mainVideoLinkBtn = document.getElementById('mainViewVideoBtn');
+        mainLinkBtn.style.display = (currSong && currSong.video) ? 'block' : 'none';
     }
 
     // --- 顏色功能與 Lock (保持原樣) ---
