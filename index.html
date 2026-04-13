@@ -492,30 +492,37 @@ function startManualMarking(text) {
                                  ? songData[rowIdx].f.split(/\s+/) : [];
         
         let fanchantPointer = 0; 
+        let inBracketScope = false; // ✨ 新增：用嚟記住係咪喺括號範圍內
 
         words.forEach(w => {
-            // ✨ 偵測多種括號：( ) [ ] （ ）
-            const hasBrackets = /[\(\（\[\]\)\）]/.test(w);
-            // 清理文字用於比對
-            const cleanWord = w.replace(/[\(\（\[\]\)\）]/g, "").trim();
-            if (!cleanWord) return;
+            let isAutoMarked = false;
 
-            let isPreviouslyMarked = false;
-            
-            // 邏輯 1: 帶有括號的單字自動標記
-            if (hasBrackets) {
-                isPreviouslyMarked = true;
+            // 1. 檢查括號狀態
+            const hasStart = /[\(\（\[]/.test(w); // 含有左括號
+            const hasEnd = /[\)\）\]]/.test(w);   // 含有右括號
+
+            // 如果呢粒字有左括號，開始著燈
+            if (hasStart) inBracketScope = true;
+
+            // ✨ 邏輯 A：括號範圍偵測 (解決 love me right 問題)
+            if (inBracketScope) {
+                isAutoMarked = true;
             } 
-            // 邏輯 2: 編輯模式下，按指針順序比對 (解決重複字問題)
-            else if (isEditMode && originalFanchant.length > 0 && 
-                     fanchantPointer < originalFanchant.length && 
-                     cleanWord === originalFanchant[fanchantPointer]) {
-                isPreviouslyMarked = true;
-                fanchantPointer++; 
+            // ✨ 邏輯 B：編輯模式順序比對 (解決重複字問題)
+            // 比對時拎走括號符號嚟比對，確保準確
+            else if (isEditMode && originalFanchant.length > 0) {
+                const cleanWord = w.replace(/[\(\（\[\]\)\）]/g, "").trim();
+                if (fanchantPointer < originalFanchant.length && cleanWord === originalFanchant[fanchantPointer]) {
+                    isAutoMarked = true;
+                    fanchantPointer++;
+                }
             }
             
-            // 這裡顯示 cleanWord 以保持介面整潔，如果你想保留括號符號，將 cleanWord 改回 w 即可
-            html += `<span onclick="toggleChip(this, event)" class="word-chip ${isPreviouslyMarked ? 'is-fc' : ''}">${cleanWord}</span>`;
+            // 如果呢粒字有右括號，下一粒字就停止著燈
+            if (hasEnd) inBracketScope = false;
+
+            // ⚠️ 呢度直接用 w，唔好 del 走括號，保持原汁原味
+            html += `<span onclick="toggleChip(this, event)" class="word-chip ${isAutoMarked ? 'is-fc' : ''}">${w}</span>`;
         });
         html += `</div>`;
     });
