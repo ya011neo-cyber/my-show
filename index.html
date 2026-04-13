@@ -6,103 +6,103 @@
     <title>應援助手 Cloud Pro</title>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-   <style>
-/* --- 基礎設定 --- */
-body { 
-    margin: 0; 
-    background: #000; 
-    color: #fff; 
-    font-family: sans-serif; 
-    height: 100vh; 
-    /* 核心修正：確保 body 絕對唔可以左右郁 */
-    overflow: hidden; 
-    position: fixed; 
+  <style>
+/* --- 基礎鎖定：防止左右晃動 --- */
+html, body {
+    margin: 0;
+    padding: 0;
     width: 100%;
-    touch-action: pan-y; 
-    padding-top: env(safe-area-inset-top); 
+    height: 100vh;
+    overflow: hidden; /* 徹底鎖死 Body 捲動 */
+    position: fixed; /* iOS 鎖死晃動最強招式 */
+    background: #000;
+    color: #fff;
+    font-family: sans-serif;
+    touch-action: pan-y;
 }
 
-#app { 
-    height: 100vh; 
-    width: 100vw; 
-    display: flex; 
-    flex-direction: column; 
+#app {
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
     position: relative;
-    /* 核心修正：防止內容撐開畫面 */
-    overflow: hidden; 
+    overflow: hidden;
 }
 
-/* --- 頂部按鈕組 --- */
-.btn-group { 
-    position: absolute; 
-    top: calc(10px + env(safe-area-inset-top)); 
-    right: 10px; 
-    display: flex; 
-    gap: 5px; 
-    z-index: 100; 
-    flex-wrap: wrap; 
+/* --- 頂部按鈕組 (透明、不遮擋) --- */
+.btn-group {
+    position: absolute;
+    top: calc(10px + env(safe-area-inset-top));
+    right: 10px;
+    display: flex;
+    gap: 5px;
+    z-index: 100;
+    flex-wrap: wrap;
     justify-content: flex-end;
+    background: transparent !important;
 }
 
-.btn { 
-    padding: 8px 12px; 
-    background: rgba(34, 34, 34, 0.8); 
-    border-radius: 5px; 
-    font-size: 0.7rem; 
-    border: 1px solid #444; 
-    color: #fff; 
-    cursor: pointer; 
+.btn {
+    padding: 8px 12px;
+    background: rgba(40, 40, 40, 0.7);
+    border-radius: 5px;
+    font-size: 0.7rem;
+    border: 1px solid #444;
+    color: #fff;
+    cursor: pointer;
     backdrop-filter: blur(4px);
 }
 
-/* --- 專注模式掣容器 --- */
+/* --- 專注模式掣 (絕對定位) --- */
 .focus-controls {
     position: absolute;
-    top: 70px; 
+    top: 70px; /* 擺喺掣組下面 */
     left: 0;
     width: 100%;
     display: flex;
     justify-content: center;
-    z-index: 110; /* 提升層級 */
+    z-index: 110;
 }
 
 #focus-toggle-btn {
     background: rgba(255, 255, 255, 0.1);
     border: 1px solid #555;
     color: #ccc;
-    padding: 6px 18px;
+    padding: 6px 16px;
     border-radius: 20px;
     font-size: 0.8rem;
     cursor: pointer;
     backdrop-filter: blur(4px);
-    transition: opacity 0.3s;
+    transition: all 0.3s ease;
 }
 
-/* --- 歌詞窗口 --- */
-#lyrics-window {
-    height: 100%;
-    width: 100%;
-    overflow-y: auto;
-    scrollbar-width: none;
-}
-#lyrics-window::-webkit-scrollbar { display: none; }
-
-#lyrics-list {
-    padding: 140px 0 120px 0 !important; 
-    width: 100% !important;
-}
-
-/* --- 專注模式啟動時 --- */
-/* 淨係收埋 btn-group 同 footer，保留專注掣 */
+/* --- 專注模式啟動狀態 --- */
 body.focus-mode .btn-group,
 body.focus-mode #footer-info {
     display: none !important;
 }
 
-/* 專注模式下，將粒掣整淡啲，等佢唔好擋住歌詞 */
 body.focus-mode #focus-toggle-btn {
-    opacity: 0.3;
-    background: rgba(0, 0, 0, 0.5);
+    opacity: 0.2; /* 進入專注模式後變好淡 */
+    transform: scale(0.9);
+}
+
+/* --- 歌詞視窗 --- */
+#lyrics-window {
+    flex: 1;
+    width: 100%;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+#lyrics-window::-webkit-scrollbar { display: none; }
+
+#lyrics-list {
+    /* ✨ 關鍵修正：用 !important 壓過 inline style */
+    padding: 140px 0 150px 0 !important; 
+    width: 100% !important;
+    box-sizing: border-box;
 }
 
 /* --- 字體樣式 --- */
@@ -112,16 +112,20 @@ body.focus-mode #focus-toggle-btn {
 
 /* --- Footer --- */
 #footer-info {
-    position: absolute; /* 改用 absolute 配合 app 容器 */
+    position: absolute;
     bottom: 0;
     left: 0;
     width: 100%;
     padding: 20px 0 calc(15px + env(safe-area-inset-bottom));
     background: linear-gradient(transparent, rgba(0,0,0,0.9) 70%);
     color: #555;
+    font-size: 0.8rem;
+    text-align: center;
     z-index: 50;
     pointer-events: none;
 }
+#display-song-name { font-weight: bold; color: #666; pointer-events: auto; }
+#display-upload-info { font-size: 0.65rem; color: #444; pointer-events: auto; }
 </style>
 </head>
     
@@ -137,87 +141,93 @@ body.focus-mode #focus-toggle-btn {
         <div class="btn" onclick="uploadSong(event)">☁️</div>
         <div class="btn" onclick="editCurrentSong(event)">✏️</div>
         <div id="lockBtn" class="btn" onclick="toggleLock(event)">🔓</div>
-        
     </div>
-<div class="focus-controls">
+
+    <div class="focus-controls">
         <button id="focus-toggle-btn" onclick="toggleFocusMode(event)">專注模式</button>
     </div>
-<div id="lyrics-window">
-    <div id="lyrics-list" style="padding: 180px 0; width: 100% !important;"></div>
-</div>
 
-<div id="main-photo-overlay">
-    <div class="close-photo-btn" onclick="hideMainPhoto()">×</div>
-    <img id="main-photo-img" src="" alt="應援參考圖">
-</div>
-
-<div id="color-modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:#222; padding:20px; border-radius:15px; z-index:2000; border:1px solid #444; width:250px; text-align:center;">
-    <h4 style="margin:0 0 15px 0;">自定義顏色</h4>
-    <input type="color" id="colorPicker" onchange="updateHexInput(this.value)" style="width:100%; height:40px; border:none; background:none; cursor:pointer;">
-    <div style="margin:15px 0;">
-        <label style="font-size:0.8rem; color:#888;">HEX Code:</label>
-        <input type="text" id="hexInput" style="width:100%; background:#111; color:#fff; border:1px solid #555; padding:8px; border-radius:5px; margin-top:5px; text-align:center; font-family:monospace;">
-    </div>
-    <div style="display:flex; gap:10px;">
-        <button class="btn" style="flex:1; background:#0f0; color:#000; font-weight:bold;" onclick="saveCustomColor()">套用</button>
-        <button class="btn" style="flex:1;" onclick="closeColorMenu()">取消</button>
-    </div>
-</div>
-<div id="import-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:1000; padding:20px; box-sizing:border-box; overflow-y:auto;">
-    
-    <div style="position: sticky; top: -20px; background: rgba(0,0,0,0.95); z-index: 1100; padding: 15px 0; border-bottom: 1px solid #333; margin-bottom: 15px; margin-top: -20px; text-align: center;">
-        <h3 id="modal-title" style="color:#0f0; margin: 5px 0;">編輯歌詞</h3>
-        <div style="display: flex; gap: 10px; justify-content: center; align-items: center;">
-            <button id="importViewPhotoBtn" class="btn" style="background:#444; display:none;" onclick="showMainPhoto(event)">🖼️ 睇參考圖</button>
-            <button id="importRemovePhotoBtn" class="btn" style="background:#800; display:none; font-size:0.7rem;" onclick="removePhoto()">❌ 移除相片</button>
-        </div>
+    <div id="lyrics-window">
+        <div id="lyrics-list"></div>
     </div>
 
-    <div id="editor-layout" style="display: flex; gap: 15px; width: 100%; min-height: 60vh;">
-        
-        <div id="reference-image-container" style="flex: 1.2; overflow-y: auto; background: #111; border: 1px solid #333; border-radius: 10px; display: none;">
-            <img id="reference-img" src="" style="width: 100%; height: auto; display: block;">
-        </div>
-
-        <div id="input-container" style="flex: 1; display: flex; flex-direction: column;">
-            <textarea id="manualInput" style="width:100%; flex-grow: 1; background:#111; color:#fff; border:1px solid #444; padding:15px; border-radius:10px; font-size:1rem; box-sizing:border-box; font-family: monospace;" placeholder="括號 () 內文字會自動變應援色..."></textarea>
-            
-            <div style="margin: 15px 0;">
-                <input type="text" id="sourceLinkInput" style="width:100%; background:#111; color:#0f0; border:1px solid #444; padding:12px; border-radius:5px; box-sizing:border-box; font-size:0.8rem;" placeholder="🔗 貼上來源網址 (YouTube/歌詞網)...">
-            </div>
-        </div>
-    </div>
-
-    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top: 20px; padding-bottom: 30px;">
-        <button class="btn" style="flex:2; padding:15px; background:#0f0; color:#000; font-weight:bold;" onclick="handleManualSubmit()">✅ 確認並標記</button>
-        <button class="btn" style="flex:1; padding:15px;" onclick="document.getElementById('refInput').click()">📷 附相</button>
-        <button class="btn" style="flex:1; padding:15px; background:#444;" onclick="closeImporter()">取消</button>
-    </div>
-    
-    <input type="file" id="refInput" accept="image/*" style="display:none" onchange="previewRefImage(event)">
-</div>
-<div id="public-songs-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:2000; padding:20px; box-sizing:border-box; overflow-y:auto;">
-    </div>
-
-<div id="editor-overlay">
-    <div style="position: sticky; top: 0; background: #111; z-index: 1000; padding: 10px 0; border-bottom: 1px solid #333; margin-bottom: 20px;">
-        <h2 style="text-align:center; margin: 0 0 10px 0; font-size: 1.2rem;">點擊【應援詞】使其變色</h2>
-        <div style="text-align:center;">
-            <button id="editorPhotoBtn" class="btn" style="background:#444; display:none; padding: 10px 20px;" onclick="showMainPhoto(event)">🖼️ 睇參考圖</button>
-        </div>
-    </div>
-    
-    <div id="chips-container" style="text-align:center;"></div>
-    
-    <div style="text-align:center; margin-top:30px; padding-bottom:50px;">
-        <button class="btn" style="font-size: 1.2rem; padding: 15px 30px; background:#0f0; color:#000;" onclick="saveMarkedData()">✅ 完成生成</button>
-        <button class="btn" style="font-size: 1.2rem; padding: 15px 30px; background:#444;" onclick="cancelMarking()">❌ 取消</button>
-    </div>
-</div>
-<div id="footer-info" onclick="handleAdminTrigger()">
+    <div id="footer-info" onclick="handleAdminTrigger()">
         <div id="display-song-name">應援貓紙 Fanchant Helper</div>
         <div id="display-upload-info"></div>
     </div>
+
+    <div id="main-photo-overlay">
+        <div class="close-photo-btn" onclick="hideMainPhoto()">×</div>
+        <img id="main-photo-img" src="" alt="應援參考圖">
+    </div>
+
+    <div id="color-modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:#222; padding:20px; border-radius:15px; z-index:2000; border:1px solid #444; width:250px; text-align:center;">
+        <h4 style="margin:0 0 15px 0;">自定義顏色</h4>
+        <input type="color" id="colorPicker" onchange="updateHexInput(this.value)" style="width:100%; height:40px; border:none; background:none; cursor:pointer;">
+        <div style="margin:15px 0;">
+            <label style="font-size:0.8rem; color:#888;">HEX Code:</label>
+            <input type="text" id="hexInput" style="width:100%; background:#111; color:#fff; border:1px solid #555; padding:8px; border-radius:5px; margin-top:5px; text-align:center; font-family:monospace;">
+        </div>
+        <div style="display:flex; gap:10px;">
+            <button class="btn" style="flex:1; background:#0f0; color:#000; font-weight:bold;" onclick="saveCustomColor()">套用</button>
+            <button class="btn" style="flex:1;" onclick="closeColorMenu()">取消</button>
+        </div>
+    </div>
+    <div id="import-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:1000; padding:20px; box-sizing:border-box; overflow-y:auto;">
+        
+        <div style="position: sticky; top: -20px; background: rgba(0,0,0,0.95); z-index: 1100; padding: 15px 0; border-bottom: 1px solid #333; margin-bottom: 15px; margin-top: -20px; text-align: center;">
+            <h3 id="modal-title" style="color:#0f0; margin: 5px 0;">編輯歌詞</h3>
+            <div style="display: flex; gap: 10px; justify-content: center; align-items: center;">
+                <button id="importViewPhotoBtn" class="btn" style="background:#444; display:none;" onclick="showMainPhoto(event)">🖼️ 睇參考圖</button>
+                <button id="importRemovePhotoBtn" class="btn" style="background:#800; display:none; font-size:0.7rem;" onclick="removePhoto()">❌ 移除相片</button>
+            </div>
+        </div>
+    
+        <div id="editor-layout" style="display: flex; gap: 15px; width: 100%; min-height: 60vh;">
+            
+            <div id="reference-image-container" style="flex: 1.2; overflow-y: auto; background: #111; border: 1px solid #333; border-radius: 10px; display: none;">
+                <img id="reference-img" src="" style="width: 100%; height: auto; display: block;">
+            </div>
+    
+            <div id="input-container" style="flex: 1; display: flex; flex-direction: column;">
+                <textarea id="manualInput" style="width:100%; flex-grow: 1; background:#111; color:#fff; border:1px solid #444; padding:15px; border-radius:10px; font-size:1rem; box-sizing:border-box; font-family: monospace;" placeholder="括號 () 內文字會自動變應援色..."></textarea>
+                
+                <div style="margin: 15px 0;">
+                    <input type="text" id="sourceLinkInput" style="width:100%; background:#111; color:#0f0; border:1px solid #444; padding:12px; border-radius:5px; box-sizing:border-box; font-size:0.8rem;" placeholder="🔗 貼上來源網址 (YouTube/歌詞網)...">
+                </div>
+            </div>
+        </div>
+    
+        <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top: 20px; padding-bottom: 30px;">
+            <button class="btn" style="flex:2; padding:15px; background:#0f0; color:#000; font-weight:bold;" onclick="handleManualSubmit()">✅ 確認並標記</button>
+            <button class="btn" style="flex:1; padding:15px;" onclick="document.getElementById('refInput').click()">📷 附相</button>
+            <button class="btn" style="flex:1; padding:15px; background:#444;" onclick="closeImporter()">取消</button>
+        </div>
+        
+        <input type="file" id="refInput" accept="image/*" style="display:none" onchange="previewRefImage(event)">
+    </div>    
+    
+    <div id="public-songs-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:2000; padding:20px; box-sizing:border-box; overflow-y:auto;">
+    </div>   
+
+    <div id="editor-overlay">
+        <div style="position: sticky; top: 0; background: #111; z-index: 1000; padding: 10px 0; border-bottom: 1px solid #333; margin-bottom: 20px;">
+            <h2 style="text-align:center; margin: 0 0 10px 0; font-size: 1.2rem;">點擊【應援詞】使其變色</h2>
+            <div style="text-align:center;">
+                <button id="editorPhotoBtn" class="btn" style="background:#444; display:none; padding: 10px 20px;" onclick="showMainPhoto(event)">🖼️ 睇參考圖</button>
+            </div>
+        </div>
+        
+        <div id="chips-container" style="text-align:center;"></div>
+        
+        <div style="text-align:center; margin-top:30px; padding-bottom:50px;">
+            <button class="btn" style="font-size: 1.2rem; padding: 15px 30px; background:#0f0; color:#000;" onclick="saveMarkedData()">✅ 完成生成</button>
+            <button class="btn" style="font-size: 1.2rem; padding: 15px 30px; background:#444;" onclick="cancelMarking()">❌ 取消</button>
+        </div>
+    </div>
+    
+</div>
+
 <script>
     // --- 原有 Firebase 配置 (請保持原樣) ---
     const firebaseConfig = { apiKey: "AIzaSyCOnH-KJfJqe6VGn7qG2TU1rIaT5OEL9JU", authDomain: "fanchartpro.firebaseapp.com", projectId: "fanchartpro", storageBucket: "fanchartpro.firebasestorage.app", messagingSenderId: "94013254919", appId: "1:94013254919:web:929fff5cd2c71067b269a2" };
