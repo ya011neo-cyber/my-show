@@ -136,14 +136,19 @@
             }
         }
         /* 當視窗非常窄時 (例如彈出式小視窗) */
-@media screen and (max-width: 450px) {
-    /* 隱藏頂部按鈕組 */
-    .btn-group, 
-    #admin-tools,
-    .top-nav { 
-        display: none !important; 
-    }
+/* 平時正常顯示，唔使寫特別嘢 */
 
+/* 當進入「小模式」時才隱藏 */
+.mini-mode .btn-group, 
+.mini-mode #admin-tools,
+.top-nav.mini-hide { 
+    display: none !important; 
+}
+
+.mini-mode .footer-info, 
+.mini-mode #display-song-name {
+    display: none !important;
+}
     /* 隱藏底部歌名資訊欄 */
     .footer-info, 
     #display-song-name, 
@@ -271,7 +276,26 @@
 
     // --- 相片顯示與縮放 (修復 Chrome & Samsung) ---
     let scale = 1, posX = 0, posY = 0, isDragging = false, startX, startY;
+function autoToggleMiniMode() {
+    // 判斷闊度，你可以根據你手機全屏嘅闊度調整 450 呢個數
+    // 建議試下 500 或者 600，確保全屏時一定會顯示返
+    if (window.innerWidth < 500) {
+        document.body.classList.add('mini-mode');
+        console.log("小窗模式：已收起工具欄");
+    } else {
+        document.body.classList.remove('mini-mode');
+        console.log("全屏模式：已還原工具欄");
+    }
+}
 
+// 監聽視窗縮放
+window.onresize = autoToggleMiniMode;
+
+// 網頁開嗰陣都要 check 一次
+window.onload = function() {
+    // 執行你原本嘅 onload 嘢...
+    autoToggleMiniMode();
+};
 function showMainPhoto(e) {
     if(e) e.stopPropagation();
     
