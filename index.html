@@ -139,7 +139,7 @@
 /* 當 body 有 .focus-mode class 時隱藏指定元件 */
 body.focus-mode .btn-group,
 body.focus-mode #admin-tools,
-body.focus-mode .footer, /* 假設你底部容器 class 係 footer */
+body.focus-mode .footer-info, /* 假設你底部容器 class 係 footer */
 body.focus-mode #display-song-name,
 body.focus-mode #display-upload-info {
     display: none !important;
@@ -171,13 +171,6 @@ body.focus-mode #display-upload-info {
     background: rgba(255, 255, 255, 0.2);
     color: #fff;
 }
-    /* 隱藏底部歌名資訊欄 */
-    .footer-info, 
-    #display-song-name, 
-    #display-upload-info {
-        display: none !important;
-    }
-
     /* 調整歌詞顯示區域，填滿空間 */
     #lyrics-list {
         height: 100vh !important;
