@@ -6,181 +6,67 @@
     <title>應援助手 Cloud Pro</title>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-    <style>
-        body { 
+   <style>
+/* --- 基礎設定 --- */
+body { 
     margin: 0; 
     background: #000; 
     color: #fff; 
     font-family: sans-serif; 
     height: 100vh; 
-    overflow-x: hidden;      /* ✨ 鎖死左右拖動 */
-    overflow-y: hidden;      /* 防止 Body 本身跳動 */
-    touch-action: pan-y;     /* ✨ 核心：允許垂直手勢，咁你先轆到歌詞 */
+    overflow: hidden; 
+    touch-action: pan-y; 
     padding-top: env(safe-area-inset-top); 
 }
 
 #app { 
     height: 100%; 
-    width: 100vw;            /* ✨ 確保滿版 */
+    width: 100vw; 
     display: flex; 
     flex-direction: column; 
-    justify-content: center; 
-    align-items: center; 
-    padding: 0 !important;   /* ✨ 取消原本 5% 的左右留白 */
     text-align: center; 
-    box-sizing: border-box; 
     position: relative;
 }
-        .lyrics-container { display: flex; flex-direction: column; gap: 2vh; width: 100%; }
-        :root { --fc-color: #0f0; }
-        .fanchant { 
-            /* 縮小字體：最高由 4.5rem 減至 3rem，最低由 1.5rem 減至 1.2rem */
-            font-size: clamp(1.2rem, 5vh, 3rem); 
-            
-            /* 減輕粗細：由 900 (極粗) 改為 700 (粗) 或 600 */
-            font-weight: 700; 
-            
-            color: var(--fc-color); 
-            
-            /* 減弱發光效果：只保留淡淡的陰影，唔好重疊幾層 shadow */
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.8); 
-            
-            white-space: normal; 
-            line-height: 1.2;      /* 稍微增加行高，唔好咁迫 */
-            display: block; 
-            letter-spacing: 0px;   /* 恢復正常字距，唔好負數縮埋一齊 */
-        }
-        .lyrics { font-size: clamp(1rem, 3vh, 2rem); color: #bbb; margin-bottom: 3px; white-space: normal; line-height: 1.2; word-break: break-word; }
-        .side-lyrics { font-size: clamp(0.8rem, 2.5vh, 1.5rem); color: #444; min-height: 2vh; transition: all 0.3s ease; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .side-lyrics .fc-text { color: var(--fc-color); filter: brightness(0.5); margin-left: 8px; }
-        .btn-group { position: fixed; top: calc(10px + env(safe-area-inset-top)); right: 10px; display: flex; gap: 5px; z-index: 100; flex-wrap: wrap; justify-content: flex-end; background: #000;}
-        .btn { padding: 8px 12px; background: #222; border-radius: 5px; font-size: 0.7rem; border: 1px solid #444; color: #fff; cursor: pointer; user-select: none; }
-        #main-photo-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 2500; justify-content: center; align-items: center; touch-action: none; overflow: hidden; }
-        #main-photo-img { max-width: 100%; max-height: 100%; object-fit: contain; transition: transform 0.2s ease-out; pointer-events: none; will-change: transform; }
-        .close-photo-btn { position: absolute; top: 20px; right: 20px; font-size: 2rem; color: #fff; background: rgba(0,0,0,0.5); border-radius: 50%; width: 50px; height: 50px; text-align: center; line-height: 50px; cursor: pointer; z-index: 2600; }
-       #editor-overlay {
-        display: none;
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: #111;
-        z-index: 999;
-        padding: 20px;
-        box-sizing: border-box;
 
-    /* ✨ 確保呢度係 auto 或者 scroll */
-    overflow-y: auto; 
-    
-    /* ✨ 核心修正：唔好用 none！
-       pan-y 代表允許垂直方向的手勢捲動，但防止縮放或左右亂跳 */
-    touch-action: pan-y; 
-    
-    /* 防止滾動傳遞到底層 */
-    overscroll-behavior: contain; 
+/* --- 頂部按鈕組 (透明背景，唔遮歌詞) --- */
+.btn-group { 
+    position: absolute; 
+    top: calc(10px + env(safe-area-inset-top)); 
+    right: 10px; 
+    display: flex; 
+    gap: 5px; 
+    z-index: 100; 
+    flex-wrap: wrap; 
+    justify-content: flex-end; 
+    background: transparent !important; /* 👈 移除黑底 */
 }
-        
-.word-chip { 
-    display: inline-block; 
-    padding: 6px 10px;      /* 你的設定 */
-    margin: 4px;            /* 你的設定 */
-    border: 1px solid #333; 
-    border-radius: 4px; 
+
+.btn { 
+    padding: 8px 12px; 
+    background: rgba(34, 34, 34, 0.8); 
+    border-radius: 5px; 
+    font-size: 0.7rem; 
+    border: 1px solid #444; 
+    color: #fff; 
     cursor: pointer; 
-    color: #999; 
-    font-size: 0.9rem;      /* 你的設定 */
+    backdrop-filter: blur(4px);
 }
 
-.word-chip.is-fc { 
-    background: transparent; 
-    color: var(--fc-color);  /* ✨ 連動自定義顏色 */
-    font-weight: bold; 
-    border-color: var(--fc-color); 
-    box-shadow: none; 
-}
-#lyrics-window {
-    height: 380px;           /* 你可以根據相機位再微調高度 */
-    width: 100vw !important;
-    overflow-y: auto;
-    overflow-x: hidden;
-    scroll-behavior: smooth;
-    -webkit-overflow-scrolling: touch;
-    /* 隱藏捲軸 */
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-}
-#lyrics-window::-webkit-scrollbar { display: none; }
-
-/* 呢個係配合 updateUI 入面 pointer-events 嘅關鍵 */
-.lyric-line {
-    width: 100%;
-    pointer-events: none;    /* 讓兩側點擊穿透 */
-}
-.lyric-content {
-    display: inline-block;
-    width: 90%;              /* ✨ 歌詞視覺闊度 */
-    pointer-events: auto;    /* ✨ 只有文字區會觸發對焦 */
-}
-        @media (max-width: 768px) {
-            #split-screen-editor > div {
-                flex-direction: column !important; /* 手機變垂直排列 */
-            }
-            #reference-image-container {
-                flex: 0 0 40% !important; /* 圖片佔上方 40% */
-                border-right: none !important;
-                border-bottom: 1px solid #333;
-            }
-            #editor-input-area {
-                flex: 1 !important;
-            }
-        }
-
-#focus-toggle-btn:hover {
-    background: rgba(255, 255, 255, 0.2);
-    color: #fff;
-}
-    /* 調整歌詞顯示區域，填滿空間 */
-    #lyrics-list {
-        height: 100vh !important;
-        padding-bottom: 0 !important;
-    }
-}
-        /* --- Footer 基本樣式 --- */
-#footer-info {
-    position: fixed;
-    bottom: 0;
+/* --- 專注模式掣容器 (排喺按鈕組下面) --- */
+.focus-controls {
+    position: absolute;
+    top: 70px; /* 避開第一排掣 */
     left: 0;
     width: 100%;
-    padding: 20px 0 calc(10px + env(safe-area-inset-bottom));
-    background: linear-gradient(transparent, rgba(0,0,0,0.9) 60%);
-    color: #555;
-    font-size: 0.8rem;
-    text-align: center;
-    z-index: 50;
-    pointer-events: none; /* 防止擋住底層點擊 */
-}
-
-#display-song-name, #display-upload-info {
-    pointer-events: auto; /* 文字恢復可點擊，方便你 handleAdminTrigger */
-}
-
-/* --- 專注模式切換容器 --- */
-.focus-controls {
     display: flex;
     justify-content: center;
-    align-items: center;
-    width: 100%;
-    margin-top: 10px;
-    margin-bottom: -60px; /* ✨ 稍微上移，縮短與歌詞距離 */
-    position: relative;
-    z-index: 110; /* 高於按鈕組 */
+    z-index: 90;
 }
 
 #focus-toggle-btn {
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid #444;
-    color: #777;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid #555;
+    color: #ccc;
     padding: 5px 15px;
     border-radius: 20px;
     font-size: 0.75rem;
@@ -188,21 +74,81 @@
     backdrop-filter: blur(4px);
 }
 
-/* --- 專注模式啟動時的隱藏邏輯 --- */
+/* --- 歌詞窗口 (核心區域) --- */
+#lyrics-window {
+    height: 100vh;
+    width: 100vw;
+    overflow-y: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+#lyrics-window::-webkit-scrollbar { display: none; }
+
+#lyrics-list {
+    /* 👈 頂部預留 130px 畀啲掣，底部留 100px 畀 Footer */
+    padding: 130px 0 100px 0 !important; 
+    width: 100% !important;
+    box-sizing: border-box;
+}
+
+/* --- 歌詞字體樣式 --- */
+:root { --fc-color: #0f0; }
+.fanchant { 
+    font-size: clamp(1.2rem, 5vh, 3rem); 
+    font-weight: 700; 
+    color: var(--fc-color); 
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.8); 
+    line-height: 1.2;
+}
+.lyrics { 
+    font-size: clamp(1rem, 3vh, 2rem); 
+    color: #bbb; 
+    line-height: 1.2; 
+    margin-bottom: 5px;
+}
+
+/* --- Footer 樣式 (確保置底且不遮擋) --- */
+#footer-info {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    padding: 15px 0 calc(15px + env(safe-area-inset-bottom));
+    background: linear-gradient(transparent, rgba(0,0,0,0.9) 70%);
+    color: #555;
+    font-size: 0.8rem;
+    z-index: 50;
+    pointer-events: none;
+}
+#display-song-name { font-weight: bold; color: #666; pointer-events: auto; }
+#display-upload-info { font-size: 0.65rem; color: #444; pointer-events: auto; }
+
+/* --- 編輯器與 Overlay --- */
+#editor-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: #111;
+    z-index: 999;
+    padding: 20px;
+    overflow-y: auto;
+    touch-action: pan-y;
+}
+.word-chip { 
+    display: inline-block; padding: 6px 10px; margin: 4px; 
+    border: 1px solid #333; border-radius: 4px; color: #999; 
+}
+.word-chip.is-fc { 
+    color: var(--fc-color); border-color: var(--fc-color); font-weight: bold; 
+}
+
+/* --- 專注模式啟動 --- */
 body.focus-mode .btn-group,
 body.focus-mode .focus-controls,
 body.focus-mode #footer-info {
     display: none !important;
 }
-
-/* 修正原本導致 Footer 消失的 Media Query */
-@media screen and (max-width: 450px) {
-    /* 唔好喺度寫 display: none 給 footer-info */
-    #lyrics-list {
-        padding-top: 120px !important; /* 調整頂部空間 */
-    }
-}
-    </style>
+</style>
 </head>
     
 <body>
@@ -1332,4 +1278,4 @@ async function adminLogin() {
     .admin-del-btn { background: #400; color: #f55; padding: 8px; border-radius: 4px; margin-left: 10px; font-size: 0.8rem; border: 1px solid #600; }
 </style>    
 </body>
-</html>幫我改善這
+</html>
