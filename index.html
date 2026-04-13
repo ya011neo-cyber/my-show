@@ -467,69 +467,56 @@ function handleManualSubmit() {
     // --- 標記與儲存 ---
 function startManualMarking(text) {
     const container = document.getElementById('chips-container');
-    
-    // 1. 獲取當前模式 (新增定係編輯)
     const modalTitle = document.getElementById('modal-title').innerText;
     const isEditMode = modalTitle.includes("編輯");
-
-    // 2. 處理 Meta 數據 (歌名同作者)
-    const currentName = window.currentSubmittingData ? window.currentSubmittingData.name : "";
-    const newMeta = {
-        name: currentName,
-        uploader: "本地編輯"
-    };
-
-    // 3. 處理相片按鈕顯示
-    const editorBtn = document.getElementById('editorPhotoBtn');
-    if (typeof tempPhotoData !== 'undefined' && tempPhotoData && editorBtn) {
-        editorBtn.style.display = 'inline-block';
-    } else if (editorBtn) {
-        editorBtn.style.display = 'none';
-    }
 
     const lines = text.split('\n');
     let html = "";
 
-    // 4. 開始生成歌詞 Chip
     lines.forEach((line, rowIdx) => {
         if (line.trim() === "") return;
         html += `<div class="line-row" data-row="${rowIdx}" style="margin-bottom:15px; border-bottom:1px solid #222;">`;
         
+        // ✨ 自動偵測括號內容
+        const bracketRegex = /[\(\（](.*?)[\)\）]/g;
+        let bracketWords = [];
+        let match;
+        while ((match = bracketRegex.exec(line)) !== null) {
+            // 將括號內嘅字拆開儲存，例如 "(NCT Dream)" 會儲低 "NCT", "Dream"
+            bracketWords.push(...match[1].trim().split(/\s+/));
+        }
+
         const words = line.split(/\s+/).filter(w => w !== "");
-        
-        // --- ✨ 核心關鍵：判斷是否需要載入舊應援數據 ---
-        // 如果係編輯模式，先至去攞 songData 嘅舊資料；新增模式就俾個空陣列 []
         const originalFanchant = (isEditMode && typeof songData !== 'undefined' && songData[rowIdx] && songData[rowIdx].f) 
-                                 ? songData[rowIdx].f.split(/\s+/) 
-                                 : [];
-        
-        // 用 Pointer (指針) 嚟按順序對比，防止重複字誤判
+                                 ? songData[rowIdx].f.split(/\s+/) : [];
         let fanchantPointer = 0; 
 
         words.forEach(w => {
-            let isPreviouslyMarked = false;
-            
-            // 只有喺編輯模式，且單字按順序對中時，先會自動 Highlight
-            if (originalFanchant.length > 0 && 
-                fanchantPointer < originalFanchant.length && 
-                w === originalFanchant[fanchantPointer]) {
-                isPreviouslyMarked = true;
-                fanchantPointer++; 
+            // 攞走標點符號嚟做比對
+            const cleanWord = w.replace(/[\(\（\)\）]/g, "").trim();
+            let isAutoMarked = false;
+
+            // --- ✨ 自動 Mark 判斷 ---
+            // 1. 如果個字帶有括號，或者佢喺我哋頭先搵到嘅 bracketWords 入面
+            if (w.includes('(') || w.includes('（') || w.includes(')') || w.includes('）') || bracketWords.includes(cleanWord)) {
+                isAutoMarked = true;
             }
-            html += `<span onclick="toggleChip(this, event)" class="word-chip ${isPreviouslyMarked ? 'is-fc' : ''}">${w}</span>`;
-            // html += `<span onclick="this.classList.toggle('is-fc')" class="word-chip ${isPreviouslyMarked ? 'is-fc' : ''}">${w}</span>`;
+            // 2. 如果係編輯模式且對中舊數據
+            else if (originalFanchant.length > 0 && fanchantPointer < originalFanchant.length && cleanWord === originalFanchant[fanchantPointer]) {
+                isAutoMarked = true;
+                fanchantPointer++;
+            }
+            
+            // 生成粒粒，注意呢度用返 toggleChip 同 var(--fc-color)
+            html += `<span onclick="toggleChip(this, event)" class="word-chip ${isAutoMarked ? 'is-fc' : ''}">${cleanWord}</span>`;
         });
         html += `</div>`;
     });
     
     container.innerHTML = html;
-    
-    // 儲存 meta 資訊供稍後 saveMarkedData 使用
-    container.dataset.meta = JSON.stringify(newMeta); 
-
-    // 5. 顯示編輯介面
     document.getElementById('editor-overlay').style.display = 'block';
 }
+    
 function cancelMarking() {
     // 直接隱藏標記畫面，唔執行 saveMarkedData，所以原本嘅數據唔會被覆蓋
     document.getElementById('editor-overlay').style.display = 'none';
@@ -1084,7 +1071,7 @@ function updateUI() {
                     <div style="font-size: 1.35rem; font-weight: bold; color: ${isCurrent ? '#fff' : '#aaa'};">
                         ${line.l}
                     </div>
-                    ${line.f ? `<div style="font-size: 1.1rem; color: #EAB308; margin-top: 4px;">${line.f}</div>` : ''}
+                    ${line.f ? `<div style="font-size: 1.1rem; color: var(--fc-color); margin-top: 4px;">${line.f}</div>` : ''}
                 </div>
             </div>
         `;
