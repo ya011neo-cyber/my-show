@@ -279,7 +279,7 @@
 function autoToggleMiniMode() {
     // 判斷闊度，你可以根據你手機全屏嘅闊度調整 450 呢個數
     // 建議試下 500 或者 600，確保全屏時一定會顯示返
-    if (window.innerWidth < 500) {
+    if (window.innerWidth < 400) {
         document.body.classList.add('mini-mode');
         console.log("小窗模式：已收起工具欄");
     } else {
