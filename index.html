@@ -126,6 +126,46 @@ body.focus-mode #focus-toggle-btn {
 }
 #display-song-name { font-weight: bold; color: #666; pointer-events: auto; }
 #display-upload-info { font-size: 0.65rem; color: #444; pointer-events: auto; }
+
+/* --- 歌詞渲染專用樣式 --- */
+.lyric-line {
+    width: 100%;
+    padding: 15px 0;
+    transition: all 0.3s ease;
+    opacity: 0.3;      /* 唔係當前行就變淡 */
+    transform: scale(0.95);
+    pointer-events: none;
+}
+
+.lyric-line.active-line {
+    opacity: 1;        /* 當前行 100% 透明度 */
+    transform: scale(1.1); /* 放大 1.1 倍 */
+}
+
+.lyric-content {
+    display: inline-block;
+    width: 90%;
+    pointer-events: auto;
+}
+
+.main-lyric {
+    font-size: 1.35rem;
+    font-weight: bold;
+    color: #aaa;       /* 預設灰色 */
+    transition: color 0.3s;
+}
+
+.active-line .main-lyric {
+    color: #fff;       /* 對焦時變白色 */
+}
+
+.fanchant-text {
+    font-size: 1.6rem;
+    font-weight: 900;
+    color: var(--fc-color);
+    margin-top: 6px;
+    text-shadow: 1px 1px 3px rgba(0,0,0,0.5);
+}
 </style>
 </head>
     
@@ -1081,25 +1121,20 @@ function updateUI() {
     const list = document.getElementById('lyrics-list');
     if (!list) return;
 
+    // 1. 渲染歌詞列表 (改用 class 簡化，移除會導致左右郁嘅 inline style)
     list.innerHTML = songData.map((line, i) => {
         const isCurrent = (i === index);
         return `
-            <div id="line-${i}" class="lyric-line" 
-                 style="width: 100%; padding: 15px 0; transition: all 0.3s; 
-                        opacity: ${isCurrent ? 1 : 0.3}; 
-                        transform: scale(${isCurrent ? 1.1 : 0.95});
-                        pointer-events: none;">
-                <div class="lyric-content" style="display: inline-block; width: 90%; pointer-events: auto;">
-                    <div style="font-size: 1.35rem; font-weight: bold; color: ${isCurrent ? '#fff' : '#aaa'};">
-                        ${line.l}
-                    </div>
-                    ${line.f ? `<div style="font-size: 1.6rem; font-weight: 900; color: var(--fc-color); margin-top: 6px;">${line.f}</div>` : ''}
+            <div id="line-${i}" class="lyric-line ${isCurrent ? 'active-line' : ''}">
+                <div class="lyric-content">
+                    <div class="main-lyric">${line.l}</div>
+                    ${line.f ? `<div class="fanchant-text">${line.f}</div>` : ''}
                 </div>
             </div>
         `;
     }).join('');
 
-    // --- 以下捲動、Footer、儲存邏輯完全保留你原本的樣子 ---
+    // 2. 捲動邏輯 (完整保留你原本的判斷)
     const editorOverlay = document.getElementById('editor-overlay');
     const isEditing = editorOverlay && (editorOverlay.style.display === 'block');
 
@@ -1108,10 +1143,13 @@ function updateUI() {
     } else {
         setTimeout(() => {
             const activeLine = document.getElementById(`line-${index}`);
-            if (activeLine) activeLine.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            if (activeLine) {
+                activeLine.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
         }, 50);
     }
 
+    // 3. Footer 資訊邏輯 (完整保留)
     const footerName = document.getElementById('display-song-name');
     const footerUpload = document.getElementById('display-upload-info');
     let currentName = "";
@@ -1126,10 +1164,11 @@ function updateUI() {
     }
 
     if (footerName && footerUpload) {
-        footerName.innerText = currentName || "應援助手 Fanchant Helper";
+        footerName.innerText = currentName || "應援貓紙 Fanchant Helper";
         footerUpload.innerText = currentUploader ? `Uploaded by: ${currentUploader}` : "";
     }
 
+    // 4. 儲存邏輯 (完整保留)
     try {
         const saveObj = {
             version: "2.0",
@@ -1137,8 +1176,11 @@ function updateUI() {
             lines: Array.from(songData)
         };
         localStorage.setItem('myConcertData', JSON.stringify(saveObj));
-    } catch (e) { console.error("Save Error", e); }
+    } catch (e) { 
+        console.error("Save Error", e); 
+    }
     
+    // 5. 更新按鈕狀態 (完整保留)
     if (typeof updateMainViewBtn === 'function') updateMainViewBtn();
 }
     // --- 管理員審核功能 ---
