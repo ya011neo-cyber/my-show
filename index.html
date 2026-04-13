@@ -6,167 +6,185 @@
     <title>應援助手 Cloud Pro</title>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-  <style>
-/* --- 基礎鎖定：防止左右晃動 --- */
-html, body {
-    margin: 0;
-    padding: 0;
-    width: 100%;
-    height: 100vh;
-    overflow: hidden; /* 徹底鎖死 Body 捲動 */
-    position: fixed; /* iOS 鎖死晃動最強招式 */
-    background: #000;
-    color: #fff;
-    font-family: sans-serif;
-    touch-action: pan-y;
+    <style>
+        body { 
+    margin: 0; 
+    background: #000; 
+    color: #fff; 
+    font-family: sans-serif; 
+    height: 100vh; 
+    overflow-x: hidden;      /* ✨ 鎖死左右拖動 */
+    overflow-y: hidden;      /* 防止 Body 本身跳動 */
+    touch-action: pan-y;     /* ✨ 核心：允許垂直手勢，咁你先轆到歌詞 */
+    padding-top: env(safe-area-inset-top); 
 }
 
-#app {
-    width: 100vw;
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
+#app { 
+    height: 100%; 
+    width: 100vw;            /* ✨ 確保滿版 */
+    display: flex; 
+    flex-direction: column; 
+    justify-content: center; 
+    align-items: center; 
+    padding: 0 !important;   /* ✨ 取消原本 5% 的左右留白 */
+    text-align: center; 
+    box-sizing: border-box; 
     position: relative;
-    overflow: hidden;
+}
+        .lyrics-container { display: flex; flex-direction: column; gap: 2vh; width: 100%; }
+        :root { --fc-color: #0f0; }
+        .fanchant { 
+            /* 縮小字體：最高由 4.5rem 減至 3rem，最低由 1.5rem 減至 1.2rem */
+            font-size: clamp(1.2rem, 5vh, 3rem); 
+            
+            /* 減輕粗細：由 900 (極粗) 改為 700 (粗) 或 600 */
+            font-weight: 700; 
+            
+            color: var(--fc-color); 
+            
+            /* 減弱發光效果：只保留淡淡的陰影，唔好重疊幾層 shadow */
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.8); 
+            
+            white-space: normal; 
+            line-height: 1.2;      /* 稍微增加行高，唔好咁迫 */
+            display: block; 
+            letter-spacing: 0px;   /* 恢復正常字距，唔好負數縮埋一齊 */
+        }
+        .lyrics { font-size: clamp(1rem, 3vh, 2rem); color: #bbb; margin-bottom: 3px; white-space: normal; line-height: 1.2; word-break: break-word; }
+        .side-lyrics { font-size: clamp(0.8rem, 2.5vh, 1.5rem); color: #444; min-height: 2vh; transition: all 0.3s ease; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .side-lyrics .fc-text { color: var(--fc-color); filter: brightness(0.5); margin-left: 8px; }
+        .btn-group { position: fixed; top: calc(10px + env(safe-area-inset-top)); right: 10px; display: flex; gap: 5px; z-index: 100; flex-wrap: wrap; justify-content: flex-end; background: #000;}
+        .btn { padding: 8px 12px; background: #222; border-radius: 5px; font-size: 0.7rem; border: 1px solid #444; color: #fff; cursor: pointer; user-select: none; }
+        #main-photo-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 2500; justify-content: center; align-items: center; touch-action: none; overflow: hidden; }
+        #main-photo-img { max-width: 100%; max-height: 100%; object-fit: contain; transition: transform 0.2s ease-out; pointer-events: none; will-change: transform; }
+        .close-photo-btn { position: absolute; top: 20px; right: 20px; font-size: 2rem; color: #fff; background: rgba(0,0,0,0.5); border-radius: 50%; width: 50px; height: 50px; text-align: center; line-height: 50px; cursor: pointer; z-index: 2600; }
+       #editor-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: #111;
+        z-index: 999;
+        padding: 20px;
+        box-sizing: border-box;
+
+    /* ✨ 確保呢度係 auto 或者 scroll */
+    overflow-y: auto; 
+    
+    /* ✨ 核心修正：唔好用 none！
+       pan-y 代表允許垂直方向的手勢捲動，但防止縮放或左右亂跳 */
+    touch-action: pan-y; 
+    
+    /* 防止滾動傳遞到底層 */
+    overscroll-behavior: contain; 
+}
+        
+.word-chip { 
+    display: inline-block; 
+    padding: 6px 10px;      /* 你的設定 */
+    margin: 4px;            /* 你的設定 */
+    border: 1px solid #333; 
+    border-radius: 4px; 
+    cursor: pointer; 
+    color: #999; 
+    font-size: 0.9rem;      /* 你的設定 */
 }
 
-/* --- 頂部按鈕組 (透明、不遮擋) --- */
-.btn-group {
-    position: absolute;
-    top: calc(10px + env(safe-area-inset-top));
-    right: 10px;
-    display: flex;
-    gap: 5px;
-    z-index: 100;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    background: transparent !important;
+.word-chip.is-fc { 
+    background: transparent; 
+    color: var(--fc-color);  /* ✨ 連動自定義顏色 */
+    font-weight: bold; 
+    border-color: var(--fc-color); 
+    box-shadow: none; 
 }
-
-.btn {
-    padding: 8px 12px;
-    background: rgba(40, 40, 40, 0.7);
-    border-radius: 5px;
-    font-size: 0.7rem;
-    border: 1px solid #444;
-    color: #fff;
-    cursor: pointer;
-    backdrop-filter: blur(4px);
+#lyrics-window {
+    height: 380px;           /* 你可以根據相機位再微調高度 */
+    width: 100vw !important;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    /* 隱藏捲軸 */
+    scrollbar-width: none;
+    -ms-overflow-style: none;
 }
+#lyrics-window::-webkit-scrollbar { display: none; }
 
-/* --- 專注模式掣 (絕對定位) --- */
-.focus-controls {
-    position: absolute;
-    top: 70px; /* 擺喺掣組下面 */
-    left: 0;
+/* 呢個係配合 updateUI 入面 pointer-events 嘅關鍵 */
+.lyric-line {
     width: 100%;
-    display: flex;
-    justify-content: center;
-    z-index: 110;
+    pointer-events: none;    /* 讓兩側點擊穿透 */
+}
+.lyric-content {
+    display: inline-block;
+    width: 90%;              /* ✨ 歌詞視覺闊度 */
+    pointer-events: auto;    /* ✨ 只有文字區會觸發對焦 */
+}
+        @media (max-width: 768px) {
+            #split-screen-editor > div {
+                flex-direction: column !important; /* 手機變垂直排列 */
+            }
+            #reference-image-container {
+                flex: 0 0 40% !important; /* 圖片佔上方 40% */
+                border-right: none !important;
+                border-bottom: 1px solid #333;
+            }
+            #editor-input-area {
+                flex: 1 !important;
+            }
+        }
+        /* 當視窗非常窄時 (例如彈出式小視窗) */
+/* 當 body 有 .focus-mode class 時隱藏指定元件 */
+body.focus-mode .btn-group,
+body.focus-mode #admin-tools,
+body.focus-mode .footer, /* 假設你底部容器 class 係 footer */
+body.focus-mode #display-song-name,
+body.focus-mode #display-upload-info {
+    display: none !important;
 }
 
+/* 專注模式掣嘅容器 */
+.focus-controls {
+    display: flex;
+    justify-content: center; /* 水平居中 */
+    align-items: center;
+    width: 100%;
+    margin-top: 10px;        /* 同上面排掣隔開 10px */
+    margin-bottom: 5px;
+}
+
+/* 執一執粒掣嘅樣式，唔好用 position: fixed */
 #focus-toggle-btn {
     background: rgba(255, 255, 255, 0.1);
     border: 1px solid #555;
     color: #ccc;
-    padding: 6px 16px;
-    border-radius: 20px;
-    font-size: 0.8rem;
+    padding: 6px 15px;
+    border-radius: 20px;     /* 圓角好睇啲 */
+    font-size: 0.85rem;
     cursor: pointer;
-    backdrop-filter: blur(4px);
     transition: all 0.3s ease;
 }
 
-/* --- 專注模式啟動狀態 --- */
-body.focus-mode .btn-group,
-body.focus-mode #footer-info {
-    display: none !important;
+#focus-toggle-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    color: #fff;
 }
+    /* 隱藏底部歌名資訊欄 */
+    .footer-info, 
+    #display-song-name, 
+    #display-upload-info {
+        display: none !important;
+    }
 
-body.focus-mode #focus-toggle-btn {
-    opacity: 0.2; /* 進入專注模式後變好淡 */
-    transform: scale(0.9);
+    /* 調整歌詞顯示區域，填滿空間 */
+    #lyrics-list {
+        height: 100vh !important;
+        padding-bottom: 0 !important;
+    }
 }
-
-/* --- 歌詞視窗 --- */
-#lyrics-window {
-    flex: 1;
-    width: 100%;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-}
-#lyrics-window::-webkit-scrollbar { display: none; }
-
-#lyrics-list {
-    /* ✨ 關鍵修正：用 !important 壓過 inline style */
-    padding: 140px 0 150px 0 !important; 
-    width: 100% !important;
-    box-sizing: border-box;
-}
-
-/* --- 字體樣式 --- */
-:root { --fc-color: #0f0; }
-.fanchant { font-size: clamp(1.2rem, 5vh, 3rem); font-weight: 700; color: var(--fc-color); text-shadow: 1px 1px 2px rgba(0,0,0,0.8); line-height: 1.2; }
-.lyrics { font-size: clamp(1rem, 3vh, 2rem); color: #bbb; line-height: 1.2; margin-bottom: 5px; }
-
-/* --- Footer --- */
-#footer-info {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    padding: 20px 0 calc(15px + env(safe-area-inset-bottom));
-    background: linear-gradient(transparent, rgba(0,0,0,0.9) 70%);
-    color: #555;
-    font-size: 0.8rem;
-    text-align: center;
-    z-index: 50;
-    pointer-events: none;
-}
-#display-song-name { font-weight: bold; color: #666; pointer-events: auto; }
-#display-upload-info { font-size: 0.65rem; color: #444; pointer-events: auto; }
-
-/* --- 歌詞渲染專用樣式 --- */
-.lyric-line {
-    width: 100%;
-    padding: 15px 0;
-    transition: all 0.3s ease;
-    opacity: 0.3;      /* 唔係當前行就變淡 */
-    transform: scale(0.95);
-    pointer-events: none;
-}
-
-.lyric-line.active-line {
-    opacity: 1;        /* 當前行 100% 透明度 */
-    transform: scale(1.1); /* 放大 1.1 倍 */
-}
-
-.lyric-content {
-    display: inline-block;
-    width: 90%;
-    pointer-events: auto;
-}
-
-.main-lyric {
-    font-size: 1.35rem;
-    font-weight: bold;
-    color: #aaa;       /* 預設灰色 */
-    transition: color 0.3s;
-}
-
-.active-line .main-lyric {
-    color: #fff;       /* 對焦時變白色 */
-}
-
-.fanchant-text {
-    font-size: 1.6rem;
-    font-weight: 900;
-    color: var(--fc-color);
-    margin-top: 6px;
-    text-shadow: 1px 1px 3px rgba(0,0,0,0.5);
-}
-</style>
+    </style>
 </head>
     
 <body>
@@ -182,92 +200,94 @@ body.focus-mode #focus-toggle-btn {
         <div class="btn" onclick="editCurrentSong(event)">✏️</div>
         <div id="lockBtn" class="btn" onclick="toggleLock(event)">🔓</div>
     </div>
-
     <div class="focus-controls">
-        <button id="focus-toggle-btn" onclick="toggleFocusMode(event)">專注模式</button>
+        <button id="focus-toggle-btn" onclick="toggleFocusMode()">專注模式</button>
     </div>
-
-    <div id="lyrics-window">
-        <div id="lyrics-list"></div>
-    </div>
-
-    <div id="footer-info" onclick="handleAdminTrigger()">
-        <div id="display-song-name">應援貓紙 Fanchant Helper</div>
-        <div id="display-upload-info"></div>
-    </div>
-
-    <div id="main-photo-overlay">
-        <div class="close-photo-btn" onclick="hideMainPhoto()">×</div>
-        <img id="main-photo-img" src="" alt="應援參考圖">
-    </div>
-
-    <div id="color-modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:#222; padding:20px; border-radius:15px; z-index:2000; border:1px solid #444; width:250px; text-align:center;">
-        <h4 style="margin:0 0 15px 0;">自定義顏色</h4>
-        <input type="color" id="colorPicker" onchange="updateHexInput(this.value)" style="width:100%; height:40px; border:none; background:none; cursor:pointer;">
-        <div style="margin:15px 0;">
-            <label style="font-size:0.8rem; color:#888;">HEX Code:</label>
-            <input type="text" id="hexInput" style="width:100%; background:#111; color:#fff; border:1px solid #555; padding:8px; border-radius:5px; margin-top:5px; text-align:center; font-family:monospace;">
+    <!-- <div class="lyrics-container">
+        <div class="side-lyrics" id="prevLine"></div>
+        <div class="main-focus" style="padding: 20px 0; transform: scale(1.1);">
+            <div class="lyrics" id="currLyrics">載入中...</div>
+            <div class="fanchant" id="currFanchant"></div>
         </div>
-        <div style="display:flex; gap:10px;">
-            <button class="btn" style="flex:1; background:#0f0; color:#000; font-weight:bold;" onclick="saveCustomColor()">套用</button>
-            <button class="btn" style="flex:1;" onclick="closeColorMenu()">取消</button>
-        </div>
-    </div>
-    <div id="import-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:1000; padding:20px; box-sizing:border-box; overflow-y:auto;">
-        
-        <div style="position: sticky; top: -20px; background: rgba(0,0,0,0.95); z-index: 1100; padding: 15px 0; border-bottom: 1px solid #333; margin-bottom: 15px; margin-top: -20px; text-align: center;">
-            <h3 id="modal-title" style="color:#0f0; margin: 5px 0;">編輯歌詞</h3>
-            <div style="display: flex; gap: 10px; justify-content: center; align-items: center;">
-                <button id="importViewPhotoBtn" class="btn" style="background:#444; display:none;" onclick="showMainPhoto(event)">🖼️ 睇參考圖</button>
-                <button id="importRemovePhotoBtn" class="btn" style="background:#800; display:none; font-size:0.7rem;" onclick="removePhoto()">❌ 移除相片</button>
-            </div>
-        </div>
-    
-        <div id="editor-layout" style="display: flex; gap: 15px; width: 100%; min-height: 60vh;">
-            
-            <div id="reference-image-container" style="flex: 1.2; overflow-y: auto; background: #111; border: 1px solid #333; border-radius: 10px; display: none;">
-                <img id="reference-img" src="" style="width: 100%; height: auto; display: block;">
-            </div>
-    
-            <div id="input-container" style="flex: 1; display: flex; flex-direction: column;">
-                <textarea id="manualInput" style="width:100%; flex-grow: 1; background:#111; color:#fff; border:1px solid #444; padding:15px; border-radius:10px; font-size:1rem; box-sizing:border-box; font-family: monospace;" placeholder="括號 () 內文字會自動變應援色..."></textarea>
-                
-                <div style="margin: 15px 0;">
-                    <input type="text" id="sourceLinkInput" style="width:100%; background:#111; color:#0f0; border:1px solid #444; padding:12px; border-radius:5px; box-sizing:border-box; font-size:0.8rem;" placeholder="🔗 貼上來源網址 (YouTube/歌詞網)...">
-                </div>
-            </div>
-        </div>
-    
-        <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top: 20px; padding-bottom: 30px;">
-            <button class="btn" style="flex:2; padding:15px; background:#0f0; color:#000; font-weight:bold;" onclick="handleManualSubmit()">✅ 確認並標記</button>
-            <button class="btn" style="flex:1; padding:15px;" onclick="document.getElementById('refInput').click()">📷 附相</button>
-            <button class="btn" style="flex:1; padding:15px; background:#444;" onclick="closeImporter()">取消</button>
-        </div>
-        
-        <input type="file" id="refInput" accept="image/*" style="display:none" onchange="previewRefImage(event)">
-    </div>    
-    
-    <div id="public-songs-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:2000; padding:20px; box-sizing:border-box; overflow-y:auto;">
-    </div>   
-
-    <div id="editor-overlay">
-        <div style="position: sticky; top: 0; background: #111; z-index: 1000; padding: 10px 0; border-bottom: 1px solid #333; margin-bottom: 20px;">
-            <h2 style="text-align:center; margin: 0 0 10px 0; font-size: 1.2rem;">點擊【應援詞】使其變色</h2>
-            <div style="text-align:center;">
-                <button id="editorPhotoBtn" class="btn" style="background:#444; display:none; padding: 10px 20px;" onclick="showMainPhoto(event)">🖼️ 睇參考圖</button>
-            </div>
-        </div>
-        
-        <div id="chips-container" style="text-align:center;"></div>
-        
-        <div style="text-align:center; margin-top:30px; padding-bottom:50px;">
-            <button class="btn" style="font-size: 1.2rem; padding: 15px 30px; background:#0f0; color:#000;" onclick="saveMarkedData()">✅ 完成生成</button>
-            <button class="btn" style="font-size: 1.2rem; padding: 15px 30px; background:#444;" onclick="cancelMarking()">❌ 取消</button>
-        </div>
-    </div>
-    
+        <div class="side-lyrics" id="nextLine"></div>
+    </div> -->
+<div id="lyrics-window">
+    <div id="lyrics-list" style="padding: 180px 0; width: 100% !important;"></div>
 </div>
 
+<div id="main-photo-overlay">
+    <div class="close-photo-btn" onclick="hideMainPhoto()">×</div>
+    <img id="main-photo-img" src="" alt="應援參考圖">
+</div>
+
+<div id="color-modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:#222; padding:20px; border-radius:15px; z-index:2000; border:1px solid #444; width:250px; text-align:center;">
+    <h4 style="margin:0 0 15px 0;">自定義顏色</h4>
+    <input type="color" id="colorPicker" onchange="updateHexInput(this.value)" style="width:100%; height:40px; border:none; background:none; cursor:pointer;">
+    <div style="margin:15px 0;">
+        <label style="font-size:0.8rem; color:#888;">HEX Code:</label>
+        <input type="text" id="hexInput" style="width:100%; background:#111; color:#fff; border:1px solid #555; padding:8px; border-radius:5px; margin-top:5px; text-align:center; font-family:monospace;">
+    </div>
+    <div style="display:flex; gap:10px;">
+        <button class="btn" style="flex:1; background:#0f0; color:#000; font-weight:bold;" onclick="saveCustomColor()">套用</button>
+        <button class="btn" style="flex:1;" onclick="closeColorMenu()">取消</button>
+    </div>
+</div>
+<div id="import-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:1000; padding:20px; box-sizing:border-box; overflow-y:auto;">
+    
+    <div style="position: sticky; top: -20px; background: rgba(0,0,0,0.95); z-index: 1100; padding: 15px 0; border-bottom: 1px solid #333; margin-bottom: 15px; margin-top: -20px; text-align: center;">
+        <h3 id="modal-title" style="color:#0f0; margin: 5px 0;">編輯歌詞</h3>
+        <div style="display: flex; gap: 10px; justify-content: center; align-items: center;">
+            <button id="importViewPhotoBtn" class="btn" style="background:#444; display:none;" onclick="showMainPhoto(event)">🖼️ 睇參考圖</button>
+            <button id="importRemovePhotoBtn" class="btn" style="background:#800; display:none; font-size:0.7rem;" onclick="removePhoto()">❌ 移除相片</button>
+        </div>
+    </div>
+
+    <div id="editor-layout" style="display: flex; gap: 15px; width: 100%; min-height: 60vh;">
+        
+        <div id="reference-image-container" style="flex: 1.2; overflow-y: auto; background: #111; border: 1px solid #333; border-radius: 10px; display: none;">
+            <img id="reference-img" src="" style="width: 100%; height: auto; display: block;">
+        </div>
+
+        <div id="input-container" style="flex: 1; display: flex; flex-direction: column;">
+            <textarea id="manualInput" style="width:100%; flex-grow: 1; background:#111; color:#fff; border:1px solid #444; padding:15px; border-radius:10px; font-size:1rem; box-sizing:border-box; font-family: monospace;" placeholder="括號 () 內文字會自動變應援色..."></textarea>
+            
+            <div style="margin: 15px 0;">
+                <input type="text" id="sourceLinkInput" style="width:100%; background:#111; color:#0f0; border:1px solid #444; padding:12px; border-radius:5px; box-sizing:border-box; font-size:0.8rem;" placeholder="🔗 貼上來源網址 (YouTube/歌詞網)...">
+            </div>
+        </div>
+    </div>
+
+    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top: 20px; padding-bottom: 30px;">
+        <button class="btn" style="flex:2; padding:15px; background:#0f0; color:#000; font-weight:bold;" onclick="handleManualSubmit()">✅ 確認並標記</button>
+        <button class="btn" style="flex:1; padding:15px;" onclick="document.getElementById('refInput').click()">📷 附相</button>
+        <button class="btn" style="flex:1; padding:15px; background:#444;" onclick="closeImporter()">取消</button>
+    </div>
+    
+    <input type="file" id="refInput" accept="image/*" style="display:none" onchange="previewRefImage(event)">
+</div>
+<div id="public-songs-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:2000; padding:20px; box-sizing:border-box; overflow-y:auto;">
+    </div>
+
+<div id="editor-overlay">
+    <div style="position: sticky; top: 0; background: #111; z-index: 1000; padding: 10px 0; border-bottom: 1px solid #333; margin-bottom: 20px;">
+        <h2 style="text-align:center; margin: 0 0 10px 0; font-size: 1.2rem;">點擊【應援詞】使其變色</h2>
+        <div style="text-align:center;">
+            <button id="editorPhotoBtn" class="btn" style="background:#444; display:none; padding: 10px 20px;" onclick="showMainPhoto(event)">🖼️ 睇參考圖</button>
+        </div>
+    </div>
+    
+    <div id="chips-container" style="text-align:center;"></div>
+    
+    <div style="text-align:center; margin-top:30px; padding-bottom:50px;">
+        <button class="btn" style="font-size: 1.2rem; padding: 15px 30px; background:#0f0; color:#000;" onclick="saveMarkedData()">✅ 完成生成</button>
+        <button class="btn" style="font-size: 1.2rem; padding: 15px 30px; background:#444;" onclick="cancelMarking()">❌ 取消</button>
+    </div>
+</div>
+    
+<div id="footer-info" onclick="handleAdminTrigger()" style="position: fixed; bottom: env(safe-area-inset-bottom); left: 0; width: 100%; padding: 15px 0; background: linear-gradient(transparent, rgba(0,0,0,0.9) 70%); color: #555; font-size: 0.8rem; text-align: center; z-index: 50; user-select: none;">
+    <div id="display-song-name" style="font-weight: bold; color: #666;">應援助手 Fanchant Helper</div>
+    <div id="display-upload-info" style="font-size: 0.65rem; margin-top: 3px; color: #444;"></div>
+</div>
 <script>
     // --- 原有 Firebase 配置 (請保持原樣) ---
     const firebaseConfig = { apiKey: "AIzaSyCOnH-KJfJqe6VGn7qG2TU1rIaT5OEL9JU", authDomain: "fanchartpro.firebaseapp.com", projectId: "fanchartpro", storageBucket: "fanchartpro.firebasestorage.app", messagingSenderId: "94013254919", appId: "1:94013254919:web:929fff5cd2c71067b269a2" };
@@ -281,11 +301,18 @@ body.focus-mode #focus-toggle-btn {
 
     // --- 相片顯示與縮放 (修復 Chrome & Samsung) ---
     let scale = 1, posX = 0, posY = 0, isDragging = false, startX, startY;
-function toggleFocusMode(e) {
-    if (e) e.stopPropagation();
+function toggleFocusMode() {
     const isFocus = document.body.classList.toggle('focus-mode');
     const btn = document.getElementById('focus-toggle-btn');
-    btn.innerText = isFocus ? "退出專注" : "專注模式";
+    
+    // 改變粒掣嘅文字嚟提醒用家
+    if (isFocus) {
+        btn.innerText = "顯示工具";
+        btn.style.opacity = "0.3"; // 收埋咗工具就將粒掣整淡啲，唔好擋住歌詞
+    } else {
+        btn.innerText = "專注模式";
+        btn.style.opacity = "1";
+    }
 }
 
 function showMainPhoto(e) {
@@ -1121,20 +1148,25 @@ function updateUI() {
     const list = document.getElementById('lyrics-list');
     if (!list) return;
 
-    // 1. 渲染歌詞列表 (改用 class 簡化，移除會導致左右郁嘅 inline style)
     list.innerHTML = songData.map((line, i) => {
         const isCurrent = (i === index);
         return `
-            <div id="line-${i}" class="lyric-line ${isCurrent ? 'active-line' : ''}">
-                <div class="lyric-content">
-                    <div class="main-lyric">${line.l}</div>
-                    ${line.f ? `<div class="fanchant-text">${line.f}</div>` : ''}
+            <div id="line-${i}" class="lyric-line" 
+                 style="width: 100%; padding: 15px 0; transition: all 0.3s; 
+                        opacity: ${isCurrent ? 1 : 0.3}; 
+                        transform: scale(${isCurrent ? 1.1 : 0.95});
+                        pointer-events: none;">
+                <div class="lyric-content" style="display: inline-block; width: 90%; pointer-events: auto;">
+                    <div style="font-size: 1.35rem; font-weight: bold; color: ${isCurrent ? '#fff' : '#aaa'};">
+                        ${line.l}
+                    </div>
+                    ${line.f ? `<div style="font-size: 1.6rem; font-weight: 900; color: var(--fc-color); margin-top: 6px;">${line.f}</div>` : ''}
                 </div>
             </div>
         `;
     }).join('');
 
-    // 2. 捲動邏輯 (完整保留你原本的判斷)
+    // --- 以下捲動、Footer、儲存邏輯完全保留你原本的樣子 ---
     const editorOverlay = document.getElementById('editor-overlay');
     const isEditing = editorOverlay && (editorOverlay.style.display === 'block');
 
@@ -1143,13 +1175,10 @@ function updateUI() {
     } else {
         setTimeout(() => {
             const activeLine = document.getElementById(`line-${index}`);
-            if (activeLine) {
-                activeLine.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
+            if (activeLine) activeLine.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }, 50);
     }
 
-    // 3. Footer 資訊邏輯 (完整保留)
     const footerName = document.getElementById('display-song-name');
     const footerUpload = document.getElementById('display-upload-info');
     let currentName = "";
@@ -1164,11 +1193,10 @@ function updateUI() {
     }
 
     if (footerName && footerUpload) {
-        footerName.innerText = currentName || "應援貓紙 Fanchant Helper";
+        footerName.innerText = currentName || "應援助手 Fanchant Helper";
         footerUpload.innerText = currentUploader ? `Uploaded by: ${currentUploader}` : "";
     }
 
-    // 4. 儲存邏輯 (完整保留)
     try {
         const saveObj = {
             version: "2.0",
@@ -1176,11 +1204,8 @@ function updateUI() {
             lines: Array.from(songData)
         };
         localStorage.setItem('myConcertData', JSON.stringify(saveObj));
-    } catch (e) { 
-        console.error("Save Error", e); 
-    }
+    } catch (e) { console.error("Save Error", e); }
     
-    // 5. 更新按鈕狀態 (完整保留)
     if (typeof updateMainViewBtn === 'function') updateMainViewBtn();
 }
     // --- 管理員審核功能 ---
@@ -1297,4 +1322,4 @@ async function adminLogin() {
     .admin-del-btn { background: #400; color: #f55; padding: 8px; border-radius: 4px; margin-left: 10px; font-size: 0.8rem; border: 1px solid #600; }
 </style>    
 </body>
-</html>
+</html>幫我改善這
