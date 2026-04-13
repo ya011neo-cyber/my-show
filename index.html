@@ -678,14 +678,25 @@ function closeModal() {
 function showVersionSelector(versions) {
     let html = `<div style="padding:20px;"><h3>選擇版本 - ${versions[0].name}</h3><ul style="list-style:none; padding:0;">`;
     
-    // 已經在 fetch 嗰陣按 createdAt 排咗序，所以直接顯示就係倒序
     versions.forEach(v => {
         const date = v.createdAt ? new Date(v.createdAt.seconds * 1000).toLocaleDateString() : "未知日期";
+        const songNameClean = v.name.replace(/'/g, "\\'"); // 處理單引號防止 JS error
+
         html += `
             <li onclick="loadSpecificSong('${v.id}')" 
-                style="padding:15px; border-bottom:1px solid #444; cursor:pointer;">
-                <div style="color:#0f0;">作者: ${v.uploader || '匿名'}</div>
-                <div style="font-size:0.7rem; color:#666;">上傳日期: ${date}</div>
+                style="padding:15px; border-bottom:1px solid #444; cursor:pointer; display:flex; justify-content:space-between; align-items:center;">
+                
+                <div>
+                    <div style="color:#0f0;">作者: ${v.uploader || '匿名'}</div>
+                    <div style="font-size:0.7rem; color:#666;">上傳日期: ${date}</div>
+                </div>
+
+                <div onclick="event.stopPropagation(); adminDeletePublic('${v.id}', '${songNameClean}')" 
+                     style="padding: 10px; cursor: pointer; opacity: 0.6;" 
+                     onmouseover="this.style.opacity='1'" 
+                     onmouseout="this.style.opacity='0.6'">
+                    🗑️
+                </div>
             </li>`;
     });
     
