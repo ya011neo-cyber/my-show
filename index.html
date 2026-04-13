@@ -135,53 +135,71 @@
                 flex: 1 !important;
             }
         }
-        /* 當視窗非常窄時 (例如彈出式小視窗) */
-/* 當 body 有 .focus-mode class 時隱藏指定元件 */
-body.focus-mode .btn-group,
-body.focus-mode #admin-tools,
-body.focus-mode .footer, /* 假設你底部容器 class 係 footer */
-body.focus-mode #display-song-name,
-body.focus-mode #display-upload-info {
-    display: none !important;
-}
-
-/* 專注模式掣嘅容器 */
-.focus-controls {
-    display: flex;
-    justify-content: center; /* 水平居中 */
-    align-items: center;
-    width: 100%;
-    margin-top: 10px;        /* 同上面排掣隔開 10px */
-    margin-bottom: 5px;
-}
-
-/* 執一執粒掣嘅樣式，唔好用 position: fixed */
-#focus-toggle-btn {
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid #555;
-    color: #ccc;
-    padding: 6px 15px;
-    border-radius: 20px;     /* 圓角好睇啲 */
-    font-size: 0.85rem;
-    cursor: pointer;
-    transition: all 0.3s ease;
-}
 
 #focus-toggle-btn:hover {
     background: rgba(255, 255, 255, 0.2);
     color: #fff;
 }
-    /* 隱藏底部歌名資訊欄 */
-    .footer-info, 
-    #display-song-name, 
-    #display-upload-info {
-        display: none !important;
-    }
-
     /* 調整歌詞顯示區域，填滿空間 */
     #lyrics-list {
         height: 100vh !important;
         padding-bottom: 0 !important;
+    }
+}
+        /* --- Footer 基本樣式 --- */
+#footer-info {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    padding: 20px 0 calc(10px + env(safe-area-inset-bottom));
+    background: linear-gradient(transparent, rgba(0,0,0,0.9) 60%);
+    color: #555;
+    font-size: 0.8rem;
+    text-align: center;
+    z-index: 50;
+    pointer-events: none; /* 防止擋住底層點擊 */
+}
+
+#display-song-name, #display-upload-info {
+    pointer-events: auto; /* 文字恢復可點擊，方便你 handleAdminTrigger */
+}
+
+/* --- 專注模式切換容器 --- */
+.focus-controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    margin-top: 10px;
+    margin-bottom: -60px; /* ✨ 稍微上移，縮短與歌詞距離 */
+    position: relative;
+    z-index: 110; /* 高於按鈕組 */
+}
+
+#focus-toggle-btn {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid #444;
+    color: #777;
+    padding: 5px 15px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    backdrop-filter: blur(4px);
+}
+
+/* --- 專注模式啟動時的隱藏邏輯 --- */
+body.focus-mode .btn-group,
+body.focus-mode .focus-controls,
+body.focus-mode #footer-info {
+    display: none !important;
+}
+
+/* 修正原本導致 Footer 消失的 Media Query */
+@media screen and (max-width: 450px) {
+    /* 唔好喺度寫 display: none 給 footer-info */
+    #lyrics-list {
+        padding-top: 120px !important; /* 調整頂部空間 */
     }
 }
     </style>
@@ -199,18 +217,11 @@ body.focus-mode #display-upload-info {
         <div class="btn" onclick="uploadSong(event)">☁️</div>
         <div class="btn" onclick="editCurrentSong(event)">✏️</div>
         <div id="lockBtn" class="btn" onclick="toggleLock(event)">🔓</div>
+        
     </div>
-    <div class="focus-controls">
-        <button id="focus-toggle-btn" onclick="toggleFocusMode()">專注模式</button>
+<div class="focus-controls">
+        <button id="focus-toggle-btn" onclick="toggleFocusMode(event)">專注模式</button>
     </div>
-    <!-- <div class="lyrics-container">
-        <div class="side-lyrics" id="prevLine"></div>
-        <div class="main-focus" style="padding: 20px 0; transform: scale(1.1);">
-            <div class="lyrics" id="currLyrics">載入中...</div>
-            <div class="fanchant" id="currFanchant"></div>
-        </div>
-        <div class="side-lyrics" id="nextLine"></div>
-    </div> -->
 <div id="lyrics-window">
     <div id="lyrics-list" style="padding: 180px 0; width: 100% !important;"></div>
 </div>
@@ -283,11 +294,10 @@ body.focus-mode #display-upload-info {
         <button class="btn" style="font-size: 1.2rem; padding: 15px 30px; background:#444;" onclick="cancelMarking()">❌ 取消</button>
     </div>
 </div>
-    
-<div id="footer-info" onclick="handleAdminTrigger()" style="position: fixed; bottom: env(safe-area-inset-bottom); left: 0; width: 100%; padding: 15px 0; background: linear-gradient(transparent, rgba(0,0,0,0.9) 70%); color: #555; font-size: 0.8rem; text-align: center; z-index: 50; user-select: none;">
-    <div id="display-song-name" style="font-weight: bold; color: #666;">應援助手 Fanchant Helper</div>
-    <div id="display-upload-info" style="font-size: 0.65rem; margin-top: 3px; color: #444;"></div>
-</div>
+<div id="footer-info" onclick="handleAdminTrigger()">
+        <div id="display-song-name">應援貓紙 Fanchant Helper</div>
+        <div id="display-upload-info"></div>
+    </div>
 <script>
     // --- 原有 Firebase 配置 (請保持原樣) ---
     const firebaseConfig = { apiKey: "AIzaSyCOnH-KJfJqe6VGn7qG2TU1rIaT5OEL9JU", authDomain: "fanchartpro.firebaseapp.com", projectId: "fanchartpro", storageBucket: "fanchartpro.firebasestorage.app", messagingSenderId: "94013254919", appId: "1:94013254919:web:929fff5cd2c71067b269a2" };
