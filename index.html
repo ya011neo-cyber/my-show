@@ -477,36 +477,43 @@ function startManualMarking(text) {
         if (line.trim() === "") return;
         html += `<div class="line-row" data-row="${rowIdx}" style="margin-bottom:15px; border-bottom:1px solid #222;">`;
         
-        // 1. 先處理呢行嘅單字
+        // 1. ✨ 先搵出括號入面嘅內容（自動 mark 功能）
+        const bracketRegex = /[\(\（](.*?)[\)\）]/g;
+        let bracketWords = [];
+        let match;
+        while ((match = bracketRegex.exec(line)) !== null) {
+            bracketWords.push(...match[1].trim().split(/\s+/));
+        }
+
         const words = line.split(/\s+/).filter(w => w !== "");
         
-        // 2. 攞返舊數據 (編輯模式用)
+        // 2. ✨ 攞返舊數據（只有編輯模式先會生效，費事舊歌影響新歌）
         const originalFanchant = (isEditMode && typeof songData !== 'undefined' && songData[rowIdx] && songData[rowIdx].f) 
                                  ? songData[rowIdx].f.split(/\s+/) : [];
         
-        // ✨ 核心邏輯：指針 (Pointer)
+        // 3. ✨ 重要：設置 Pointer 指針，確保 it 字按順序對比
         let fanchantPointer = 0; 
 
         words.forEach(w => {
-            // 清理括號符號做比對
-            const cleanWord = w.replace(/[\(\（\)\）]/g, "").trim();
-            let isAutoMarked = false;
+            // 攞走所有標點符號嚟做純文字比對 (例如 "it," 變 "it")
+            const cleanWord = w.replace(/[\(\（\)\）\.,!?;]/g, "").trim();
+            let isMarked = false;
 
-            // --- ✨ 優先權 1：括號偵測 ---
-            // 如果原本輸入嘅字本身就帶著括號，例如 "(It)"
-            if (w.includes('(') || w.includes('（') || w.includes(')') || w.includes('）')) {
-                isAutoMarked = true;
-            } 
-            // --- ✨ 優先權 2：順序比對 (解決 It 字問題) ---
-            // 只有喺「編輯模式」下，且「按順序」對中咗舊數據，先會自動 Highlight
-            else if (originalFanchant.length > 0 && 
-                     fanchantPointer < originalFanchant.length && 
-                     cleanWord === originalFanchant[fanchantPointer]) {
-                isAutoMarked = true;
-                fanchantPointer++; // 對中一個，指針先至行一步
+            // --- 判斷邏輯（優先序） ---
+            
+            // A. 先睇佢係咪本身就喺括號入面（括號自動著燈）
+            if (w.includes('(') || w.includes('（') || w.includes(')') || w.includes('）') || bracketWords.includes(cleanWord)) {
+                isMarked = true;
+            }
+            // B. 編輯模式下，按「順序」對比舊數據
+            else if (isEditMode && originalFanchant.length > 0 && fanchantPointer < originalFanchant.length) {
+                if (cleanWord === originalFanchant[fanchantPointer]) {
+                    isMarked = true;
+                    fanchantPointer++; // 只有對中咗，先至移去下一個應援字
+                }
             }
             
-            html += `<span onclick="toggleChip(this, event)" class="word-chip ${isAutoMarked ? 'is-fc' : ''}">${cleanWord}</span>`;
+            html += `<span onclick="toggleChip(this, event)" class="word-chip ${isMarked ? 'is-fc' : ''}">${cleanWord}</span>`;
         });
         html += `</div>`;
     });
