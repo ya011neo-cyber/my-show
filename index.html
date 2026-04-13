@@ -81,7 +81,7 @@
     overscroll-behavior: contain; 
 }
         
-        .word-chip { 
+        /* .word-chip { 
             display: inline-block; 
             padding: 6px 10px;      /* 縮細少少 padding */
             margin: 4px;            /* 稍微減少 margin */
@@ -98,7 +98,31 @@
             font-weight: bold; 
             border-color: var(--fc-color); 
             box-shadow: none;        /* ✨ 移除發光，改用淡淡的邊框色就好 */
-        }
+        } */
+        /* 編輯器入面的粒粒 */
+.word-chip {
+    display: inline-block;
+    padding: 6px 12px;
+    margin: 4px;
+    border: 1px solid #333;
+    border-radius: 4px;
+    cursor: pointer;
+    color: #999;
+    font-size: 1rem; /* 普通歌詞大細 */
+    transition: all 0.2s ease;
+}
+
+/* ✨ 當變咗應援詞時 (is-fc) */
+.word-chip.is-fc {
+    color: var(--fc-color);
+    border-color: var(--fc-color);
+    font-weight: bold;
+    
+    /* 這裡控制放大效果 */
+    font-size: 1.3rem; /* 比普通歌詞大 30% */
+    transform: scale(1.1); /* 視覺上再突出一啲 */
+    margin: 4px 8px; /* 加大啲間距防止重疊 */
+}
 #lyrics-window {
     height: 380px;           /* 你可以根據相機位再微調高度 */
     width: 100vw !important;
@@ -467,8 +491,22 @@ function handleManualSubmit() {
     // --- 標記與儲存 ---
 function startManualMarking(text) {
     const container = document.getElementById('chips-container');
+    
+    // 1. 獲取模式
     const modalTitle = document.getElementById('modal-title').innerText;
     const isEditMode = modalTitle.includes("編輯");
+
+    // 2. Meta 數據
+    const currentName = window.currentSubmittingData ? window.currentSubmittingData.name : "";
+    const newMeta = { name: currentName, uploader: "本地編輯" };
+
+    // 3. 相片按鈕
+    const editorBtn = document.getElementById('editorPhotoBtn');
+    if (typeof tempPhotoData !== 'undefined' && tempPhotoData && editorBtn) {
+        editorBtn.style.display = 'inline-block';
+    } else if (editorBtn) {
+        editorBtn.style.display = 'none';
+    }
 
     const lines = text.split('\n');
     let html = "";
@@ -477,48 +515,40 @@ function startManualMarking(text) {
         if (line.trim() === "") return;
         html += `<div class="line-row" data-row="${rowIdx}" style="margin-bottom:15px; border-bottom:1px solid #222;">`;
         
-        // 1. ✨ 先搵出括號入面嘅內容（自動 mark 功能）
-        const bracketRegex = /[\(\（](.*?)[\)\）]/g;
-        let bracketWords = [];
-        let match;
-        while ((match = bracketRegex.exec(line)) !== null) {
-            bracketWords.push(...match[1].trim().split(/\s+/));
-        }
-
         const words = line.split(/\s+/).filter(w => w !== "");
-        
-        // 2. ✨ 攞返舊數據（只有編輯模式先會生效，費事舊歌影響新歌）
         const originalFanchant = (isEditMode && typeof songData !== 'undefined' && songData[rowIdx] && songData[rowIdx].f) 
                                  ? songData[rowIdx].f.split(/\s+/) : [];
         
-        // 3. ✨ 重要：設置 Pointer 指針，確保 it 字按順序對比
         let fanchantPointer = 0; 
 
         words.forEach(w => {
-            // 攞走所有標點符號嚟做純文字比對 (例如 "it," 變 "it")
-            const cleanWord = w.replace(/[\(\（\)\）\.,!?;]/g, "").trim();
-            let isMarked = false;
+            // ✨ 核心修正 1：檢查係咪帶有 ( ) [ ] （ ） 括號
+            // Regex 解釋：檢查開頭係咪括號，或者結尾係咪括號
+            const hasBrackets = /[\(\（\[\]\)\）]/.test(w);
+            
+            // 清理括號拎純文字做比對 (It 字順序比對用)
+            const cleanWord = w.replace(/[\(\（\[\]\)\）]/g, "").trim();
+            
+            let isAutoMarked = false;
 
-            // --- 判斷邏輯（優先序） ---
-            
-            // A. 先睇佢係咪本身就喺括號入面（括號自動著燈）
-            if (w.includes('(') || w.includes('（') || w.includes(')') || w.includes('）') || bracketWords.includes(cleanWord)) {
-                isMarked = true;
-            }
-            // B. 編輯模式下，按「順序」對比舊數據
-            else if (isEditMode && originalFanchant.length > 0 && fanchantPointer < originalFanchant.length) {
-                if (cleanWord === originalFanchant[fanchantPointer]) {
-                    isMarked = true;
-                    fanchantPointer++; // 只有對中咗，先至移去下一個應援字
-                }
+            // --- ✨ 自動 Mark 判斷 ---
+            if (hasBrackets) {
+                // 如果輸入時就帶有括號，直接自動著燈
+                isAutoMarked = true;
+            } else if (originalFanchant.length > 0 && fanchantPointer < originalFanchant.length && cleanWord === originalFanchant[fanchantPointer]) {
+                // 或者係編輯模式按順序對中
+                isAutoMarked = true;
+                fanchantPointer++;
             }
             
-            html += `<span onclick="toggleChip(this, event)" class="word-chip ${isMarked ? 'is-fc' : ''}">${cleanWord}</span>`;
+            // ✨ 核心修正 2：顯示 cleanWord (唔要括號)，並交由 CSS 控制大細
+            html += `<span onclick="toggleChip(this, event)" class="word-chip ${isAutoMarked ? 'is-fc' : ''}">${cleanWord}</span>`;
         });
         html += `</div>`;
     });
     
     container.innerHTML = html;
+    container.dataset.meta = JSON.stringify(newMeta); 
     document.getElementById('editor-overlay').style.display = 'block';
 }
     
@@ -1241,4 +1271,4 @@ async function adminLogin() {
     .admin-del-btn { background: #400; color: #f55; padding: 8px; border-radius: 4px; margin-left: 10px; font-size: 0.8rem; border: 1px solid #600; }
 </style>    
 </body>
-</html>幫我改善這
+</html>幫我改善
