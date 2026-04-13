@@ -145,18 +145,31 @@ body.focus-mode #display-upload-info {
     display: none !important;
 }
 
-/* 專注模式粒掣本身要一直喺度，或者換個位 */
+/* 專注模式掣嘅容器 */
+.focus-controls {
+    display: flex;
+    justify-content: center; /* 水平居中 */
+    align-items: center;
+    width: 100%;
+    margin-top: 10px;        /* 同上面排掣隔開 10px */
+    margin-bottom: 5px;
+}
+
+/* 執一執粒掣嘅樣式，唔好用 position: fixed */
 #focus-toggle-btn {
-    position: fixed;
-    top: 10px;
-    right: 10px;
-    z-index: 9999;
-    background: rgba(0,0,0,0.5);
-    border: 1px solid #444;
-    color: #fff;
-    padding: 5px 10px;
-    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid #555;
+    color: #ccc;
+    padding: 6px 15px;
+    border-radius: 20px;     /* 圓角好睇啲 */
+    font-size: 0.85rem;
     cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+#focus-toggle-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    color: #fff;
 }
     /* 隱藏底部歌名資訊欄 */
     .footer-info, 
@@ -187,7 +200,9 @@ body.focus-mode #display-upload-info {
         <div class="btn" onclick="editCurrentSong(event)">✏️</div>
         <div id="lockBtn" class="btn" onclick="toggleLock(event)">🔓</div>
     </div>
-    <button id="focus-toggle-btn" onclick="toggleFocusMode()">專注模式</button>
+    <div class="focus-controls">
+        <button id="focus-toggle-btn" onclick="toggleFocusMode()">專注模式</button>
+    </div>
     <!-- <div class="lyrics-container">
         <div class="side-lyrics" id="prevLine"></div>
         <div class="main-focus" style="padding: 20px 0; transform: scale(1.1);">
