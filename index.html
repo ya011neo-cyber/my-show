@@ -14,21 +14,25 @@ body {
     color: #fff; 
     font-family: sans-serif; 
     height: 100vh; 
+    /* 核心修正：確保 body 絕對唔可以左右郁 */
     overflow: hidden; 
+    position: fixed; 
+    width: 100%;
     touch-action: pan-y; 
     padding-top: env(safe-area-inset-top); 
 }
 
 #app { 
-    height: 100%; 
+    height: 100vh; 
     width: 100vw; 
     display: flex; 
     flex-direction: column; 
-    text-align: center; 
     position: relative;
+    /* 核心修正：防止內容撐開畫面 */
+    overflow: hidden; 
 }
 
-/* --- 頂部按鈕組 (透明背景，唔遮歌詞) --- */
+/* --- 頂部按鈕組 --- */
 .btn-group { 
     position: absolute; 
     top: calc(10px + env(safe-area-inset-top)); 
@@ -37,8 +41,7 @@ body {
     gap: 5px; 
     z-index: 100; 
     flex-wrap: wrap; 
-    justify-content: flex-end; 
-    background: transparent !important; /* 👈 移除黑底 */
+    justify-content: flex-end;
 }
 
 .btn { 
@@ -52,101 +55,72 @@ body {
     backdrop-filter: blur(4px);
 }
 
-/* --- 專注模式掣容器 (排喺按鈕組下面) --- */
+/* --- 專注模式掣容器 --- */
 .focus-controls {
     position: absolute;
-    top: 70px; /* 避開第一排掣 */
+    top: 70px; 
     left: 0;
     width: 100%;
     display: flex;
     justify-content: center;
-    z-index: 90;
+    z-index: 110; /* 提升層級 */
 }
 
 #focus-toggle-btn {
     background: rgba(255, 255, 255, 0.1);
     border: 1px solid #555;
     color: #ccc;
-    padding: 5px 15px;
+    padding: 6px 18px;
     border-radius: 20px;
-    font-size: 0.75rem;
+    font-size: 0.8rem;
     cursor: pointer;
     backdrop-filter: blur(4px);
+    transition: opacity 0.3s;
 }
 
-/* --- 歌詞窗口 (核心區域) --- */
+/* --- 歌詞窗口 --- */
 #lyrics-window {
-    height: 100vh;
-    width: 100vw;
+    height: 100%;
+    width: 100%;
     overflow-y: auto;
     scrollbar-width: none;
-    -ms-overflow-style: none;
 }
 #lyrics-window::-webkit-scrollbar { display: none; }
 
 #lyrics-list {
-    /* 👈 頂部預留 130px 畀啲掣，底部留 100px 畀 Footer */
-    padding: 130px 0 100px 0 !important; 
+    padding: 140px 0 120px 0 !important; 
     width: 100% !important;
-    box-sizing: border-box;
 }
 
-/* --- 歌詞字體樣式 --- */
+/* --- 專注模式啟動時 --- */
+/* 淨係收埋 btn-group 同 footer，保留專注掣 */
+body.focus-mode .btn-group,
+body.focus-mode #footer-info {
+    display: none !important;
+}
+
+/* 專注模式下，將粒掣整淡啲，等佢唔好擋住歌詞 */
+body.focus-mode #focus-toggle-btn {
+    opacity: 0.3;
+    background: rgba(0, 0, 0, 0.5);
+}
+
+/* --- 字體樣式 --- */
 :root { --fc-color: #0f0; }
-.fanchant { 
-    font-size: clamp(1.2rem, 5vh, 3rem); 
-    font-weight: 700; 
-    color: var(--fc-color); 
-    text-shadow: 1px 1px 2px rgba(0,0,0,0.8); 
-    line-height: 1.2;
-}
-.lyrics { 
-    font-size: clamp(1rem, 3vh, 2rem); 
-    color: #bbb; 
-    line-height: 1.2; 
-    margin-bottom: 5px;
-}
+.fanchant { font-size: clamp(1.2rem, 5vh, 3rem); font-weight: 700; color: var(--fc-color); text-shadow: 1px 1px 2px rgba(0,0,0,0.8); line-height: 1.2; }
+.lyrics { font-size: clamp(1rem, 3vh, 2rem); color: #bbb; line-height: 1.2; margin-bottom: 5px; }
 
-/* --- Footer 樣式 (確保置底且不遮擋) --- */
+/* --- Footer --- */
 #footer-info {
-    position: fixed;
+    position: absolute; /* 改用 absolute 配合 app 容器 */
     bottom: 0;
     left: 0;
     width: 100%;
-    padding: 15px 0 calc(15px + env(safe-area-inset-bottom));
+    padding: 20px 0 calc(15px + env(safe-area-inset-bottom));
     background: linear-gradient(transparent, rgba(0,0,0,0.9) 70%);
     color: #555;
-    font-size: 0.8rem;
     z-index: 50;
     pointer-events: none;
-}
-#display-song-name { font-weight: bold; color: #666; pointer-events: auto; }
-#display-upload-info { font-size: 0.65rem; color: #444; pointer-events: auto; }
-
-/* --- 編輯器與 Overlay --- */
-#editor-overlay {
-    display: none;
-    position: fixed;
-    top: 0; left: 0; width: 100%; height: 100%;
-    background: #111;
-    z-index: 999;
-    padding: 20px;
-    overflow-y: auto;
-    touch-action: pan-y;
-}
-.word-chip { 
-    display: inline-block; padding: 6px 10px; margin: 4px; 
-    border: 1px solid #333; border-radius: 4px; color: #999; 
-}
-.word-chip.is-fc { 
-    color: var(--fc-color); border-color: var(--fc-color); font-weight: bold; 
-}
-
-/* --- 專注模式啟動 --- */
-body.focus-mode .btn-group,
-body.focus-mode .focus-controls,
-body.focus-mode #footer-info {
-    display: none !important;
 }
 </style>
 </head>
@@ -257,18 +231,11 @@ body.focus-mode #footer-info {
 
     // --- 相片顯示與縮放 (修復 Chrome & Samsung) ---
     let scale = 1, posX = 0, posY = 0, isDragging = false, startX, startY;
-function toggleFocusMode() {
+function toggleFocusMode(e) {
+    if (e) e.stopPropagation();
     const isFocus = document.body.classList.toggle('focus-mode');
     const btn = document.getElementById('focus-toggle-btn');
-    
-    // 改變粒掣嘅文字嚟提醒用家
-    if (isFocus) {
-        btn.innerText = "顯示工具";
-        btn.style.opacity = "0.3"; // 收埋咗工具就將粒掣整淡啲，唔好擋住歌詞
-    } else {
-        btn.innerText = "專注模式";
-        btn.style.opacity = "1";
-    }
+    btn.innerText = isFocus ? "退出專注" : "專注模式";
 }
 
 function showMainPhoto(e) {
