@@ -1248,11 +1248,11 @@ async function adminLogin() {
     function updateHexInput(val) { document.getElementById('hexInput').value = val.toUpperCase(); }
     function saveCustomColor() { let col = document.getElementById('hexInput').value.trim(); if (!col.startsWith('#')) col = '#' + col; if (/^#[0-9A-F]{6}$/i.test(col)) { document.documentElement.style.setProperty('--fc-color', col); localStorage.setItem('fanchantColor', col); closeColorMenu(); } else { alert("格式錯誤！"); } }
     function toggleLock(e) { e.stopPropagation(); isLocked = !isLocked; document.getElementById('lockBtn').innerText = isLocked ? "🔒" : "🔓"; document.getElementById('lockBtn').style.borderColor = isLocked ? "red" : "#444"; }
-    window.onresize = autoToggleMiniMode;
+
     // --- 修改 window.onload：統一讀取 myConcertData ---
     window.onload = function() {
     // 1. ✨ 讀取上次儲存的數據 (支援新舊格式)
-    autoToggleMiniMode();
+
     const savedDataRaw = localStorage.getItem('myConcertData');
     if (savedDataRaw) { 
         const parsed = JSON.parse(savedDataRaw);
