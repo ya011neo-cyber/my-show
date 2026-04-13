@@ -81,9 +81,9 @@
     overscroll-behavior: contain; 
 }
         
-        /* .word-chip { 
+        .word-chip { 
             display: inline-block; 
-            padding: 6px 10px;      /* 縮細少少 padding */
+            padding: 6px 10px;      /* 縮細少少 padding
             margin: 4px;            /* 稍微減少 margin */
             border: 1px solid #333; 
             border-radius: 4px; 
@@ -99,30 +99,7 @@
             border-color: var(--fc-color); 
             box-shadow: none;        /* ✨ 移除發光，改用淡淡的邊框色就好 */
         } */
-        /* 編輯器入面的粒粒 */
-.word-chip {
-    display: inline-block;
-    padding: 6px 12px;
-    margin: 4px;
-    border: 1px solid #333;
-    border-radius: 4px;
-    cursor: pointer;
-    color: #999;
-    font-size: 1rem; /* 普通歌詞大細 */
-    transition: all 0.2s ease;
-}
-
-/* ✨ 當變咗應援詞時 (is-fc) */
-.word-chip.is-fc {
-    color: var(--fc-color);
-    border-color: var(--fc-color);
-    font-weight: bold;
-    
-    /* 這裡控制放大效果 */
-    font-size: 1.3rem; /* 比普通歌詞大 30% */
-    transform: scale(1.1); /* 視覺上再突出一啲 */
-    margin: 4px 8px; /* 加大啲間距防止重疊 */
-}
+  
 #lyrics-window {
     height: 380px;           /* 你可以根據相機位再微調高度 */
     width: 100vw !important;
@@ -1094,6 +1071,7 @@ function updateUI() {
     if (!list) return;
 
     // 1. 這裡要用返你原本生成歌詞 HTML 嘅邏輯，唔好用 { ... }
+    // 搵返 updateUI 入面 list.innerHTML 嗰段
     list.innerHTML = songData.map((line, i) => {
         const isCurrent = (i === index);
         return `
@@ -1103,10 +1081,22 @@ function updateUI() {
                         transform: scale(${isCurrent ? 1.1 : 0.95});
                         pointer-events: none;">
                 <div class="lyric-content" style="display: inline-block; width: 90%; pointer-events: auto;">
+                    
                     <div style="font-size: 1.35rem; font-weight: bold; color: ${isCurrent ? '#fff' : '#aaa'};">
                         ${line.l}
                     </div>
-                    ${line.f ? `<div style="font-size: 1.1rem; color: var(--fc-color); margin-top: 4px;">${line.f}</div>` : ''}
+    
+                    ${line.f ? `
+                        <div class="fanchant-display" 
+                             style="font-size: 1.8rem; /* 👈 呢度加大咗 (原本 1.1rem) */
+                                    font-weight: 900; 
+                                    color: var(--fc-color); 
+                                    margin-top: 8px;
+                                    text-shadow: 0 0 10px rgba(0,0,0,0.5); /* 加少少陰影令佢更突出 */
+                                    letter-spacing: 1px;">
+                            ${line.f}
+                        </div>
+                    ` : ''}
                 </div>
             </div>
         `;
