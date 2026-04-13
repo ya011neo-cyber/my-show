@@ -81,25 +81,24 @@
     overscroll-behavior: contain; 
 }
         
-        .word-chip { 
-            display: inline-block; 
-            padding: 6px 10px;      /* 縮細少少 padding
-            margin: 4px;            /* 稍微減少 margin */
-            border: 1px solid #333; 
-            border-radius: 4px; 
-            cursor: pointer; 
-            color: #999;            /* 未選中時顏色暗啲 */
-            font-size: 0.9rem;      /* 固定大細，唔好太大 */
-        }
-        
-        .word-chip.is-fc { 
-            background: transparent; /* ✨ 改用透明背景 */
-            color: var(--fc-color);  /* ✨ 文字變綠色就好 */
-            font-weight: bold; 
-            border-color: var(--fc-color); 
-            box-shadow: none;        /* ✨ 移除發光，改用淡淡的邊框色就好 */
-        } */
-  
+.word-chip { 
+    display: inline-block; 
+    padding: 6px 10px;      /* 你的設定 */
+    margin: 4px;            /* 你的設定 */
+    border: 1px solid #333; 
+    border-radius: 4px; 
+    cursor: pointer; 
+    color: #999; 
+    font-size: 0.9rem;      /* 你的設定 */
+}
+
+.word-chip.is-fc { 
+    background: transparent; 
+    color: var(--fc-color);  /* ✨ 連動自定義顏色 */
+    font-weight: bold; 
+    border-color: var(--fc-color); 
+    box-shadow: none; 
+}
 #lyrics-window {
     height: 380px;           /* 你可以根據相機位再微調高度 */
     width: 100vw !important;
@@ -491,24 +490,31 @@ function startManualMarking(text) {
         const words = line.split(/\s+/).filter(w => w !== "");
         const originalFanchant = (isEditMode && typeof songData !== 'undefined' && songData[rowIdx] && songData[rowIdx].f) 
                                  ? songData[rowIdx].f.split(/\s+/) : [];
+        
         let fanchantPointer = 0; 
 
         words.forEach(w => {
-            // ✨ 支援三種括號
+            // ✨ 偵測多種括號：( ) [ ] （ ）
             const hasBrackets = /[\(\（\[\]\)\）]/.test(w);
+            // 清理文字用於比對
             const cleanWord = w.replace(/[\(\（\[\]\)\）]/g, "").trim();
             if (!cleanWord) return;
 
             let isPreviouslyMarked = false;
             
-            // 判斷自動著燈
+            // 邏輯 1: 帶有括號的單字自動標記
             if (hasBrackets) {
                 isPreviouslyMarked = true;
-            } else if (originalFanchant.length > 0 && fanchantPointer < originalFanchant.length && cleanWord === originalFanchant[fanchantPointer]) {
+            } 
+            // 邏輯 2: 編輯模式下，按指針順序比對 (解決重複字問題)
+            else if (isEditMode && originalFanchant.length > 0 && 
+                     fanchantPointer < originalFanchant.length && 
+                     cleanWord === originalFanchant[fanchantPointer]) {
                 isPreviouslyMarked = true;
                 fanchantPointer++; 
             }
             
+            // 這裡顯示 cleanWord 以保持介面整潔，如果你想保留括號符號，將 cleanWord 改回 w 即可
             html += `<span onclick="toggleChip(this, event)" class="word-chip ${isPreviouslyMarked ? 'is-fc' : ''}">${cleanWord}</span>`;
         });
         html += `</div>`;
@@ -518,7 +524,6 @@ function startManualMarking(text) {
     container.dataset.meta = JSON.stringify(newMeta); 
     document.getElementById('editor-overlay').style.display = 'block';
 }
-    
 function cancelMarking() {
     // 直接隱藏標記畫面，唔執行 saveMarkedData，所以原本嘅數據唔會被覆蓋
     document.getElementById('editor-overlay').style.display = 'none';
@@ -1072,16 +1077,13 @@ function updateUI() {
                     <div style="font-size: 1.35rem; font-weight: bold; color: ${isCurrent ? '#fff' : '#aaa'};">
                         ${line.l}
                     </div>
-                    ${line.f ? `
-                        <div style="font-size: 1.8rem; font-weight: 900; color: var(--fc-color); margin-top: 6px;">
-                            ${line.f}
-                        </div>` : ''}
+                    ${line.f ? `<div style="font-size: 1.6rem; font-weight: 900; color: var(--fc-color); margin-top: 6px;">${line.f}</div>` : ''}
                 </div>
             </div>
         `;
     }).join('');
 
-    // --- 以下原本邏輯全部保留 ---
+    // --- 以下捲動、Footer、儲存邏輯完全保留你原本的樣子 ---
     const editorOverlay = document.getElementById('editor-overlay');
     const isEditing = editorOverlay && (editorOverlay.style.display === 'block');
 
@@ -1236,4 +1238,4 @@ async function adminLogin() {
     .admin-del-btn { background: #400; color: #f55; padding: 8px; border-radius: 4px; margin-left: 10px; font-size: 0.8rem; border: 1px solid #600; }
 </style>    
 </body>
-</html>幫我改善
+</html>幫我改善這
