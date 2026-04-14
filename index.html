@@ -178,6 +178,25 @@ body.focus-mode #display-upload-info {
         padding-bottom: 0 !important;
     }
 }
+.collection-item {
+    padding: 15px;
+    border-bottom: 1px solid #333;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #111;
+    margin-bottom: 5px;
+    border-radius: 8px;
+}
+.collection-info {
+    flex: 1;
+    text-align: left;
+}
+.remove-btn {
+    color: #ff4444;
+    padding: 10px;
+    cursor: pointer;
+}
     </style>
 </head>
     
@@ -193,6 +212,8 @@ body.focus-mode #display-upload-info {
         <div class="btn" onclick="fetchPublicSongs(event)">📂</div>
         <div class="btn" onclick="uploadSong(event)">☁️</div>
         <div class="btn" onclick="openImporter(false)">➕</div>
+        <div class="btn" onclick="openLibraryMenu(event)">⭐</div>
+        <div class="btn" onclick="toggleFavorite(event)">🤍</div>
         <!-- <div id="lockBtn" class="btn" onclick="toggleLock(event)">🔓</div> -->
     </div>
     <div class="focus-controls">
@@ -288,7 +309,6 @@ body.focus-mode #display-upload-info {
     const firebaseConfig = { apiKey: "AIzaSyCOnH-KJfJqe6VGn7qG2TU1rIaT5OEL9JU", authDomain: "fanchartpro.firebaseapp.com", projectId: "fanchartpro", storageBucket: "fanchartpro.firebasestorage.app", messagingSenderId: "94013254919", appId: "1:94013254919:web:929fff5cd2c71067b269a2" };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
-
     let songData = [{ l: "歡迎使用應援貓紙", f: "點擊畫面下半區域閱讀使用指南（睇曬再試啊！）" },
                     { l: "🔄refresh", f: "點擊重新載入網站" },
                     { l: "🎨自定義顏色", f: "可選擇/輸入HEX碼喜歡的顏色取代應援詞顏色" },
@@ -1014,6 +1034,170 @@ async function uploadSong(e) {
     } catch (e) {
         console.error(e);
         alert("投稿失敗。");
+    }
+}
+// 第一層：選擇清單類型
+function openLibraryMenu(e) {
+    if (e) e.stopPropagation();
+    const modal = document.getElementById('public-songs-modal');
+    if (!modal) return;
+
+    let html = `
+        <div style="padding:20px; color:#fff; height:60vh; display:flex; flex-direction:column; justify-content:center; gap:20px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; position:absolute; top:20px; left:20px; right:20px;">
+                <h3 style="margin:0;">🎵 歌單圖書館</h3>
+                <span onclick="closeModal()" style="cursor:pointer; font-size:1.5rem;">✕</span>
+            </div>
+
+            <div onclick="openMyCollection()" style="padding:30px; background:#222; border:2px solid #cc9900; border-radius:15px; text-align:center; cursor:pointer;">
+                <div style="font-size:2rem; margin-bottom:10px;">⭐</div>
+                <div style="font-weight:bold; font-size:1.2rem;">我的收藏</div>
+                <div style="font-size:0.8rem; color:#888; margin-top:5px;">儲存在本地的個人歌單</div>
+            </div>
+
+            <div onclick="fetchPublicSetlists()" style="padding:30px; background:#222; border:2px solid #6a0dad; border-radius:15px; text-align:center; cursor:pointer;">
+                <div style="font-size:2rem; margin-bottom:10px;">📋</div>
+                <div style="font-weight:bold; font-size:1.2rem;">公共 Setlist</div>
+                <div style="font-size:0.8rem; color:#888; margin-top:5px;">官方演唱會或專輯歌單</div>
+            </div>
+
+            <button class="btn" style="margin-top:10px;" onclick="closeModal()">取消</button>
+        </div>
+    `;
+
+    modal.innerHTML = html;
+    modal.style.display = 'block';
+}
+function openMyCollection() {
+    let collection = JSON.parse(localStorage.getItem('mySetlist') || '[]');
+    const modal = document.getElementById('public-songs-modal');
+
+    let html = `
+        <div style="padding:20px; color:#fff; height:80vh; display:flex; flex-direction:column;">
+            <div style="margin-bottom:15px;">
+                <span onclick="openLibraryMenu()" style="cursor:pointer; color:#cc9900;">⬅️ 返回</span>
+                <h3 style="margin:10px 0;">⭐ 我的收藏</h3>
+            </div>
+            
+            <div style="flex:1; overflow-y:auto; text-align:left;">
+                ${collection.length === 0 ? '<p style="color:#666; text-align:center; margin-top:50px;">仲未有收藏喎</p>' : ''}
+                ${collection.map((s, i) => `
+                    <div style="padding:15px; border-bottom:1px solid #333; display:flex; justify-content:space-between; align-items:center;">
+                        <div style="flex:1; cursor:pointer;" onclick='loadCollectedSong(${JSON.stringify(s).replace(/'/g, "&apos;")})'>
+                            <div style="font-size:1.1rem;">${s.name}</div>
+                            <div style="font-size:0.7rem; color:#666;">${s.uploader}</div>
+                        </div>
+                        <span onclick="removeFromCollection(${i})" style="color:#800; padding:10px;">🗑️</span>
+                    </div>
+                `).join('')}
+            </div>
+            <button class="btn" style="margin-top:10px;" onclick="closeModal()">關閉</button>
+        </div>
+    `;
+    modal.innerHTML = html;
+}
+
+function removeFromCollection(i) {
+    let collection = JSON.parse(localStorage.getItem('mySetlist') || '[]');
+    collection.splice(i, 1);
+    localStorage.setItem('mySetlist', JSON.stringify(collection));
+    openMyCollection(); // 重新整理
+}
+// 呢個 function 用嚟加入收藏
+function toggleFavorite() {
+    const currSong = (typeof getFirstLineData === 'function') ? getFirstLineData() : {};
+    if (!currSong.name) {
+        alert("呢首歌冇名，收藏唔到喎！");
+        return;
+    }
+
+    let collection = JSON.parse(localStorage.getItem('mySetlist') || '[]');
+    
+    // 檢查係咪已經喺收藏入面 (用名同 ID 比對)
+    const existsIndex = collection.findIndex(s => s.name === currSong.name);
+
+    if (existsIndex > -1) {
+        collection.splice(existsIndex, 1);
+        alert("已從我的收藏移除");
+    } else {
+        // 儲存必要的 Meta 資料
+        collection.push({
+            id: window.currentDocId || "", // 紀錄 Firebase ID
+            name: currSong.name,
+            uploader: currSong.uploader || "未知",
+            link: currSong.link || "",
+            video: currSong.video || ""
+        });
+        alert("已加入我的收藏！");
+    }
+    localStorage.setItem('mySetlist', JSON.stringify(collection));
+}
+function addToCollection(songMeta) {
+    let collection = JSON.parse(localStorage.getItem('mySetlist') || '[]');
+    // 檢查係咪已經存在
+    if (collection.some(s => s.id === songMeta.id)) {
+        alert("已經喺你個收藏夾度喇！");
+        return;
+    }
+    collection.push(songMeta);
+    localStorage.setItem('mySetlist', JSON.stringify(collection));
+    alert("已加入收藏！");
+}
+function openCollectionMenu(e) {
+    if (e) e.stopPropagation();
+    
+    let collection = JSON.parse(localStorage.getItem('mySetlist') || '[]');
+    let modal = document.getElementById('public-songs-modal'); // 共用同一個 Modal Container
+    
+    let html = `
+        <div style="padding:20px; color:#fff;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <h3 style="margin:0; color:#ffcc00;">⭐ 我的 Setlist</h3>
+                <span onclick="closeModal()" style="cursor:pointer; font-size:1.5rem;">✕</span>
+            </div>
+            
+            <div id="collection-list" style="max-height:60vh; overflow-y:auto;">
+                ${collection.length === 0 ? '<p style="color:#666; text-align:center;">仲未有收藏喎，去公開歌單加啲歌啦！</p>' : ''}
+                ${collection.map((song, i) => `
+                    <div class="collection-item">
+                        <div class="collection-info" onclick='loadCollectedSong(${JSON.stringify(song).replace(/'/g, "&apos;")})'>
+                            <div style="font-weight:bold;">${song.name}</div>
+                            <div style="font-size:0.7rem; color:#888;">${song.uploader || '匿名'}</div>
+                        </div>
+                        <div class="remove-btn" onclick="removeFromCollection(${i})">🗑️</div>
+                    </div>
+                `).join('')}
+            </div>
+            
+            <button class="btn" style="width:100%; margin-top:20px; background:#444;" onclick="closeModal()">關閉</button>
+        </div>
+    `;
+    
+    modal.innerHTML = html;
+    modal.style.display = 'block';
+}
+function removeFromCollection(index) {
+    let collection = JSON.parse(localStorage.getItem('mySetlist') || '[]');
+    collection.splice(index, 1);
+    localStorage.setItem('mySetlist', JSON.stringify(collection));
+    openCollectionMenu(); // 重新整理 UI
+}
+
+// 載入歌曲
+async function loadCollectedSong(songMeta) {
+    try {
+        // 根據 ID 去 Firebase 攞最新嘅歌詞數據
+        const doc = await db.collection("songs").doc(songMeta.id).get();
+        if (doc.exists) {
+            const data = doc.data();
+            songData = data.lines; // 更新全域歌詞數據
+            songData.meta = { name: data.name, uploader: data.uploader, link: data.link, video: data.video, photo: data.photo };
+            index = 0; // 重置到第一句
+            updateUI();
+            closeModal();
+        }
+    } catch (err) {
+        alert("載入失敗！");
     }
 }
 // ------------------------------------------------
