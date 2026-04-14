@@ -151,7 +151,7 @@ body.focus-mode #display-upload-info {
     justify-content: center; /* 水平居中 */
     align-items: center;
     width: 100%;
-    margin-top: 10px;        /* 同上面排掣隔開 10px */
+    margin-top: 50px;        /* 同上面排掣隔開 10px */
     margin-bottom: 5px;
 }
 
@@ -183,19 +183,19 @@ body.focus-mode #display-upload-info {
 <body>
 <div id="app" onclick="handleTap(event)">
     <div class="btn-group">
-        <div class="btn" style="background:#0055aa;" onclick="location.reload()">🔄</div>
-        <div id="mainViewPhotoBtn" class="btn" style="display:none; background:#444;" onclick="showMainPhoto(event)">🖼️</div>
-        <div id="mainViewLinkBtn" class="btn" style="display:none; background:#444;" onclick="openSourceLink(event)">🔗</div>
         <div id="mainViewVideoBtn" class="btn" style="display:none; background:#444;" onclick="openVideoLink(event)">🎬</div>
+        <div id="mainViewLinkBtn" class="btn" style="display:none; background:#444;" onclick="openSourceLink(event)">🔗</div>
+        <div id="mainViewPhotoBtn" class="btn" style="display:none; background:#444;" onclick="showMainPhoto(event)">🖼️</div>
+        <div class="btn" style="background:#444;" onclick="editCurrentSong(event)">✏️</div>
+        <div class="btn" style="background:#0055aa;" onclick="location.reload()">🔄</div>
         <div class="btn" onclick="openColorMenu(event)">🎨</div>
         <div class="btn" onclick="fetchPublicSongs(event)">📂</div>
-        <div class="btn" onclick="openImporter(false)">➕</div>
         <div class="btn" onclick="uploadSong(event)">☁️</div>
-        <div class="btn" style="background:#444;" onclick="editCurrentSong(event)">✏️</div>
-        <div id="lockBtn" class="btn" onclick="toggleLock(event)">🔓</div>
+        <div class="btn" onclick="openImporter(false)">➕</div>
+        <!-- <div id="lockBtn" class="btn" onclick="toggleLock(event)">🔓</div> -->
     </div>
     <div class="focus-controls">
-        <button id="focus-toggle-btn" onclick="toggleFocusMode()">專注模式</button>
+        <button id="focus-toggle-btn" onclick="toggleFocusMode()">演唱會模式</button>
     </div>
     <!-- <div class="lyrics-container">
         <div class="side-lyrics" id="prevLine"></div>
@@ -279,7 +279,7 @@ body.focus-mode #display-upload-info {
 </div>
     
 <div id="footer-info" onclick="handleAdminTrigger()" style="position: fixed; bottom: env(safe-area-inset-bottom); left: 0; width: 100%; padding: 15px 0; background: linear-gradient(transparent, rgba(0,0,0,0.9) 70%); color: #555; font-size: 0.8rem; text-align: center; z-index: 50; user-select: none;">
-    <div id="display-song-name" style="font-weight: bold; color: #666;">應援助手 Fanchant Helper</div>
+    <div id="display-song-name" style="font-weight: bold; color: #666;">應援貓紙 Fanchant Helper</div>
     <div id="display-upload-info" style="font-size: 0.65rem; margin-top: 3px; color: #444;"></div>
 </div>
 <script>
@@ -288,13 +288,27 @@ body.focus-mode #display-upload-info {
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
-    let songData = [{ l: "歡迎使用應援助手", f: "開始" }];
+    let songData = [{ l: "歡迎使用應援貓紙", f: "點擊畫面下半區域閱讀使用指南（睇曬再試啊！）" },
+                    { l: "🔄refresh", f: "點擊重新載入網站" },
+                    { l: "🎨自定義顏色", f: "可選擇/輸入HEX碼喜歡的顏色取代應援詞顏色" },
+                    { l: "📂已公開貓紙", f: "可查看其他人上載的貓紙/在🗑️輸入對該貓紙的意見" },
+                    { l: "➕新增貓紙", f: "幫手入貓紙！手動編輯歌詞和標記應援詞" },
+                    { l: "✏️修改貓紙", f: "隨時修改你/其他人貓紙錯處" },
+                    { l: "☁️上載貓紙", f: "審核後會公開貓紙~造福你我他" },
+                    { l: "🖼️圖片版貓紙", f: "load唔切就睇圖片版貓紙" },
+                    { l: "🔗圖片來源", f: "想睇清D可跳到貓紙來源" },
+                    { l: "🎬參考影片", f: "睇實際例子/官方教學" },
+                    { l: "演唱會模式（正上方）", f: "彈出視窗就可以邊錄片邊睇貓紙！" },
+                    { l: "（上下移動畫面再點擊字）", f: "miss咗都可以快速跟返"},
+                    { l: "（完）", f: "快D試下啦！"}
+                   ];
     let index = 0;
     let isLocked = false;
     let tempPhotoData = ""; // 用來編輯時臨時儲存相片
 
     // --- 相片顯示與縮放 (修復 Chrome & Samsung) ---
     let scale = 1, posX = 0, posY = 0, isDragging = false, startX, startY;
+    
 function toggleFocusMode() {
     const isFocus = document.body.classList.toggle('focus-mode');
     const btn = document.getElementById('focus-toggle-btn');
@@ -304,7 +318,7 @@ function toggleFocusMode() {
         btn.innerText = "顯示工具";
         btn.style.opacity = "0.3"; // 收埋咗工具就將粒掣整淡啲，唔好擋住歌詞
     } else {
-        btn.innerText = "專注模式";
+        btn.innerText = "演唱會模式";
         btn.style.opacity = "1";
     }
 }
@@ -518,9 +532,9 @@ function handleManualSubmit() {
 
     if (isEditMode) {
         name = document.getElementById('display-song-name').innerText;
-        if (name === "應援助手 Fanchant Helper") name = prompt("請輸入[歌名 - 歌手]：");
+        if (name === "應援貓紙 Fanchant Helper") name = prompt("請輸入[歌名 - 歌手]（最好跟YouTube版本）：");
     } else {
-        name = prompt("請輸入[歌名 - 歌手]：");
+        name = prompt("請輸入[歌名 - 歌手]（最好跟YouTube版本）：");
     }
 
     if (!name) return;
@@ -533,7 +547,7 @@ function handleManualSubmit() {
     if (typeof songData !== 'undefined') {
         songData.meta = {
             name: name,
-            uploader: "本地編輯" // 或者你想寫 "本地"
+            uploader: "本地編輯者" // 或者你想寫 "本地"
         };
     }
 
@@ -549,7 +563,7 @@ function startManualMarking(text) {
     const isEditMode = modalTitle.includes("編輯");
 
     const currentName = window.currentSubmittingData ? window.currentSubmittingData.name : "";
-    const newMeta = { name: currentName, uploader: "本地編輯" };
+    const newMeta = { name: currentName, uploader: "本地編輯者" };
 
     const editorBtn = document.getElementById('editorPhotoBtn');
     if (typeof tempPhotoData !== 'undefined' && tempPhotoData && editorBtn) {
@@ -681,7 +695,7 @@ function saveMarkedData() {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-                username: "應援助手投稿機",
+                username: "應援貓紙投稿機",
                 embeds: [{
                     title: "🆕 收到新歌投稿/編輯！",
                     color: 65280,
@@ -861,7 +875,7 @@ async function adminDeletePublic(docId, songName) {
                 // 2. ✨ 檢查有無 Webhook URL 先至發送
                 if (webhookURL) {
                     const discordMsg = {
-                        username: "應援助手管理員",
+                        username: "應援貓紙管理員",
                         embeds: [{
                             title: "🚨 收到刪除建議！",
                             color: 16711680,
@@ -898,7 +912,7 @@ async function uploadSong(e) {
     const defaultName = window.currentSubmittingData?.name || document.getElementById('display-song-name').innerText;
     
     // 第一個 prompt 依家會預填個名 (第二個參數就係預填內容)
-    const songName = prompt("【第一步】填寫格式：歌名 - 歌手", defaultName);
+    const songName = prompt("【第一步】填寫格式：歌名 - 歌手（最好跟YouTube）", defaultName);
     if (!songName) return;
     
     const uploaderName = prompt("【第二步】你的暱稱 (會顯示喺底端)：");
@@ -937,7 +951,7 @@ async function sendDiscordNotification(songName, uploader, docId) {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    username: "應援助手投稿機",
+                    username: "應援貓紙投稿機",
                     embeds: [{
                         title: "🆕 收到新歌投稿！",
                         color: 65280, // 綠色
@@ -1218,7 +1232,7 @@ function updateUI() {
     }
 
     if (footerName && footerUpload) {
-        footerName.innerText = currentName || "應援助手 Fanchant Helper";
+        footerName.innerText = currentName || "應援貓紙 Fanchant Helper";
         footerUpload.innerText = currentUploader ? `Uploaded by: ${currentUploader}` : "";
     }
 
@@ -1239,7 +1253,7 @@ let adminClickCount = 0;
 
 function handleAdminTrigger() {
     adminClickCount++;
-    if (adminClickCount >= 5) {
+    if (adminClickCount >= 6) {
         adminClickCount = 0; // reset
         adminLogin();
     }
