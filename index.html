@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>應援助手 Cloud Pro</title>
+    <title>應援貓紙 Fanchant Cheatsheet</title>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
     <style>
@@ -153,6 +153,7 @@ body.focus-mode #display-upload-info {
     width: 100%;
     margin-top: 50px;        /* 同上面排掣隔開 10px */
     margin-bottom: 5px;
+    z-index: 110;
 }
 
 /* 執一執粒掣嘅樣式，唔好用 position: fixed */
@@ -279,7 +280,7 @@ body.focus-mode #display-upload-info {
 </div>
     
 <div id="footer-info" onclick="handleAdminTrigger()" style="position: fixed; bottom: env(safe-area-inset-bottom); left: 0; width: 100%; padding: 15px 0; background: linear-gradient(transparent, rgba(0,0,0,0.9) 70%); color: #555; font-size: 0.8rem; text-align: center; z-index: 50; user-select: none;">
-    <div id="display-song-name" style="font-weight: bold; color: #666;">應援貓紙 Fanchant Helper</div>
+    <div id="display-song-name" style="font-weight: bold; color: #666;">應援貓紙 Fanchant Cheatsheet</div>
     <div id="display-upload-info" style="font-size: 0.65rem; margin-top: 3px; color: #444;"></div>
 </div>
 <script>
@@ -532,7 +533,7 @@ function handleManualSubmit() {
 
     if (isEditMode) {
         name = document.getElementById('display-song-name').innerText;
-        if (name === "應援貓紙 Fanchant Helper") name = prompt("請輸入[歌名 - 歌手]（最好跟YouTube版本）：");
+        if (name === "應援貓紙 Fanchant Cheatsheet") name = prompt("請輸入[歌名 - 歌手]（最好跟YouTube版本）：");
     } else {
         name = prompt("請輸入[歌名 - 歌手]（最好跟YouTube版本）：");
     }
@@ -562,6 +563,9 @@ function startManualMarking(text) {
     const modalTitle = document.getElementById('modal-title').innerText;
     const isEditMode = modalTitle.includes("編輯");
 
+    // ✨ 新增：彈窗詢問。如果用戶按「取消」，isAutoRun 就會係 false
+    const isAutoRun = confirm("是否需要根據括號 () 自動標示應援詞？\n(如果上次已手動調整，建議按「取消」以保持原狀)");
+
     const currentName = window.currentSubmittingData ? window.currentSubmittingData.name : "";
     const newMeta = { name: currentName, uploader: "本地編輯者" };
 
@@ -584,36 +588,41 @@ function startManualMarking(text) {
                                  ? songData[rowIdx].f.split(/\s+/) : [];
         
         let fanchantPointer = 0; 
-        let inBracketScope = false; // ✨ 新增：用嚟記住係咪喺括號範圍內
+        let inBracketScope = false; 
 
         words.forEach(w => {
             let isAutoMarked = false;
 
-            // 1. 檢查括號狀態
-            const hasStart = /[\(\（\[]/.test(w); // 含有左括號
-            const hasEnd = /[\)\）\]]/.test(w);   // 含有右括號
+            // ✨ 只有喺用戶同意 (isAutoRun 為 true) 嘅情況下，先執行括號偵測邏輯
+            if (isAutoRun) {
+                const hasStart = /[\(\（\[]/.test(w);
+                const hasEnd = /[\)\）\]]/.test(w);
 
-            // 如果呢粒字有左括號，開始著燈
-            if (hasStart) inBracketScope = true;
+                if (hasStart) inBracketScope = true;
 
-            // ✨ 邏輯 A：括號範圍偵測 (解決 love me right 問題)
-            if (inBracketScope) {
-                isAutoMarked = true;
-            } 
-            // ✨ 邏輯 B：編輯模式順序比對 (解決重複字問題)
-            // 比對時拎走括號符號嚟比對，確保準確
-            else if (isEditMode && originalFanchant.length > 0) {
-                const cleanWord = w.replace(/[\(\（\[\]\)\）]/g, "").trim();
-                if (fanchantPointer < originalFanchant.length && cleanWord === originalFanchant[fanchantPointer]) {
+                if (inBracketScope) {
                     isAutoMarked = true;
-                    fanchantPointer++;
+                } 
+                else if (isEditMode && originalFanchant.length > 0) {
+                    const cleanWord = w.replace(/[\(\（\[\]\)\）]/g, "").trim();
+                    if (fanchantPointer < originalFanchant.length && cleanWord === originalFanchant[fanchantPointer]) {
+                        isAutoMarked = true;
+                        fanchantPointer++;
+                    }
+                }
+                
+                if (hasEnd) inBracketScope = false;
+            } else {
+                // ✨ 如果用戶揀「取消」，我哋依然檢查編輯模式嘅原有狀態 (等佢記得你上次 mark 咗邊粒)
+                if (isEditMode && originalFanchant.length > 0) {
+                    const cleanWord = w.replace(/[\(\（\[\]\)\）]/g, "").trim();
+                    if (fanchantPointer < originalFanchant.length && cleanWord === originalFanchant[fanchantPointer]) {
+                        isAutoMarked = true;
+                        fanchantPointer++;
+                    }
                 }
             }
             
-            // 如果呢粒字有右括號，下一粒字就停止著燈
-            if (hasEnd) inBracketScope = false;
-
-            // ⚠️ 呢度直接用 w，唔好 del 走括號，保持原汁原味
             html += `<span onclick="toggleChip(this, event)" class="word-chip ${isAutoMarked ? 'is-fc' : ''}">${w}</span>`;
         });
         html += `</div>`;
@@ -1232,7 +1241,7 @@ function updateUI() {
     }
 
     if (footerName && footerUpload) {
-        footerName.innerText = currentName || "應援貓紙 Fanchant Helper";
+        footerName.innerText = currentName || "應援貓紙 Fanchant Cheatsheet";
         footerUpload.innerText = currentUploader ? `Uploaded by: ${currentUploader}` : "";
     }
 
