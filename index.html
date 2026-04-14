@@ -759,7 +759,7 @@ function showSongGroupList(groupedData) {
             <li onclick='showVersionSelector(${JSON.stringify(versions).replace(/'/g, "&apos;")})' 
                 style="padding:15px; border-bottom:1px solid #333; cursor:pointer; display:flex; justify-content:space-between;text-align:left;">
                 <span>${name}</span>
-                <span style="color:#666; font-size:0.8rem;">${versions.length} 個版本 ></span>
+                <span style="color:#666;font-size:0.8rem;width: 80px;text-align: right;">${versions.length} 個版本 ></span>
             </li>`;
     });
     
@@ -779,7 +779,7 @@ function closeModal() {
     if (modal) modal.style.display = 'none';
 }    
 function showVersionSelector(versions) {
-    let html = `<div style="padding:20px;"><h3>${versions[0].name}</h3><h2>選擇版本</h2><ul style="list-style:none; padding:0;">`;
+    let html = `<div style="padding:20px;"><h3>選擇版本</h3><h2>${versions[0].name}</h2><ul style="list-style:none; padding:0;">`;
     
     versions.forEach(v => {
         const date = v.createdAt ? new Date(v.createdAt.seconds * 1000).toLocaleDateString() : "未知日期";
