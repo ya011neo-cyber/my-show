@@ -100,7 +100,7 @@
     box-shadow: none; 
 }
 #lyrics-window {
-    height: 480px;           /* 你可以根據相機位再微調高度 */
+    height: 380px;           /* 你可以根據相機位再微調高度 */
     width: 100vw !important;
     overflow-y: auto;
     overflow-x: hidden;
@@ -1625,6 +1625,848 @@ async function deletePending(docId, songName) {
             alert("批准失敗，請檢查權限。");
         }
     }
+// ==================== 公共歌單功能 ====================
+
+// 當前瀏覽的歌單數據
+let currentSetlistData = null;
+let currentSetlistId = null;
+
+// 獲取公共歌單列表
+async function fetchPublicSetlists() {
+    const modal = document.getElementById('public-songs-modal');
+    
+    // 顯示載入中
+    modal.innerHTML = `
+        <div style="padding:20px; color:#fff; height:80vh; display:flex; flex-direction:column;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <h3 style="margin:0;">📋 公共歌單</h3>
+                <span onclick="closeModal()" style="cursor:pointer; font-size:1.5rem;">✕</span>
+            </div>
+            <div style="flex:1; display:flex; justify-content:center; align-items:center;">
+                <p style="color:#666;">載入中...</p>
+            </div>
+        </div>
+    `;
+    modal.style.display = 'block';
+    
+    try {
+        // 從 Firebase 獲取已公開的歌單
+        const snapshot = await db.collection("setlists")
+            .where("status", "==", "public")
+            .orderBy("createdAt", "desc")
+            .get();
+        
+        if (snapshot.empty) {
+            showEmptySetlistMessage();
+            return;
+        }
+        
+        const setlists = [];
+        snapshot.forEach(doc => {
+            setlists.push({
+                id: doc.id,
+                ...doc.data()
+            });
+        });
+        
+        // 顯示歌單列表
+        showSetlistList(setlists);
+        
+    } catch (err) {
+        console.error("獲取歌單失敗", err);
+        modal.innerHTML = `
+            <div style="padding:20px; color:#fff; height:80vh; display:flex; flex-direction:column;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
+                    <h3 style="margin:0;">📋 公共歌單</h3>
+                    <span onclick="closeModal()" style="cursor:pointer;">✕</span>
+                </div>
+                <div style="flex:1; display:flex; justify-content:center; align-items:center;">
+                    <p style="color:#f00;">載入失敗，請重試</p>
+                </div>
+                <button class="btn" onclick="fetchPublicSetlists()">重試</button>
+            </div>
+        `;
+    }
+}
+
+// 顯示空的歌單訊息
+function showEmptySetlistMessage() {
+    const modal = document.getElementById('public-songs-modal');
+    modal.innerHTML = `
+        <div style="padding:20px; color:#fff; height:80vh; display:flex; flex-direction:column;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <h3 style="margin:0;">📋 公共歌單</h3>
+                <span onclick="closeModal()" style="cursor:pointer; font-size:1.5rem;">✕</span>
+            </div>
+            
+            <div style="flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center;">
+                <div style="font-size:3rem; margin-bottom:20px;">📭</div>
+                <p style="color:#666; margin-bottom:30px;">暫時未有公共歌單</p>
+                <button class="btn" style="background:#0f0; color:#000; padding:15px 30px;" onclick="showCreateSetlistForm()">➕ 建立第一個歌單</button>
+            </div>
+            
+            <div style="display:flex; gap:10px;">
+                <button class="btn" style="flex:1;" onclick="openLibraryMenu()">⬅️ 返回</button>
+                <button class="btn" style="flex:1;" onclick="closeModal()">關閉</button>
+            </div>
+        </div>
+    `;
+}
+
+// 顯示歌單列表
+function showSetlistList(setlists) {
+    const modal = document.getElementById('public-songs-modal');
+    
+    // 按演唱會/專輯分類
+    const categorized = {
+        concert: setlists.filter(s => s.type === 'concert'),
+        album: setlists.filter(s => s.type === 'album'),
+        custom: setlists.filter(s => s.type === 'custom' || !s.type)
+    };
+    
+    let html = `
+        <div style="padding:20px; color:#fff; height:80vh; display:flex; flex-direction:column;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <span onclick="openLibraryMenu()" style="cursor:pointer; color:#cc9900;">⬅️</span>
+                    <h3 style="margin:0;">📋 公共歌單</h3>
+                </div>
+                <div style="display:flex; gap:10px;">
+                    <button class="btn" style="background:#0f0; color:#000; padding:8px 15px;" onclick="showCreateSetlistForm()">➕ 建立</button>
+                    <span onclick="closeModal()" style="cursor:pointer; font-size:1.5rem;">✕</span>
+                </div>
+            </div>
+            
+            <div style="flex:1; overflow-y:auto;">
+    `;
+    
+    // 演唱會歌單
+    if (categorized.concert.length > 0) {
+        html += `
+            <div style="margin-bottom:20px;">
+                <h4 style="color:#ff6b6b; margin-bottom:10px; display:flex; align-items:center; gap:5px;">
+                    <span>🎤</span> 演唱會 Setlist
+                </h4>
+                ${categorized.concert.map(s => renderSetlistItem(s)).join('')}
+            </div>
+        `;
+    }
+    
+    // 專輯歌單
+    if (categorized.album.length > 0) {
+        html += `
+            <div style="margin-bottom:20px;">
+                <h4 style="color:#6b9fff; margin-bottom:10px; display:flex; align-items:center; gap:5px;">
+                    <span>💿</span> 專輯
+                </h4>
+                ${categorized.album.map(s => renderSetlistItem(s)).join('')}
+            </div>
+        `;
+    }
+    
+    // 自訂歌單
+    if (categorized.custom.length > 0) {
+        html += `
+            <div style="margin-bottom:20px;">
+                <h4 style="color:#9f6bff; margin-bottom:10px; display:flex; align-items:center; gap:5px;">
+                    <span>📝</span> 自訂歌單
+                </h4>
+                ${categorized.custom.map(s => renderSetlistItem(s)).join('')}
+            </div>
+        `;
+    }
+    
+    html += `
+            </div>
+            
+            <div style="display:flex; gap:10px; margin-top:15px;">
+                <button class="btn" style="flex:1;" onclick="closeModal()">關閉</button>
+            </div>
+        </div>
+    `;
+    
+    modal.innerHTML = html;
+}
+
+// 渲染單個歌單項目
+function renderSetlistItem(setlist) {
+    const typeIcon = setlist.type === 'concert' ? '🎤' : setlist.type === 'album' ? '💿' : '📝';
+    const dateStr = setlist.createdAt ? new Date(setlist.createdAt.seconds * 1000).toLocaleDateString('zh-HK') : '';
+    
+    return `
+        <div style="background:#1a1a1a; border-radius:10px; padding:15px; margin-bottom:10px; border-left:4px solid ${setlist.type === 'concert' ? '#ff6b6b' : setlist.type === 'album' ? '#6b9fff' : '#9f6bff'};">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                <div style="flex:1; cursor:pointer;" onclick="viewSetlistDetail('${setlist.id}')">
+                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:5px;">
+                        <span>${typeIcon}</span>
+                        <span style="font-weight:bold; font-size:1.1rem;">${setlist.name}</span>
+                    </div>
+                    <div style="font-size:0.8rem; color:#888; margin-bottom:5px;">
+                        ${setlist.artist ? `🎵 ${setlist.artist}` : ''}
+                    </div>
+                    <div style="font-size:0.75rem; color:#666; display:flex; gap:15px;">
+                        <span>📊 ${setlist.songCount || 0} 首歌</span>
+                        <span>👤 ${setlist.creator || '匿名'}</span>
+                        ${dateStr ? `<span>📅 ${dateStr}</span>` : ''}
+                    </div>
+                    ${setlist.description ? `
+                        <div style="font-size:0.75rem; color:#555; margin-top:8px; font-style:italic;">
+                            "${setlist.description.substring(0, 50)}${setlist.description.length > 50 ? '...' : ''}"
+                        </div>
+                    ` : ''}
+                </div>
+                <div style="display:flex; gap:5px;">
+                    <button class="btn" style="padding:5px 10px; font-size:0.7rem;" onclick="viewSetlistDetail('${setlist.id}')">👀 查看</button>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// 顯示建立歌單表單
+function showCreateSetlistForm() {
+    // 獲取當前收藏作為預設歌曲
+    const collection = JSON.parse(localStorage.getItem('mySetlist') || '[]');
+    
+    const modal = document.getElementById('public-songs-modal');
+    
+    let html = `
+        <div style="padding:20px; color:#fff; height:85vh; display:flex; flex-direction:column;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <h3 style="margin:0; color:#0f0;">📋 建立新歌單</h3>
+                <span onclick="fetchPublicSetlists()" style="cursor:pointer; font-size:1.5rem;">✕</span>
+            </div>
+            
+            <div style="flex:1; overflow-y:auto;">
+                <div style="margin-bottom:20px;">
+                    <label style="display:block; margin-bottom:5px; color:#888;">歌單名稱 *</label>
+                    <input type="text" id="setlist-name" placeholder="例如：MAMAMOO 演唱會 Setlist" 
+                           style="width:100%; padding:12px; background:#111; border:1px solid #444; border-radius:8px; color:#fff; box-sizing:border-box;">
+                </div>
+                
+                <div style="margin-bottom:20px;">
+                    <label style="display:block; margin-bottom:5px; color:#888;">歌手/藝人</label>
+                    <input type="text" id="setlist-artist" placeholder="例如：MAMAMOO" 
+                           style="width:100%; padding:12px; background:#111; border:1px solid #444; border-radius:8px; color:#fff; box-sizing:border-box;">
+                </div>
+                
+                <div style="margin-bottom:20px;">
+                    <label style="display:block; margin-bottom:5px; color:#888;">歌單類型 *</label>
+                    <select id="setlist-type" style="width:100%; padding:12px; background:#111; border:1px solid #444; border-radius:8px; color:#fff;">
+                        <option value="concert">🎤 演唱會 Setlist</option>
+                        <option value="album">💿 專輯</option>
+                        <option value="custom">📝 自訂歌單</option>
+                    </select>
+                </div>
+                
+                <div style="margin-bottom:20px;">
+                    <label style="display:block; margin-bottom:5px; color:#888;">描述（可選）</label>
+                    <textarea id="setlist-description" rows="3" placeholder="簡單描述呢個歌單..." 
+                              style="width:100%; padding:12px; background:#111; border:1px solid #444; border-radius:8px; color:#fff; box-sizing:border-box; resize:vertical;"></textarea>
+                </div>
+                
+                <div style="margin-bottom:20px;">
+                    <label style="display:block; margin-bottom:10px; color:#888;">選擇歌曲</label>
+                    
+                    <div style="margin-bottom:10px;">
+                        <button class="btn" style="background:#444; padding:8px 15px;" onclick="importFromCollection()">📂 從我的收藏導入</button>
+                        <button class="btn" style="background:#444; padding:8px 15px;" onclick="searchPublicSongs()">🔍 搜尋公開歌曲</button>
+                    </div>
+                    
+                    <div id="selected-songs-list" style="background:#111; border:1px solid #333; border-radius:8px; padding:10px; min-height:100px; max-height:200px; overflow-y:auto;">
+    `;
+    
+    if (collection.length > 0) {
+        html += `<p style="color:#666; text-align:center;">點擊上方按鈕選擇歌曲</p>`;
+    } else {
+        html += `<p style="color:#666; text-align:center;">未有歌曲，請先搜尋或從收藏導入</p>`;
+    }
+    
+    html += `
+                    </div>
+                    <p style="font-size:0.7rem; color:#666; margin-top:5px;">已選擇 <span id="selected-count">0</span> 首歌</p>
+                </div>
+            </div>
+            
+            <div style="display:flex; gap:10px; margin-top:15px;">
+                <button class="btn" style="flex:1; background:#444;" onclick="fetchPublicSetlists()">取消</button>
+                <button class="btn" style="flex:1; background:#0f0; color:#000;" onclick="submitSetlist()">✅ 建立並提交審核</button>
+            </div>
+        </div>
+    `;
+    
+    modal.innerHTML = html;
+    
+    // 初始化暫存歌曲列表
+    window.tempSetlistSongs = [];
+}
+
+// 從收藏導入歌曲
+function importFromCollection() {
+    const collection = JSON.parse(localStorage.getItem('mySetlist') || '[]');
+    
+    if (collection.length === 0) {
+        alert("你嘅收藏係空的，請先加入歌曲");
+        return;
+    }
+    
+    const modal = document.getElementById('public-songs-modal');
+    
+    let html = `
+        <div style="padding:20px; color:#fff; height:80vh; display:flex; flex-direction:column;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
+                <h3 style="margin:0;">📂 從收藏選擇</h3>
+                <span onclick="showCreateSetlistForm()" style="cursor:pointer; font-size:1.5rem;">✕</span>
+            </div>
+            
+            <div style="flex:1; overflow-y:auto;">
+                ${collection.map((song, i) => `
+                    <div style="padding:12px; border-bottom:1px solid #333; display:flex; align-items:center; gap:10px;">
+                        <input type="checkbox" id="song-${i}" value="${i}" 
+                               ${window.tempSetlistSongs?.some(s => s.uniqueId === song.uniqueId) ? 'checked' : ''}
+                               style="width:18px; height:18px;">
+                        <label for="song-${i}" style="flex:1; cursor:pointer;">
+                            <div style="font-weight:bold;">${song.name}</div>
+                            <div style="font-size:0.7rem; color:#666;">${song.uploader || '匿名'}</div>
+                        </label>
+                    </div>
+                `).join('')}
+            </div>
+            
+            <div style="display:flex; gap:10px; margin-top:15px;">
+                <button class="btn" style="flex:1;" onclick="showCreateSetlistForm()">取消</button>
+                <button class="btn" style="flex:1; background:#0f0; color:#000;" onclick="confirmImportFromCollection()">✅ 確認選擇</button>
+            </div>
+        </div>
+    `;
+    
+    modal.innerHTML = html;
+}
+
+// 確認從收藏導入
+function confirmImportFromCollection() {
+    const collection = JSON.parse(localStorage.getItem('mySetlist') || '[]');
+    const selectedSongs = [];
+    
+    document.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
+        const index = parseInt(cb.value);
+        if (collection[index]) {
+            selectedSongs.push({
+                name: collection[index].name,
+                uploader: collection[index].uploader,
+                songId: collection[index].id || null,
+                uniqueId: collection[index].uniqueId
+            });
+        }
+    });
+    
+    window.tempSetlistSongs = selectedSongs;
+    
+    // 返回建立表單
+    showCreateSetlistForm();
+    
+    // 更新顯示
+    updateSelectedSongsDisplay();
+}
+
+// 搜尋公開歌曲
+function searchPublicSongs() {
+    const modal = document.getElementById('public-songs-modal');
+    
+    let html = `
+        <div style="padding:20px; color:#fff; height:80vh; display:flex; flex-direction:column;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
+                <h3 style="margin:0;">🔍 搜尋歌曲</h3>
+                <span onclick="showCreateSetlistForm()" style="cursor:pointer; font-size:1.5rem;">✕</span>
+            </div>
+            
+            <input type="text" id="song-search-input" placeholder="輸入歌名..." 
+                   style="width:100%; padding:12px; background:#111; border:1px solid #444; border-radius:8px; color:#fff; margin-bottom:15px; box-sizing:border-box;">
+            
+            <div style="margin-bottom:10px;">
+                <button class="btn" style="background:#444;" onclick="performSongSearch()">搜尋</button>
+            </div>
+            
+            <div id="search-results" style="flex:1; overflow-y:auto;">
+                <p style="color:#666; text-align:center; margin-top:50px;">輸入關鍵字搜尋歌曲</p>
+            </div>
+            
+            <div style="display:flex; gap:10px; margin-top:15px;">
+                <button class="btn" style="flex:1;" onclick="showCreateSetlistForm()">取消</button>
+                <button class="btn" style="flex:1; background:#0f0; color:#000;" onclick="confirmSongSearchSelection()">✅ 確認加入</button>
+            </div>
+        </div>
+    `;
+    
+    modal.innerHTML = html;
+    window.tempSearchResults = [];
+}
+
+// 執行歌曲搜尋
+async function performSongSearch() {
+    const query = document.getElementById('song-search-input')?.value.trim();
+    if (!query) {
+        alert("請輸入搜尋關鍵字");
+        return;
+    }
+    
+    const resultsDiv = document.getElementById('search-results');
+    resultsDiv.innerHTML = '<p style="color:#666; text-align:center;">搜尋中...</p>';
+    
+    try {
+        const snapshot = await db.collection("songs")
+            .where("status", "==", "public")
+            .get();
+        
+        const results = [];
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            if (data.name.toLowerCase().includes(query.toLowerCase())) {
+                results.push({
+                    id: doc.id,
+                    ...data
+                });
+            }
+        });
+        
+        window.tempSearchResults = results;
+        
+        if (results.length === 0) {
+            resultsDiv.innerHTML = '<p style="color:#666; text-align:center; margin-top:50px;">冇相關結果</p>';
+            return;
+        }
+        
+        resultsDiv.innerHTML = results.map((song, i) => `
+            <div style="padding:12px; border-bottom:1px solid #333; display:flex; align-items:center; gap:10px;">
+                <input type="checkbox" id="search-song-${i}" value="${i}" style="width:18px; height:18px;">
+                <label for="search-song-${i}" style="flex:1; cursor:pointer;">
+                    <div style="font-weight:bold;">${song.name}</div>
+                    <div style="font-size:0.7rem; color:#666;">${song.uploader || '匿名'}</div>
+                </label>
+            </div>
+        `).join('');
+        
+    } catch (err) {
+        console.error("搜尋失敗", err);
+        resultsDiv.innerHTML = '<p style="color:#f00; text-align:center;">搜尋失敗</p>';
+    }
+}
+
+// 確認搜尋選擇
+function confirmSongSearchSelection() {
+    const selectedSongs = [];
+    
+    document.querySelectorAll('#search-results input[type="checkbox"]:checked').forEach(cb => {
+        const index = parseInt(cb.value);
+        if (window.tempSearchResults && window.tempSearchResults[index]) {
+            const song = window.tempSearchResults[index];
+            selectedSongs.push({
+                name: song.name,
+                uploader: song.uploader,
+                songId: song.id || null
+            });
+        }
+    });
+    
+    // 合併到現有選擇
+    window.tempSetlistSongs = [...(window.tempSetlistSongs || []), ...selectedSongs];
+    
+    // 返回建立表單
+    showCreateSetlistForm();
+    updateSelectedSongsDisplay();
+}
+
+// 更新已選擇歌曲顯示
+function updateSelectedSongsDisplay() {
+    const songs = window.tempSetlistSongs || [];
+    const listDiv = document.getElementById('selected-songs-list');
+    const countSpan = document.getElementById('selected-count');
+    
+    if (listDiv) {
+        if (songs.length === 0) {
+            listDiv.innerHTML = '<p style="color:#666; text-align:center;">未有選擇歌曲</p>';
+        } else {
+            listDiv.innerHTML = songs.map((song, i) => `
+                <div style="padding:8px; border-bottom:1px solid #333; display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                        <span style="color:#0f0;">${i + 1}.</span>
+                        <span style="margin-left:8px;">${song.name}</span>
+                        <span style="font-size:0.7rem; color:#666; margin-left:8px;">${song.uploader || ''}</span>
+                    </div>
+                    <span onclick="removeSelectedSong(${i})" style="color:#800; cursor:pointer; padding:5px;">✕</span>
+                </div>
+            `).join('');
+        }
+    }
+    
+    if (countSpan) {
+        countSpan.textContent = songs.length;
+    }
+}
+
+// 移除已選擇歌曲
+function removeSelectedSong(index) {
+    if (window.tempSetlistSongs) {
+        window.tempSetlistSongs.splice(index, 1);
+        updateSelectedSongsDisplay();
+    }
+}
+
+// 提交歌單
+async function submitSetlist() {
+    const name = document.getElementById('setlist-name')?.value.trim();
+    const artist = document.getElementById('setlist-artist')?.value.trim();
+    const type = document.getElementById('setlist-type')?.value;
+    const description = document.getElementById('setlist-description')?.value.trim();
+    const songs = window.tempSetlistSongs || [];
+    
+    if (!name) {
+        alert("請輸入歌單名稱");
+        return;
+    }
+    
+    if (songs.length === 0) {
+        alert("請至少選擇一首歌曲");
+        return;
+    }
+    
+    const creator = prompt("請輸入你的暱稱（會顯示喺歌單上）：");
+    if (!creator) return;
+    
+    try {
+        const setlistData = {
+            name: name,
+            artist: artist || null,
+            type: type,
+            description: description || null,
+            songs: songs,
+            songCount: songs.length,
+            creator: creator,
+            status: "pending",
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        
+        const docRef = await db.collection("setlists").add(setlistData);
+        
+        alert("✅ 歌單已提交審核！審核通過後會出現在公共歌單。");
+        
+        // 發送 Discord 通知
+        sendSetlistDiscordNotification(name, creator, docRef.id, songs.length);
+        
+        // 返回歌單列表
+        fetchPublicSetlists();
+        
+    } catch (err) {
+        console.error("提交失敗", err);
+        alert("❌ 提交失敗，請重試");
+    }
+}
+
+// 發送 Discord 通知
+async function sendSetlistDiscordNotification(name, creator, id, songCount) {
+    try {
+        const adminDoc = await db.collection("admin_config").doc("security").get();
+        const webhookURL = adminDoc.data()?.discord_webhook;
+        
+        if (webhookURL) {
+            fetch(webhookURL, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    username: "應援貓紙投稿機",
+                    embeds: [{
+                        title: "📋 收到新歌單投稿！",
+                        color: 65280,
+                        fields: [
+                            { name: "歌單名稱", value: name, inline: true },
+                            { name: "投稿者", value: creator, inline: true },
+                            { name: "歌曲數量", value: `${songCount} 首`, inline: true },
+                            { name: "Firebase ID", value: id, inline: false }
+                        ],
+                        timestamp: new Date().toISOString()
+                    }]
+                })
+            });
+        }
+    } catch (err) {
+        console.error("Discord 通知失敗", err);
+    }
+}
+
+// 查看歌單詳情
+async function viewSetlistDetail(setlistId) {
+    const modal = document.getElementById('public-songs-modal');
+    
+    modal.innerHTML = `
+        <div style="padding:20px; color:#fff; height:80vh; display:flex; flex-direction:column;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
+                <span onclick="fetchPublicSetlists()" style="cursor:pointer; color:#cc9900;">⬅️ 返回</span>
+                <span onclick="closeModal()" style="cursor:pointer; font-size:1.5rem;">✕</span>
+            </div>
+            <div style="flex:1; display:flex; justify-content:center; align-items:center;">
+                <p style="color:#666;">載入中...</p>
+            </div>
+        </div>
+    `;
+    
+    try {
+        const doc = await db.collection("setlists").doc(setlistId).get();
+        
+        if (!doc.exists) {
+            alert("歌單不存在");
+            fetchPublicSetlists();
+            return;
+        }
+        
+        const setlist = doc.data();
+        currentSetlistData = setlist;
+        currentSetlistId = setlistId;
+        
+        const typeIcon = setlist.type === 'concert' ? '🎤' : setlist.type === 'album' ? '💿' : '📝';
+        const typeName = setlist.type === 'concert' ? '演唱會' : setlist.type === 'album' ? '專輯' : '自訂';
+        const dateStr = setlist.createdAt ? new Date(setlist.createdAt.seconds * 1000).toLocaleDateString('zh-HK') : '';
+        
+        let html = `
+            <div style="padding:20px; color:#fff; height:80vh; display:flex; flex-direction:column;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                    <span onclick="fetchPublicSetlists()" style="cursor:pointer; color:#cc9900;">⬅️ 返回列表</span>
+                    <span onclick="closeModal()" style="cursor:pointer; font-size:1.5rem;">✕</span>
+                </div>
+                
+                <div style="text-align:center; margin-bottom:20px; padding-bottom:15px; border-bottom:1px solid #333;">
+                    <div style="font-size:1rem; color:#888; margin-bottom:5px;">${typeIcon} ${typeName}</div>
+                    <h2 style="margin:5px 0; color:#fff;">${setlist.name}</h2>
+                    ${setlist.artist ? `<div style="font-size:1.1rem; color:#0f0; margin:5px 0;">${setlist.artist}</div>` : ''}
+                    <div style="font-size:0.8rem; color:#666; margin-top:10px; display:flex; justify-content:center; gap:20px;">
+                        <span>📊 ${setlist.songCount || 0} 首歌</span>
+                        <span>👤 ${setlist.creator || '匿名'}</span>
+                        ${dateStr ? `<span>📅 ${dateStr}</span>` : ''}
+                    </div>
+                    ${setlist.description ? `
+                        <div style="margin-top:15px; padding:10px; background:#1a1a1a; border-radius:8px; font-style:italic; color:#aaa;">
+                            "${setlist.description}"
+                        </div>
+                    ` : ''}
+                </div>
+                
+                <div style="flex:1; overflow-y:auto;">
+                    <h4 style="color:#888; margin-bottom:10px;">📜 歌曲列表</h4>
+        `;
+        
+        if (setlist.songs && setlist.songs.length > 0) {
+            setlist.songs.forEach((song, i) => {
+                html += `
+                    <div style="padding:12px; border-bottom:1px solid #333; display:flex; align-items:center; gap:10px;">
+                        <span style="color:#0f0; width:30px; text-align:right;">${i + 1}.</span>
+                        <div style="flex:1;">
+                            <div style="font-weight:bold;">${song.name}</div>
+                            <div style="font-size:0.7rem; color:#666;">${song.uploader || '匿名'}</div>
+                        </div>
+                        ${song.songId ? `
+                            <button class="btn" style="padding:5px 10px; font-size:0.7rem;" onclick="loadSongFromSetlist('${song.songId}')">🎵 播放</button>
+                        ` : `
+                            <span style="color:#666; font-size:0.7rem;">本地版本</span>
+                        `}
+                    </div>
+                `;
+            });
+        }
+        
+        html += `
+                </div>
+                
+                <div style="display:flex; gap:10px; margin-top:15px;">
+                    <button class="btn" style="flex:1; background:#444;" onclick="fetchPublicSetlists()">返回</button>
+                    <button class="btn" style="flex:1; background:#0f0; color:#000;" onclick="playEntireSetlist()">▶️ 播放整個歌單</button>
+                    <button class="btn" style="flex:1; background:#cc9900; color:#000;" onclick="addSetlistToCollection()">⭐ 收藏歌單</button>
+                </div>
+            </div>
+        `;
+        
+        modal.innerHTML = html;
+        
+    } catch (err) {
+        console.error("載入歌單失敗", err);
+        alert("載入失敗");
+        fetchPublicSetlists();
+    }
+}
+
+// 從歌單載入單首歌曲
+async function loadSongFromSetlist(songId) {
+    try {
+        const doc = await db.collection("songs").doc(songId).get();
+        if (doc.exists) {
+            const data = doc.data();
+            
+            songData = data.data || [];
+            songData.meta = {
+                name: data.name,
+                uploader: data.uploader || "匿名",
+                link: data.data?.[0]?.link || "",
+                video: data.data?.[0]?.video || "",
+                photo: data.data?.[0]?.photo || ""
+            };
+            
+            window.currentDocId = songId;
+            window.currentSubmittingData = { name: data.name };
+            
+            index = 0;
+            updateUI();
+            closeModal();
+        }
+    } catch (err) {
+        console.error("載入失敗", err);
+        alert("載入歌曲失敗");
+    }
+}
+
+// 播放整個歌單
+async function playEntireSetlist() {
+    if (!currentSetlistData || !currentSetlistData.songs || currentSetlistData.songs.length === 0) {
+        alert("歌單冇歌曲");
+        return;
+    }
+    
+    // 將歌單儲存到一個播放隊列
+    window.playQueue = currentSetlistData.songs.filter(s => s.songId);
+    window.playQueueIndex = 0;
+    
+    if (window.playQueue.length === 0) {
+        alert("呢個歌單冇可播放的歌曲（全部都係本地版本）");
+        return;
+    }
+    
+    // 載入第一首歌
+    await loadSongFromSetlist(window.playQueue[0].songId);
+    
+    alert(`🎵 開始播放歌單「${currentSetlistData.name}」\n共 ${window.playQueue.length} 首歌`);
+}
+
+// 播放下一首（在 updateUI 或其他地方呼叫）
+async function playNextInQueue() {
+    if (window.playQueue && window.playQueueIndex < window.playQueue.length - 1) {
+        window.playQueueIndex++;
+        await loadSongFromSetlist(window.playQueue[window.playQueueIndex].songId);
+    } else {
+        window.playQueue = null;
+        window.playQueueIndex = 0;
+        alert("🎉 歌單播放完畢！");
+    }
+}
+
+// 將歌單加入我的收藏
+function addSetlistToCollection() {
+    if (!currentSetlistData) return;
+    
+    let collection = JSON.parse(localStorage.getItem('mySetlist') || '[]');
+    let addedCount = 0;
+    
+    currentSetlistData.songs.forEach(song => {
+        // 檢查是否已存在
+        const exists = collection.some(s => 
+            (song.songId && s.id === song.songId) ||
+            s.name === song.name
+        );
+        
+        if (!exists) {
+            collection.push({
+                uniqueId: `setlist_${Date.now()}_${addedCount}`,
+                id: song.songId || null,
+                name: song.name,
+                uploader: song.uploader || "未知",
+                isLocal: !song.songId,
+                savedAt: new Date().toISOString(),
+                fromSetlist: currentSetlistData.name
+            });
+            addedCount++;
+        }
+    });
+    
+    localStorage.setItem('mySetlist', JSON.stringify(collection));
+    alert(`✅ 已將 ${addedCount} 首歌加入我的收藏！`);
+}
+
+// ==================== 管理員審核歌單功能 ====================
+
+// 顯示待審核歌單
+async function showPendingSetlists() {
+    try {
+        const snapshot = await db.collection("setlists")
+            .where("status", "==", "pending")
+            .get();
+        
+        if (snapshot.empty) {
+            alert("暫時冇待審核嘅歌單");
+            return;
+        }
+        
+        const modal = document.getElementById('public-songs-modal');
+        let html = `
+            <div style="padding:20px; color:#fff; height:80vh; display:flex; flex-direction:column;">
+                <h3 style="margin-bottom:15px;">📋 待審核歌單</h3>
+                <div style="flex:1; overflow-y:auto;">
+        `;
+        
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            html += `
+                <div style="background:#1a1a1a; padding:15px; margin-bottom:10px; border-radius:8px;">
+                    <div style="font-weight:bold; margin-bottom:5px;">${data.name}</div>
+                    <div style="font-size:0.8rem; color:#666; margin-bottom:10px;">
+                        投稿者: ${data.creator} | ${data.songCount} 首歌
+                    </div>
+                    <div style="display:flex; gap:10px;">
+                        <button class="btn" style="background:#0f0; color:#000;" onclick="approveSetlist('${doc.id}')">✅ 通過</button>
+                        <button class="btn" style="background:#f00;" onclick="rejectSetlist('${doc.id}')">❌ 拒絕</button>
+                        <button class="btn" style="background:#444;" onclick="viewSetlistDetail('${doc.id}')">👀 查看</button>
+                    </div>
+                </div>
+            `;
+        });
+        
+        html += `
+                </div>
+                <button class="btn" onclick="closeModal()">關閉</button>
+            </div>
+        `;
+        
+        modal.innerHTML = html;
+        modal.style.display = 'block';
+        
+    } catch (err) {
+        console.error(err);
+        alert("載入失敗");
+    }
+}
+
+// 批准歌單
+async function approveSetlist(setlistId) {
+    if (!confirm("確定批准呢個歌單？")) return;
+    
+    try {
+        await db.collection("setlists").doc(setlistId).update({
+            status: "public"
+        });
+        alert("✅ 歌單已公開！");
+        showPendingSetlists();
+    } catch (err) {
+        alert("操作失敗");
+    }
+}
+
+// 拒絕歌單
+async function rejectSetlist(setlistId) {
+    const reason = prompt("請輸入拒絕原因（可選）：");
+    
+    try {
+        await db.collection("setlists").doc(setlistId).delete();
+        alert("🗑️ 歌單已刪除" + (reason ? `\n原因：${reason}` : ""));
+        showPendingSetlists();
+    } catch (err) {
+        alert("操作失敗");
+    }
+}
     // function handleTap(e) {
     //     if (isLocked) return;
     //     const x = e.clientX || (e.touches && e.touches[0].clientX);
