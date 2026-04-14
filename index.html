@@ -757,7 +757,7 @@ function showSongGroupList(groupedData) {
         // 點擊後跳到第二層選單，傳入該歌名的所有版本
         html += `
             <li onclick='showVersionSelector(${JSON.stringify(versions).replace(/'/g, "&apos;")})' 
-                style="padding:15px; border-bottom:1px solid #333; cursor:pointer; display:flex; justify-content:space-between;">
+                style="padding:15px; border-bottom:1px solid #333; cursor:pointer; display:flex; justify-content:space-between;text-align:left;">
                 <span>${name}</span>
                 <span style="color:#666; font-size:0.8rem;">${versions.length} 個版本 ></span>
             </li>`;
@@ -779,7 +779,7 @@ function closeModal() {
     if (modal) modal.style.display = 'none';
 }    
 function showVersionSelector(versions) {
-    let html = `<div style="padding:20px;"><h3>選擇版本 - ${versions[0].name}</h3><ul style="list-style:none; padding:0;">`;
+    let html = `<div style="padding:20px;"><h3>${versions[0].name}</h3><h2>選擇版本</h2><ul style="list-style:none; padding:0;">`;
     
     versions.forEach(v => {
         const date = v.createdAt ? new Date(v.createdAt.seconds * 1000).toLocaleDateString() : "未知日期";
@@ -789,7 +789,7 @@ function showVersionSelector(versions) {
             <li onclick="loadSpecificSong('${v.id}')" 
                 style="padding:15px; border-bottom:1px solid #444; cursor:pointer; display:flex; justify-content:space-between; align-items:center;">
                 
-                <div>
+                <div style="text-align: left;">
                     <div style="color:#0f0;">作者: ${v.uploader || '匿名'}</div>
                     <div style="font-size:0.7rem; color:#666;">上傳日期: ${date}</div>
                 </div>
