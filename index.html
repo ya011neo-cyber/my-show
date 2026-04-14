@@ -563,8 +563,8 @@ function startManualMarking(text) {
     const modalTitle = document.getElementById('modal-title').innerText;
     const isEditMode = modalTitle.includes("編輯");
 
-    // ✨ 新增：彈窗詢問。如果用戶按「取消」，isAutoRun 就會係 false
-    const isAutoRun = confirm("是否需要根據括號 () 自動標示應援詞？\n(如果上次已手動調整，建議按「取消」以保持原狀)");
+    // 1. 詢問是否執行括號自動標示
+    const isAutoRun = confirm("是否需要根據括號 () 自動標示應援詞？\n(按「取消」將完全依照你上次手動標記的結果)");
 
     const currentName = window.currentSubmittingData ? window.currentSubmittingData.name : "";
     const newMeta = { name: currentName, uploader: "本地編輯者" };
@@ -584,6 +584,7 @@ function startManualMarking(text) {
         html += `<div class="line-row" data-row="${rowIdx}" style="margin-bottom:15px; border-bottom:1px solid #222;">`;
         
         const words = line.split(/\s+/).filter(w => w !== "");
+        // 取得上次編輯儲存的應援詞陣列
         const originalFanchant = (isEditMode && typeof songData !== 'undefined' && songData[rowIdx] && songData[rowIdx].f) 
                                  ? songData[rowIdx].f.split(/\s+/) : [];
         
@@ -591,39 +592,29 @@ function startManualMarking(text) {
         let inBracketScope = false; 
 
         words.forEach(w => {
-            let isAutoMarked = false;
+            let isMarked = false;
+            // 拎走括號方便做內容比對
+            const cleanWord = w.replace(/[\(\（\[\]\)\）]/g, "").trim();
 
-            // ✨ 只有喺用戶同意 (isAutoRun 為 true) 嘅情況下，先執行括號偵測邏輯
+            // 邏輯 A：如果用戶想自動標示
             if (isAutoRun) {
                 const hasStart = /[\(\（\[]/.test(w);
                 const hasEnd = /[\)\）\]]/.test(w);
-
                 if (hasStart) inBracketScope = true;
-
-                if (inBracketScope) {
-                    isAutoMarked = true;
-                } 
-                else if (isEditMode && originalFanchant.length > 0) {
-                    const cleanWord = w.replace(/[\(\（\[\]\)\）]/g, "").trim();
-                    if (fanchantPointer < originalFanchant.length && cleanWord === originalFanchant[fanchantPointer]) {
-                        isAutoMarked = true;
-                        fanchantPointer++;
-                    }
-                }
-                
+                if (inBracketScope) isMarked = true;
                 if (hasEnd) inBracketScope = false;
-            } else {
-                // ✨ 如果用戶揀「取消」，我哋依然檢查編輯模式嘅原有狀態 (等佢記得你上次 mark 咗邊粒)
-                if (isEditMode && originalFanchant.length > 0) {
-                    const cleanWord = w.replace(/[\(\（\[\]\)\）]/g, "").trim();
-                    if (fanchantPointer < originalFanchant.length && cleanWord === originalFanchant[fanchantPointer]) {
-                        isAutoMarked = true;
-                        fanchantPointer++;
-                    }
+            }
+
+            // 邏輯 B：如果自動標示冇著燈，或者用戶揀咗「取消」，就比對上次編輯嘅紀錄
+            // 只要 cleanWord 同上次儲存嘅對應應援詞一樣，就幫佢著返燈
+            if (!isMarked && isEditMode && originalFanchant.length > 0) {
+                if (fanchantPointer < originalFanchant.length && cleanWord === originalFanchant[fanchantPointer]) {
+                    isMarked = true;
+                    fanchantPointer++;
                 }
             }
             
-            html += `<span onclick="toggleChip(this, event)" class="word-chip ${isAutoMarked ? 'is-fc' : ''}">${w}</span>`;
+            html += `<span onclick="toggleChip(this, event)" class="word-chip ${isMarked ? 'is-fc' : ''}">${w}</span>`;
         });
         html += `</div>`;
     });
