@@ -1037,6 +1037,7 @@ async function uploadSong(e) {
     }
 }
 // 第一層：選擇清單類型
+// 第一層：選擇清單類型
 function openLibraryMenu(e) {
     if (e) e.stopPropagation();
     const modal = document.getElementById('public-songs-modal');
@@ -1068,6 +1069,8 @@ function openLibraryMenu(e) {
     modal.innerHTML = html;
     modal.style.display = 'block';
 }
+
+// 開啟我的收藏頁面
 function openMyCollection() {
     let collection = JSON.parse(localStorage.getItem('mySetlist') || '[]');
     const modal = document.getElementById('public-songs-modal');
@@ -1084,8 +1087,8 @@ function openMyCollection() {
                 ${collection.map((s, i) => `
                     <div style="padding:15px; border-bottom:1px solid #333; display:flex; justify-content:space-between; align-items:center;">
                         <div style="flex:1; cursor:pointer;" onclick='loadCollectedSong(${JSON.stringify(s).replace(/'/g, "&apos;")})'>
-                            <div style="font-size:1.1rem;">${s.name}</div>
-                            <div style="font-size:0.7rem; color:#666;">${s.uploader}</div>
+                            <div style="font-size:1.1rem;">${s.name || '未命名'}</div>
+                            <div style="font-size:0.7rem; color:#666;">${s.uploader || '匿名'}</div>
                         </div>
                         <span onclick="removeFromCollection(${i})" style="color:#800; padding:10px;">🗑️</span>
                     </div>
@@ -1097,57 +1100,96 @@ function openMyCollection() {
     modal.innerHTML = html;
 }
 
+// 從收藏中移除
 function removeFromCollection(i) {
     let collection = JSON.parse(localStorage.getItem('mySetlist') || '[]');
     collection.splice(i, 1);
     localStorage.setItem('mySetlist', JSON.stringify(collection));
     openMyCollection(); // 重新整理
 }
-// 呢個 function 用嚟加入收藏
-function toggleFavorite() {
-    const currSong = (typeof getFirstLineData === 'function') ? getFirstLineData() : {};
-    if (!currSong.name) {
+
+// 切換收藏狀態 (加入/移除)
+function toggleFavorite(e) {
+    if (e) e.stopPropagation();
+    
+    // 獲取當前歌曲的 meta 資訊
+    const meta = songData.meta || {};
+    const songName = meta.name || document.getElementById('display-song-name')?.innerText || '';
+    
+    if (!songName || songName === "應援貓紙 Fanchant Cheatsheet") {
         alert("呢首歌冇名，收藏唔到喎！");
         return;
     }
 
     let collection = JSON.parse(localStorage.getItem('mySetlist') || '[]');
     
-    // 檢查係咪已經喺收藏入面 (用名同 ID 比對)
-    const existsIndex = collection.findIndex(s => s.name === currSong.name);
+    // 檢查係咪已經喺收藏入面 (用歌名比對，因為可能冇 ID)
+    const existsIndex = collection.findIndex(s => s.name === songName);
 
     if (existsIndex > -1) {
+        // 移除收藏
         collection.splice(existsIndex, 1);
-        alert("已從我的收藏移除");
+        localStorage.setItem('mySetlist', JSON.stringify(collection));
+        alert(`「${songName}」已從我的收藏移除`);
+        
+        // 更新按鈕樣式 (如果有)
+        const favBtn = document.querySelector('.btn[onclick*="toggleFavorite"]');
+        if (favBtn) favBtn.innerHTML = '🤍';
     } else {
-        // 儲存必要的 Meta 資料
-        collection.push({
-            id: window.currentDocId || "", // 紀錄 Firebase ID
-            name: currSong.name,
-            uploader: currSong.uploader || "未知",
-            link: currSong.link || "",
-            video: currSong.video || ""
-        });
-        alert("已加入我的收藏！");
+        // 加入收藏
+        const songToSave = {
+            id: window.currentDocId || null,           // Firebase 文檔 ID (如果有)
+            name: songName,
+            uploader: meta.uploader || "本地編輯者",
+            link: meta.link || "",
+            video: meta.video || "",
+            photo: meta.photo || ""
+        };
+        
+        collection.push(songToSave);
+        localStorage.setItem('mySetlist', JSON.stringify(collection));
+        alert(`「${songName}」已加入我的收藏！`);
+        
+        // 更新按鈕樣式
+        const favBtn = document.querySelector('.btn[onclick*="toggleFavorite"]');
+        if (favBtn) favBtn.innerHTML = '❤️';
     }
-    localStorage.setItem('mySetlist', JSON.stringify(collection));
 }
+
+// 將歌曲加入收藏 (外部調用)
 function addToCollection(songMeta) {
     let collection = JSON.parse(localStorage.getItem('mySetlist') || '[]');
-    // 檢查係咪已經存在
-    if (collection.some(s => s.id === songMeta.id)) {
+    
+    // 檢查係咪已經存在 (用 ID 或歌名)
+    const exists = collection.some(s => 
+        (songMeta.id && s.id === songMeta.id) || 
+        (!songMeta.id && s.name === songMeta.name)
+    );
+    
+    if (exists) {
         alert("已經喺你個收藏夾度喇！");
         return;
     }
-    collection.push(songMeta);
+    
+    collection.push({
+        id: songMeta.id || null,
+        name: songMeta.name,
+        uploader: songMeta.uploader || "匿名",
+        link: songMeta.link || "",
+        video: songMeta.video || "",
+        photo: songMeta.photo || ""
+    });
+    
     localStorage.setItem('mySetlist', JSON.stringify(collection));
     alert("已加入收藏！");
 }
+
+// 開啟收藏選單 (舊版兼容)
 function openCollectionMenu(e) {
     if (e) e.stopPropagation();
     
     let collection = JSON.parse(localStorage.getItem('mySetlist') || '[]');
-    let modal = document.getElementById('public-songs-modal'); // 共用同一個 Modal Container
+    let modal = document.getElementById('public-songs-modal');
     
     let html = `
         <div style="padding:20px; color:#fff;">
@@ -1161,7 +1203,7 @@ function openCollectionMenu(e) {
                 ${collection.map((song, i) => `
                     <div class="collection-item">
                         <div class="collection-info" onclick='loadCollectedSong(${JSON.stringify(song).replace(/'/g, "&apos;")})'>
-                            <div style="font-weight:bold;">${song.name}</div>
+                            <div style="font-weight:bold;">${song.name || '未命名'}</div>
                             <div style="font-size:0.7rem; color:#888;">${song.uploader || '匿名'}</div>
                         </div>
                         <div class="remove-btn" onclick="removeFromCollection(${i})">🗑️</div>
@@ -1176,30 +1218,88 @@ function openCollectionMenu(e) {
     modal.innerHTML = html;
     modal.style.display = 'block';
 }
-function removeFromCollection(index) {
-    let collection = JSON.parse(localStorage.getItem('mySetlist') || '[]');
-    collection.splice(index, 1);
-    localStorage.setItem('mySetlist', JSON.stringify(collection));
-    openCollectionMenu(); // 重新整理 UI
-}
 
-// 載入歌曲
+// 載入收藏的歌曲
 async function loadCollectedSong(songMeta) {
     try {
-        // 根據 ID 去 Firebase 攞最新嘅歌詞數據
-        const doc = await db.collection("songs").doc(songMeta.id).get();
-        if (doc.exists) {
-            const data = doc.data();
-            songData = data.lines; // 更新全域歌詞數據
-            songData.meta = { name: data.name, uploader: data.uploader, link: data.link, video: data.video, photo: data.photo };
-            index = 0; // 重置到第一句
-            updateUI();
-            closeModal();
+        // 如果有 Firebase ID，就從雲端載入最新數據
+        if (songMeta.id) {
+            const doc = await db.collection("songs").doc(songMeta.id).get();
+            if (doc.exists) {
+                const data = doc.data();
+                
+                // ✅ 修正：Firebase 中的欄位是 data，不是 lines
+                songData = data.data || [];
+                
+                // ✅ 修正：正確設置 meta 資訊
+                songData.meta = {
+                    name: data.name,
+                    uploader: data.uploader || "匿名",
+                    link: data.data?.[0]?.link || "",
+                    video: data.data?.[0]?.video || "",
+                    photo: data.data?.[0]?.photo || ""
+                };
+                
+                // 紀錄當前文檔 ID (供後續使用)
+                window.currentDocId = songMeta.id;
+                window.currentSubmittingData = { name: data.name };
+                
+                index = 0;
+                updateUI();
+                closeModal();
+                return;
+            }
         }
+        
+        // 如果冇 ID 或者雲端載入失敗，就用本地儲存的資料
+        // 呢個情況通常係「本地編輯者」創作嘅歌
+        
+        // 從 localStorage 讀取完整歌詞數據
+        const savedDataRaw = localStorage.getItem('myConcertData');
+        if (savedDataRaw) {
+            const parsed = JSON.parse(savedDataRaw);
+            
+            if (parsed.meta && parsed.meta.name === songMeta.name) {
+                // ✅ 使用正確的資料結構
+                songData = parsed.lines || parsed;
+                songData.meta = parsed.meta;
+                
+                window.currentSubmittingData = { name: parsed.meta.name };
+                index = 0;
+                updateUI();
+                closeModal();
+                return;
+            }
+        }
+        
+        // 如果以上都失敗
+        alert("載入失敗！無法找到呢首歌嘅完整資料。");
+        
     } catch (err) {
+        console.error("載入收藏失敗", err);
         alert("載入失敗！");
     }
 }
+
+// 輔助函數：更新收藏按鈕的顯示狀態
+function updateFavoriteButton() {
+    const meta = songData.meta || {};
+    const songName = meta.name || '';
+    
+    if (!songName || songName === "應援貓紙 Fanchant Cheatsheet") return;
+    
+    let collection = JSON.parse(localStorage.getItem('mySetlist') || '[]');
+    const isFavorited = collection.some(s => s.name === songName);
+    
+    const favBtn = document.querySelector('.btn[onclick*="toggleFavorite"]');
+    if (favBtn) {
+        favBtn.innerHTML = isFavorited ? '❤️' : '🤍';
+    }
+}
+
+// 在 updateUI 函數最後加入這行來更新收藏按鈕狀態
+// 你原本的 updateUI 函數最後加上：
+// if (typeof updateFavoriteButton === 'function') updateFavoriteButton();
 // ------------------------------------------------
 // 抽離出嚟嘅 Discord 通知 Function (放喺 script 任何地方都得)
 // ------------------------------------------------
@@ -1509,6 +1609,7 @@ function updateUI() {
     } catch (e) { console.error("Save Error", e); }
     
     if (typeof updateMainViewBtn === 'function') updateMainViewBtn();
+    if (typeof updateFavoriteButton === 'function') updateFavoriteButton();
 }
     // --- 管理員審核功能 ---
     // 搵返你 HTML 顯示歌詞標題或某個地方，加個 counter
