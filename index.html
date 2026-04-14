@@ -637,6 +637,7 @@ function toggleChip(el, event) {
 }
 function saveMarkedData() {
     const rows = document.querySelectorAll('.line-row');
+    const tempPhotoData = document.getElementById('reference-img').src;
     const sourceLink = document.getElementById('sourceLinkInput').value.trim(); 
     const videoLink = document.getElementById('videoLinkInput').value.trim(); 
     let newData = [];
