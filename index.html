@@ -1832,7 +1832,7 @@ function showEmptySetlistMessage() {
     `;
 }
 
-// 顯示歌單列表
+// 顯示歌單列表（刪除功能同歌曲版本選擇一樣）
 function showSetlistList(setlists) {
     const modal = document.getElementById('public-songs-modal');
     
@@ -1863,10 +1863,8 @@ function showSetlistList(setlists) {
     if (categorized.concert.length > 0) {
         html += `
             <div style="margin-bottom:20px;">
-                <h4 style="color:#ff6b6b; margin-bottom:10px; display:flex; align-items:center; gap:5px;">
-                    <span>🎤</span> 演唱會 Setlist
-                </h4>
-                ${categorized.concert.map(s => renderSetlistItem(s)).join('')}
+                <h4 style="color:#ff6b6b; margin-bottom:10px;">🎤 演唱會 Setlist</h4>
+                ${categorized.concert.map(s => renderSetlistItemSimple(s)).join('')}
             </div>
         `;
     }
@@ -1875,10 +1873,8 @@ function showSetlistList(setlists) {
     if (categorized.album.length > 0) {
         html += `
             <div style="margin-bottom:20px;">
-                <h4 style="color:#6b9fff; margin-bottom:10px; display:flex; align-items:center; gap:5px;">
-                    <span>💿</span> 專輯
-                </h4>
-                ${categorized.album.map(s => renderSetlistItem(s)).join('')}
+                <h4 style="color:#6b9fff; margin-bottom:10px;">💿 專輯</h4>
+                ${categorized.album.map(s => renderSetlistItemSimple(s)).join('')}
             </div>
         `;
     }
@@ -1887,10 +1883,8 @@ function showSetlistList(setlists) {
     if (categorized.custom.length > 0) {
         html += `
             <div style="margin-bottom:20px;">
-                <h4 style="color:#9f6bff; margin-bottom:10px; display:flex; align-items:center; gap:5px;">
-                    <span>📝</span> 自訂歌單
-                </h4>
-                ${categorized.custom.map(s => renderSetlistItem(s)).join('')}
+                <h4 style="color:#9f6bff; margin-bottom:10px;">📝 自訂歌單</h4>
+                ${categorized.custom.map(s => renderSetlistItemSimple(s)).join('')}
             </div>
         `;
     }
@@ -1905,8 +1899,94 @@ function showSetlistList(setlists) {
     `;
     
     modal.innerHTML = html;
+    modal.style.display = 'block';
 }
 
+// ✅ 簡潔版歌單項目（刪除功能同 showVersionSelector 一樣）
+function renderSetlistItemSimple(setlist) {
+    const typeIcon = setlist.type === 'concert' ? '🎤' : setlist.type === 'album' ? '💿' : '📝';
+    const dateStr = setlist.createdAt ? new Date(setlist.createdAt.seconds * 1000).toLocaleDateString() : "未知日期";
+    const setlistNameClean = setlist.name.replace(/'/g, "\\'");
+    
+    return `
+        <li onclick="viewSetlistDetail('${setlist.id}')" 
+            style="padding:15px; border-bottom:1px solid #444; cursor:pointer; display:flex; justify-content:space-between; align-items:center; background:#1a1a1a; margin-bottom:5px; border-radius:8px;">
+            
+            <div style="text-align: left;">
+                <div style="display:flex; align-items:center; gap:5px; margin-bottom:3px;">
+                    <span>${typeIcon}</span>
+                    <span style="font-weight:bold; color:#fff;">${setlist.name}</span>
+                </div>
+                ${setlist.artist ? `<div style="color:#0f0; font-size:0.85rem;">${setlist.artist}</div>` : ''}
+                <div style="color:#888; font-size:0.75rem;">${setlist.songCount || 0} 首歌</div>
+                <div style="font-size:0.7rem; color:#666;">建立者: ${setlist.creator || '匿名'} | ${dateStr}</div>
+            </div>
+
+            <div onclick="event.stopPropagation(); adminDeleteSetlist('${setlist.id}', '${setlistNameClean}')" 
+                 style="padding: 10px; cursor: pointer; opacity: 0.6;" 
+                 onmouseover="this.style.opacity='1'" 
+                 onmouseout="this.style.opacity='0.6'">
+                🗑️
+            </div>
+        </li>
+    `;
+}
+
+// ✅ 管理員刪除歌單（同 adminDeletePublic 一樣邏輯）
+async function adminDeleteSetlist(docId, setlistName) {
+    const pw = prompt(`確定要刪除「${setlistName}」嗎？\n請輸入管理員密碼：`);
+    if (pw === null) return;
+
+    try {
+        const adminDoc = await db.collection("admin_config").doc("security").get();
+        const adminData = adminDoc.data();
+        const correctPw = adminData.password;
+        const webhookURL = adminData.discord_webhook;
+
+        if (pw === correctPw) {
+            await db.collection("setlists").doc(docId).delete();
+            alert("🗑️ 該歌單已永久刪除。");
+            fetchPublicSetlists();
+        } else {
+            const reason = prompt("密碼不正確。如果您想建議刪除此歌單，請輸入原因：");
+            
+            if (reason && reason.trim() !== "") {
+                await db.collection("delete_requests").add({
+                    type: "setlist",
+                    targetId: docId,
+                    targetName: setlistName,
+                    reason: reason,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                if (webhookURL) {
+                    const discordMsg = {
+                        username: "應援貓紙管理員",
+                        embeds: [{
+                            title: "🚨 收到歌單刪除建議！",
+                            color: 16711680,
+                            fields: [
+                                { name: "歌單名稱", value: setlistName, inline: true },
+                                { name: "建議原因", value: reason, inline: false }
+                            ]
+                        }]
+                    };
+
+                    fetch(webhookURL, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(discordMsg)
+                    });
+                }
+
+                alert("感謝您的意見！通知已發送。");
+            }
+        }
+    } catch (e) {
+        console.error(e);
+        alert("操作失敗。");
+    }
+}
 // 渲染單個歌單項目
 function renderSetlistItem(setlist) {
     const typeIcon = setlist.type === 'concert' ? '🎤' : setlist.type === 'album' ? '💿' : '📝';
