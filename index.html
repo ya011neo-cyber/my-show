@@ -2673,11 +2673,16 @@ function addSetlistToCollection() {
 // ==================== 管理員審核歌單功能 ====================
 
 // 顯示待審核歌單
+// 顯示待審核歌單（修正版）
 async function showPendingSetlists() {
     try {
+        console.log("開始獲取待審核歌單..."); // 除錯用
+        
         const snapshot = await db.collection("setlists")
             .where("status", "==", "pending")
             .get();
+        
+        console.log("獲取成功，文檔數:", snapshot.size); // 除錯用
         
         if (snapshot.empty) {
             alert("暫時冇待審核嘅歌單");
@@ -2685,6 +2690,11 @@ async function showPendingSetlists() {
         }
         
         const modal = document.getElementById('public-songs-modal');
+        if (!modal) {
+            console.error("找不到 modal 元素");
+            return;
+        }
+        
         let html = `
             <div style="padding:20px; color:#fff; height:80vh; display:flex; flex-direction:column;">
                 <h3 style="margin-bottom:15px;">📋 待審核歌單</h3>
@@ -2693,11 +2703,12 @@ async function showPendingSetlists() {
         
         snapshot.forEach(doc => {
             const data = doc.data();
+            console.log("歌單資料:", data); // 除錯用
             html += `
                 <div style="background:#1a1a1a; padding:15px; margin-bottom:10px; border-radius:8px;">
-                    <div style="font-weight:bold; margin-bottom:5px;">${data.name}</div>
+                    <div style="font-weight:bold; margin-bottom:5px;">${data.name || '未命名'}</div>
                     <div style="font-size:0.8rem; color:#666; margin-bottom:10px;">
-                        投稿者: ${data.creator} | ${data.songCount} 首歌
+                        投稿者: ${data.creator || '匿名'} | ${data.songCount || 0} 首歌
                     </div>
                     <div style="display:flex; gap:10px;">
                         <button class="btn" style="background:#0f0; color:#000;" onclick="approveSetlist('${doc.id}')">✅ 通過</button>
@@ -2718,11 +2729,21 @@ async function showPendingSetlists() {
         modal.style.display = 'block';
         
     } catch (err) {
-        console.error(err);
-        alert("載入失敗");
+        console.error("讀取失敗，詳細錯誤:", err);
+        
+        // ✅ 顯示更詳細嘅錯誤訊息
+        let errorMsg = "讀取失敗";
+        if (err.code === "permission-denied") {
+            errorMsg = "❌ 權限不足！請檢查 Firestore 安全規則。";
+        } else if (err.code === "not-found") {
+            errorMsg = "❌ Collection 'setlists' 不存在！請先建立。";
+        } else if (err.message) {
+            errorMsg = `❌ ${err.message}`;
+        }
+        
+        alert(errorMsg);
     }
 }
-
 // 批准歌單
 async function approveSetlist(setlistId) {
     if (!confirm("確定批准呢個歌單？")) return;
