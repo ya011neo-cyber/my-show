@@ -1719,6 +1719,7 @@ async function finalizeApproval(docId, songName) {
         await db.collection("songs").doc(docId).update({ status: "public" });
         alert("已公開！");
         document.getElementById('audit-bar').remove();
+        showPendingSongs();
     }
 }
 
@@ -1728,6 +1729,7 @@ async function deletePending(docId, songName) {
         await db.collection("songs").doc(docId).delete();
         alert("已刪除！");
         document.getElementById('audit-bar').remove();
+        showPendingSongs();
     }
 }
     // 獨立出來的批准 function
@@ -1737,6 +1739,7 @@ async function deletePending(docId, songName) {
                 status: "public"
             });
             alert(`✅ 「${songName}」已正式公開！`);
+            showPendingSongs();
         } catch (e) {
             alert("批准失敗，請檢查權限。");
         }
