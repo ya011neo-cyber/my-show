@@ -1824,11 +1824,29 @@ function renderSetlistItem(setlist) {
 }
 
 // 顯示建立歌單表單
+// 暫存表單資料
+window.tempSetlistForm = {
+    name: '',
+    artist: '',
+    type: 'concert',
+    description: '',
+    songs: []
+};
+
+// 顯示建立歌單表單
 function showCreateSetlistForm() {
-    // 獲取當前收藏作為預設歌曲
     const collection = JSON.parse(localStorage.getItem('mySetlist') || '[]');
-    
     const modal = document.getElementById('public-songs-modal');
+    
+    // ✅ 使用暫存的表單資料
+    const form = window.tempSetlistForm || {
+        name: '',
+        artist: '',
+        type: 'concert',
+        description: '',
+        songs: []
+    };
+    window.tempSetlistForm = form;
     
     let html = `
         <div style="padding:20px; color:#fff; height:85vh; display:flex; flex-direction:column;">
@@ -1840,68 +1858,138 @@ function showCreateSetlistForm() {
             <div style="flex:1; overflow-y:auto;">
                 <div style="margin-bottom:20px;">
                     <label style="display:block; margin-bottom:5px; color:#888;">歌單名稱 *</label>
-                    <input type="text" id="setlist-name" placeholder="例如：MAMAMOO 演唱會 Setlist" 
+                    <input type="text" id="setlist-name" placeholder="例如：2026 WOODZ WORLD TOUR 'Archive. 1' IN HONG KONG" 
+                           value="${escapeHtml(form.name)}"
                            style="width:100%; padding:12px; background:#111; border:1px solid #444; border-radius:8px; color:#fff; box-sizing:border-box;">
                 </div>
                 
                 <div style="margin-bottom:20px;">
                     <label style="display:block; margin-bottom:5px; color:#888;">歌手/藝人</label>
-                    <input type="text" id="setlist-artist" placeholder="例如：MAMAMOO" 
+                    <input type="text" id="setlist-artist" placeholder="例如：WOODZ" 
+                           value="${escapeHtml(form.artist)}"
                            style="width:100%; padding:12px; background:#111; border:1px solid #444; border-radius:8px; color:#fff; box-sizing:border-box;">
                 </div>
                 
                 <div style="margin-bottom:20px;">
                     <label style="display:block; margin-bottom:5px; color:#888;">歌單類型 *</label>
                     <select id="setlist-type" style="width:100%; padding:12px; background:#111; border:1px solid #444; border-radius:8px; color:#fff;">
-                        <option value="concert">🎤 演唱會 Setlist</option>
-                        <option value="album">💿 專輯</option>
-                        <option value="custom">📝 自訂歌單</option>
+                        <option value="concert" ${form.type === 'concert' ? 'selected' : ''}>🎤 演唱會</option>
+                        <option value="album" ${form.type === 'album' ? 'selected' : ''}>💿 專輯</option>
+                        <option value="custom" ${form.type === 'custom' ? 'selected' : ''}>📝 自訂歌單</option>
                     </select>
                 </div>
                 
                 <div style="margin-bottom:20px;">
                     <label style="display:block; margin-bottom:5px; color:#888;">描述（可選）</label>
                     <textarea id="setlist-description" rows="3" placeholder="簡單描述呢個歌單..." 
-                              style="width:100%; padding:12px; background:#111; border:1px solid #444; border-radius:8px; color:#fff; box-sizing:border-box; resize:vertical;"></textarea>
+                              style="width:100%; padding:12px; background:#111; border:1px solid #444; border-radius:8px; color:#fff; box-sizing:border-box; resize:vertical;">${escapeHtml(form.description)}</textarea>
                 </div>
                 
                 <div style="margin-bottom:20px;">
                     <label style="display:block; margin-bottom:10px; color:#888;">選擇歌曲</label>
                     
-                    <div style="margin-bottom:10px;">
-                        <button class="btn" style="background:#444; padding:8px 15px;" onclick="importFromCollection()">📂 從我的收藏導入</button>
-                        <button class="btn" style="background:#444; padding:8px 15px;" onclick="searchPublicSongs()">🔍 搜尋公開歌曲</button>
+                    <div style="margin-bottom:10px; display:flex; gap:8px;">
+                        <button class="btn" style="background:#444; padding:8px 15px;" onclick="saveFormData(); importFromCollection()">📂 從我的收藏導入</button>
+                        <button class="btn" style="background:#444; padding:8px 15px;" onclick="saveFormData(); searchPublicSongs()">🔍 搜尋公開歌曲</button>
                     </div>
                     
                     <div id="selected-songs-list" style="background:#111; border:1px solid #333; border-radius:8px; padding:10px; min-height:100px; max-height:200px; overflow-y:auto;">
     `;
     
-    if (collection.length > 0) {
-        html += `<p style="color:#666; text-align:center;">點擊上方按鈕選擇歌曲</p>`;
+    // ✅ 顯示已選擇的歌曲
+    if (form.songs && form.songs.length > 0) {
+        form.songs.forEach((song, i) => {
+            html += `
+                <div style="padding:8px; border-bottom:1px solid #333; display:flex; justify-content:space-between; align-items:center;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span style="color:#0f0; min-width:25px;">${i + 1}.</span>
+                        <div>
+                            <div style="font-weight:bold;">${escapeHtml(song.name)}</div>
+                            <div style="font-size:0.7rem; color:#666;">${escapeHtml(song.uploader || '匿名')}</div>
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:5px;">
+                        ${i > 0 ? `<span onclick="moveSongUp(${i})" style="color:#666; cursor:pointer; padding:5px;">⬆️</span>` : ''}
+                        ${i < form.songs.length - 1 ? `<span onclick="moveSongDown(${i})" style="color:#666; cursor:pointer; padding:5px;">⬇️</span>` : ''}
+                        <span onclick="removeSelectedSong(${i})" style="color:#800; cursor:pointer; padding:5px;">✕</span>
+                    </div>
+                </div>
+            `;
+        });
     } else {
-        html += `<p style="color:#666; text-align:center;">未有歌曲，請先搜尋或從收藏導入</p>`;
+        html += `<p style="color:#666; text-align:center;">點擊上方按鈕選擇歌曲</p>`;
     }
     
     html += `
                     </div>
-                    <p style="font-size:0.7rem; color:#666; margin-top:5px;">已選擇 <span id="selected-count">0</span> 首歌</p>
+                    <p style="font-size:0.7rem; color:#666; margin-top:5px;">已選擇 <span id="selected-count">${form.songs.length}</span> 首歌</p>
                 </div>
             </div>
             
             <div style="display:flex; gap:10px; margin-top:15px;">
-                <button class="btn" style="flex:1; background:#444;" onclick="fetchPublicSetlists()">取消</button>
-                <button class="btn" style="flex:1; background:#0f0; color:#000;" onclick="submitSetlist()">✅ 建立並提交審核</button>
+                <button class="btn" style="flex:1; background:#444;" onclick="cancelCreateSetlist()">取消</button>
+                <button class="btn" style="flex:1; background:#0f0; color:#000;" onclick="saveFormData(); submitSetlist()">✅ 建立並提交審核</button>
             </div>
         </div>
     `;
     
     modal.innerHTML = html;
-    
-    // 初始化暫存歌曲列表
-    window.tempSetlistSongs = [];
+    modal.style.display = 'block';
 }
 
-// 從收藏導入歌曲
+    // ✅ 輔助函數：轉義 HTML 防止 XSS
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// ✅ 儲存表單資料（在跳轉前呼叫）
+function saveFormData() {
+    const nameInput = document.getElementById('setlist-name');
+    const artistInput = document.getElementById('setlist-artist');
+    const typeSelect = document.getElementById('setlist-type');
+    const descTextarea = document.getElementById('setlist-description');
+    
+    if (nameInput) window.tempSetlistForm.name = nameInput.value;
+    if (artistInput) window.tempSetlistForm.artist = artistInput.value;
+    if (typeSelect) window.tempSetlistForm.type = typeSelect.value;
+    if (descTextarea) window.tempSetlistForm.description = descTextarea.value;
+}
+
+/ ✅ 取消建立歌單（清空暫存）
+function cancelCreateSetlist() {
+    window.tempSetlistForm = {
+        name: '',
+        artist: '',
+        type: 'concert',
+        description: '',
+        songs: []
+    };
+    fetchPublicSetlists();
+}
+
+// ✅ 移動歌曲向上
+function moveSongUp(index) {
+    if (index > 0 && window.tempSetlistForm.songs) {
+        const songs = window.tempSetlistForm.songs;
+        [songs[index - 1], songs[index]] = [songs[index], songs[index - 1]];
+        showCreateSetlistForm();
+    }
+}
+
+// ✅ 移動歌曲向下
+function moveSongDown(index) {
+    if (window.tempSetlistForm.songs && index < window.tempSetlistForm.songs.length - 1) {
+        const songs = window.tempSetlistForm.songs;
+        [songs[index], songs[index + 1]] = [songs[index + 1], songs[index]];
+        showCreateSetlistForm();
+    }
+}
+
+// ==================== 修正：從收藏導入歌曲 ====================
+
 function importFromCollection() {
     const collection = JSON.parse(localStorage.getItem('mySetlist') || '[]');
     
@@ -1912,6 +2000,9 @@ function importFromCollection() {
     
     const modal = document.getElementById('public-songs-modal');
     
+    // ✅ 獲取目前已選擇的歌曲 ID 列表
+    const selectedIds = (window.tempSetlistForm.songs || []).map(s => s.uniqueId || s.songId).filter(id => id);
+    
     let html = `
         <div style="padding:20px; color:#fff; height:80vh; display:flex; flex-direction:column;">
             <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
@@ -1919,22 +2010,32 @@ function importFromCollection() {
                 <span onclick="showCreateSetlistForm()" style="cursor:pointer; font-size:1.5rem;">✕</span>
             </div>
             
+            <div style="margin-bottom:10px; display:flex; gap:10px;">
+                <button class="btn" style="background:#444;" onclick="selectAllCollectionSongs()">全選</button>
+                <button class="btn" style="background:#444;" onclick="deselectAllCollectionSongs()">取消全選</button>
+            </div>
+            
             <div style="flex:1; overflow-y:auto;">
-                ${collection.map((song, i) => `
-                    <div style="padding:12px; border-bottom:1px solid #333; display:flex; align-items:center; gap:10px;">
-                        <input type="checkbox" id="song-${i}" value="${i}" 
-                               ${window.tempSetlistSongs?.some(s => s.uniqueId === song.uniqueId) ? 'checked' : ''}
-                               style="width:18px; height:18px;">
-                        <label for="song-${i}" style="flex:1; cursor:pointer;">
-                            <div style="font-weight:bold;">${song.name}</div>
-                            <div style="font-size:0.7rem; color:#666;">${song.uploader || '匿名'}</div>
-                        </label>
-                    </div>
-                `).join('')}
+                ${collection.map((song, i) => {
+                    const songId = song.uniqueId || song.id;
+                    const isChecked = selectedIds.includes(songId);
+                    return `
+                        <div style="padding:12px; border-bottom:1px solid #333; display:flex; align-items:center; gap:10px;">
+                            <input type="checkbox" id="song-${i}" value="${i}" 
+                                   ${isChecked ? 'checked' : ''}
+                                   style="width:18px; height:18px;">
+                            <label for="song-${i}" style="flex:1; cursor:pointer;">
+                                <div style="font-weight:bold;">${escapeHtml(song.name)}</div>
+                                <div style="font-size:0.7rem; color:#666;">${escapeHtml(song.uploader || '匿名')}</div>
+                                ${song.fromSetlist ? `<div style="font-size:0.6rem; color:#0f0;">📦 ${escapeHtml(song.fromSetlist)}</div>` : ''}
+                            </label>
+                        </div>
+                    `;
+                }).join('')}
             </div>
             
             <div style="display:flex; gap:10px; margin-top:15px;">
-                <button class="btn" style="flex:1;" onclick="showCreateSetlistForm()">取消</button>
+                <button class="btn" style="flex:1; background:#444;" onclick="showCreateSetlistForm()">取消</button>
                 <button class="btn" style="flex:1; background:#0f0; color:#000;" onclick="confirmImportFromCollection()">✅ 確認選擇</button>
             </div>
         </div>
@@ -1943,7 +2044,17 @@ function importFromCollection() {
     modal.innerHTML = html;
 }
 
-// 確認從收藏導入
+// 全選收藏歌曲
+function selectAllCollectionSongs() {
+    document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = true);
+}
+
+// 取消全選
+function deselectAllCollectionSongs() {
+    document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+}
+
+// ✅ 確認從收藏導入（修正版）
 function confirmImportFromCollection() {
     const collection = JSON.parse(localStorage.getItem('mySetlist') || '[]');
     const selectedSongs = [];
@@ -1951,25 +2062,36 @@ function confirmImportFromCollection() {
     document.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
         const index = parseInt(cb.value);
         if (collection[index]) {
+            const song = collection[index];
             selectedSongs.push({
-                name: collection[index].name,
-                uploader: collection[index].uploader,
-                songId: collection[index].id || null,
-                uniqueId: collection[index].uniqueId
+                name: song.name,
+                uploader: song.uploader || '匿名',
+                songId: song.id || null,
+                uniqueId: song.uniqueId || `local_${Date.now()}_${selectedSongs.length}`
             });
         }
     });
     
-    window.tempSetlistSongs = selectedSongs;
+    // ✅ 合併到現有歌曲（去重）
+    const existingSongs = window.tempSetlistForm.songs || [];
+    const existingKeys = new Set(existingSongs.map(s => s.uniqueId || s.songId));
+    
+    selectedSongs.forEach(song => {
+        const key = song.uniqueId || song.songId;
+        if (key && !existingKeys.has(key)) {
+            existingSongs.push(song);
+            existingKeys.add(key);
+        }
+    });
+    
+    window.tempSetlistForm.songs = existingSongs;
     
     // 返回建立表單
     showCreateSetlistForm();
-    
-    // 更新顯示
-    updateSelectedSongsDisplay();
 }
 
-// 搜尋公開歌曲
+// ==================== 修正：搜尋公開歌曲 ====================
+
 function searchPublicSongs() {
     const modal = document.getElementById('public-songs-modal');
     
@@ -1980,11 +2102,10 @@ function searchPublicSongs() {
                 <span onclick="showCreateSetlistForm()" style="cursor:pointer; font-size:1.5rem;">✕</span>
             </div>
             
-            <input type="text" id="song-search-input" placeholder="輸入歌名..." 
-                   style="width:100%; padding:12px; background:#111; border:1px solid #444; border-radius:8px; color:#fff; margin-bottom:15px; box-sizing:border-box;">
-            
-            <div style="margin-bottom:10px;">
-                <button class="btn" style="background:#444;" onclick="performSongSearch()">搜尋</button>
+            <div style="display:flex; gap:10px; margin-bottom:15px;">
+                <input type="text" id="song-search-input" placeholder="輸入歌名..." 
+                       style="flex:1; padding:12px; background:#111; border:1px solid #444; border-radius:8px; color:#fff;">
+                <button class="btn" style="background:#0f0; color:#000; padding:12px 20px;" onclick="performSongSearch()">搜尋</button>
             </div>
             
             <div id="search-results" style="flex:1; overflow-y:auto;">
@@ -1992,7 +2113,7 @@ function searchPublicSongs() {
             </div>
             
             <div style="display:flex; gap:10px; margin-top:15px;">
-                <button class="btn" style="flex:1;" onclick="showCreateSetlistForm()">取消</button>
+                <button class="btn" style="flex:1; background:#444;" onclick="showCreateSetlistForm()">取消</button>
                 <button class="btn" style="flex:1; background:#0f0; color:#000;" onclick="confirmSongSearchSelection()">✅ 確認加入</button>
             </div>
         </div>
@@ -2000,6 +2121,17 @@ function searchPublicSongs() {
     
     modal.innerHTML = html;
     window.tempSearchResults = [];
+    
+    // ✅ 支援 Enter 鍵搜尋
+    setTimeout(() => {
+        const input = document.getElementById('song-search-input');
+        if (input) {
+            input.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') performSongSearch();
+            });
+            input.focus();
+        }
+    }, 100);
 }
 
 // 執行歌曲搜尋
@@ -2011,7 +2143,7 @@ async function performSongSearch() {
     }
     
     const resultsDiv = document.getElementById('search-results');
-    resultsDiv.innerHTML = '<p style="color:#666; text-align:center;">搜尋中...</p>';
+    resultsDiv.innerHTML = '<p style="color:#666; text-align:center; padding:20px;">🔍 搜尋中...</p>';
     
     try {
         const snapshot = await db.collection("songs")
@@ -2032,27 +2164,51 @@ async function performSongSearch() {
         window.tempSearchResults = results;
         
         if (results.length === 0) {
-            resultsDiv.innerHTML = '<p style="color:#666; text-align:center; margin-top:50px;">冇相關結果</p>';
+            resultsDiv.innerHTML = '<p style="color:#666; text-align:center; padding:50px;">😿 冇相關結果</p>';
             return;
         }
         
-        resultsDiv.innerHTML = results.map((song, i) => `
-            <div style="padding:12px; border-bottom:1px solid #333; display:flex; align-items:center; gap:10px;">
-                <input type="checkbox" id="search-song-${i}" value="${i}" style="width:18px; height:18px;">
-                <label for="search-song-${i}" style="flex:1; cursor:pointer;">
-                    <div style="font-weight:bold;">${song.name}</div>
-                    <div style="font-size:0.7rem; color:#666;">${song.uploader || '匿名'}</div>
-                </label>
+        // ✅ 獲取目前已選擇的歌曲 ID
+        const selectedIds = (window.tempSetlistForm.songs || []).map(s => s.songId).filter(id => id);
+        
+        resultsDiv.innerHTML = `
+            <div style="margin-bottom:10px; display:flex; gap:10px;">
+                <button class="btn" style="background:#444; font-size:0.7rem;" onclick="selectAllSearchResults()">全選</button>
+                <button class="btn" style="background:#444; font-size:0.7rem;" onclick="deselectAllSearchResults()">取消全選</button>
+                <span style="color:#666; margin-left:auto;">找到 ${results.length} 個結果</span>
             </div>
-        `).join('');
+            ${results.map((song, i) => {
+                const isChecked = selectedIds.includes(song.id);
+                return `
+                    <div style="padding:12px; border-bottom:1px solid #333; display:flex; align-items:center; gap:10px;">
+                        <input type="checkbox" id="search-song-${i}" value="${i}" 
+                               ${isChecked ? 'checked' : ''}
+                               style="width:18px; height:18px;">
+                        <label for="search-song-${i}" style="flex:1; cursor:pointer;">
+                            <div style="font-weight:bold;">${escapeHtml(song.name)}</div>
+                            <div style="font-size:0.7rem; color:#666;">${escapeHtml(song.uploader || '匿名')}</div>
+                        </label>
+                    </div>
+                `;
+            }).join('')}
+        `;
         
     } catch (err) {
         console.error("搜尋失敗", err);
-        resultsDiv.innerHTML = '<p style="color:#f00; text-align:center;">搜尋失敗</p>';
+        resultsDiv.innerHTML = '<p style="color:#f00; text-align:center; padding:50px;">搜尋失敗，請重試</p>';
     }
 }
+// 全選搜尋結果
+function selectAllSearchResults() {
+    document.querySelectorAll('#search-results input[type="checkbox"]').forEach(cb => cb.checked = true);
+}
 
-// 確認搜尋選擇
+// 取消全選搜尋結果
+function deselectAllSearchResults() {
+    document.querySelectorAll('#search-results input[type="checkbox"]').forEach(cb => cb.checked = false);
+}
+    
+// ✅ 確認搜尋選擇（修正版）
 function confirmSongSearchSelection() {
     const selectedSongs = [];
     
@@ -2062,18 +2218,27 @@ function confirmSongSearchSelection() {
             const song = window.tempSearchResults[index];
             selectedSongs.push({
                 name: song.name,
-                uploader: song.uploader,
+                uploader: song.uploader || '匿名',
                 songId: song.id || null
             });
         }
     });
     
-    // 合併到現有選擇
-    window.tempSetlistSongs = [...(window.tempSetlistSongs || []), ...selectedSongs];
+    // ✅ 合併到現有歌曲（去重）
+    const existingSongs = window.tempSetlistForm.songs || [];
+    const existingIds = new Set(existingSongs.map(s => s.songId).filter(id => id));
+    
+    selectedSongs.forEach(song => {
+        if (song.songId && !existingIds.has(song.songId)) {
+            existingSongs.push(song);
+            existingIds.add(song.songId);
+        }
+    });
+    
+    window.tempSetlistForm.songs = existingSongs;
     
     // 返回建立表單
     showCreateSetlistForm();
-    updateSelectedSongsDisplay();
 }
 
 // 更新已選擇歌曲顯示
@@ -2103,22 +2268,28 @@ function updateSelectedSongsDisplay() {
         countSpan.textContent = songs.length;
     }
 }
+    
+// ==================== 修正：移除已選擇歌曲 ====================
 
-// 移除已選擇歌曲
 function removeSelectedSong(index) {
-    if (window.tempSetlistSongs) {
-        window.tempSetlistSongs.splice(index, 1);
-        updateSelectedSongsDisplay();
+    if (window.tempSetlistForm && window.tempSetlistForm.songs) {
+        window.tempSetlistForm.songs.splice(index, 1);
+        showCreateSetlistForm();
     }
 }
 
-// 提交歌單
+// ==================== 修正：提交歌單 ====================
+
 async function submitSetlist() {
-    const name = document.getElementById('setlist-name')?.value.trim();
-    const artist = document.getElementById('setlist-artist')?.value.trim();
-    const type = document.getElementById('setlist-type')?.value;
-    const description = document.getElementById('setlist-description')?.value.trim();
-    const songs = window.tempSetlistSongs || [];
+    // ✅ 先儲存表單資料
+    saveFormData();
+    
+    const form = window.tempSetlistForm;
+    const name = form.name?.trim();
+    const artist = form.artist?.trim();
+    const type = form.type;
+    const description = form.description?.trim();
+    const songs = form.songs || [];
     
     if (!name) {
         alert("請輸入歌單名稱");
@@ -2152,6 +2323,15 @@ async function submitSetlist() {
         
         // 發送 Discord 通知
         sendSetlistDiscordNotification(name, creator, docRef.id, songs.length);
+        
+        // ✅ 清空暫存表單
+        window.tempSetlistForm = {
+            name: '',
+            artist: '',
+            type: 'concert',
+            description: '',
+            songs: []
+        };
         
         // 返回歌單列表
         fetchPublicSetlists();
