@@ -1487,45 +1487,148 @@ function openVideoLink(e) {
         alert("呢首歌暫時冇參考影片網址啊");
     }
 }
+    
+// 修改現有嘅 showAdminPanel 函數
 async function showAdminPanel() {
     try {
-        const snapshot = await db.collection("songs")
+        // 獲取待審核歌曲
+        const songSnapshot = await db.collection("songs")
                                  .where("status", "==", "pending")
                                  .get();
         
-        if (snapshot.empty) {
-            alert("暫時冇待審核嘅歌。");
+        // 獲取待審核歌單
+        const setlistSnapshot = await db.collection("setlists")
+                                 .where("status", "==", "pending")
+                                 .get();
+        
+        const pendingSongsCount = songSnapshot.size;
+        const pendingSetlistsCount = setlistSnapshot.size;
+        
+        if (pendingSongsCount === 0 && pendingSetlistsCount === 0) {
+            alert("暫時冇待審核嘅內容。");
             return;
         }
 
-        let listText = "【待審核清單】\n";
-        let pendingSongs = [];
+        // 顯示管理員選單
+        showAdminMenu(pendingSongsCount, pendingSetlistsCount, songSnapshot, setlistSnapshot);
         
-        let i = 0; // 手動加個計數器
-        snapshot.forEach((doc) => {
-            const data = doc.data();
-            pendingSongs.push({ id: doc.id, name: data.name, data: data.data, uploader: data.uploader });
-            listText += `${i + 1}. ${data.name}\n`;
-            i++; // 每次加 1
-        });
-        const choice = prompt(listText + "\n輸入編號進行預覽：");
-        const selected = pendingSongs[choice - 1];
-
-        if (selected) {
-            // 1. 載入數據到 UI
-            songData = selected.data; 
-            songData.meta = { 
-                name: selected.name, 
-                uploader: selected.uploader || "未知" 
-            };
-            index = 0;
-            updateUI(); 
-            
-            // 2. 唔好用 confirm，改為顯示一個自定義嘅審核工具列
-            showAuditBar(selected.id, selected.name);
-        }
     } catch (e) {
         alert("讀取失敗。");
+    }
+}
+
+// 顯示管理員主選單
+function showAdminMenu(songCount, setlistCount, songSnapshot, setlistSnapshot) {
+    const modal = document.getElementById('public-songs-modal');
+    
+    let html = `
+        <div style="padding:20px; color:#fff; height:70vh; display:flex; flex-direction:column;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:20px;">
+                <h3 style="margin:0; color:#0f0;">🔐 管理員面板</h3>
+                <span onclick="closeModal()" style="cursor:pointer; font-size:1.5rem;">✕</span>
+            </div>
+            
+            <div style="flex:1; display:flex; flex-direction:column; gap:20px;">
+    `;
+    
+    // 待審核歌曲選項
+    if (songCount > 0) {
+        html += `
+            <div onclick="showPendingSongs()" style="background:#1a1a1a; border:2px solid #0f0; border-radius:15px; padding:25px; cursor:pointer;">
+                <div style="font-size:2rem; margin-bottom:10px;">🎵</div>
+                <div style="font-weight:bold; font-size:1.2rem;">待審核歌曲</div>
+                <div style="font-size:0.8rem; color:#0f0; margin-top:5px;">${songCount} 首歌等待審核</div>
+            </div>
+        `;
+    }
+    
+    // 待審核歌單選項
+    if (setlistCount > 0) {
+        html += `
+            <div onclick="showPendingSetlists()" style="background:#1a1a1a; border:2px solid #cc9900; border-radius:15px; padding:25px; cursor:pointer;">
+                <div style="font-size:2rem; margin-bottom:10px;">📋</div>
+                <div style="font-weight:bold; font-size:1.2rem;">待審核歌單</div>
+                <div style="font-size:0.8rem; color:#cc9900; margin-top:5px;">${setlistCount} 個歌單等待審核</div>
+            </div>
+        `;
+    }
+    
+    html += `
+            </div>
+            
+            <button class="btn" style="margin-top:20px;" onclick="closeModal()">關閉</button>
+        </div>
+    `;
+    
+    modal.innerHTML = html;
+    modal.style.display = 'block';
+    
+    // 暫存 snapshot 供後續使用
+    window.pendingSongsSnapshot = songSnapshot;
+    window.pendingSetlistsSnapshot = setlistSnapshot;
+}
+
+// 顯示待審核歌曲列表（原有功能）
+function showPendingSongs() {
+    const snapshot = window.pendingSongsSnapshot;
+    if (!snapshot || snapshot.empty) {
+        alert("暫時冇待審核嘅歌。");
+        return;
+    }
+
+    const modal = document.getElementById('public-songs-modal');
+    let pendingSongs = [];
+    
+    let html = `
+        <div style="padding:20px; color:#fff; height:80vh; display:flex; flex-direction:column;">
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:15px;">
+                <span onclick="showAdminPanel()" style="cursor:pointer; color:#cc9900;">⬅️ 返回</span>
+                <h3 style="margin:0;">🎵 待審核歌曲</h3>
+            </div>
+            <div style="flex:1; overflow-y:auto;">
+    `;
+    
+    let i = 0;
+    snapshot.forEach((doc) => {
+        const data = doc.data();
+        pendingSongs.push({ id: doc.id, name: data.name, data: data.data, uploader: data.uploader });
+        html += `
+            <div style="background:#1a1a1a; padding:15px; margin-bottom:10px; border-radius:8px;">
+                <div style="font-weight:bold; margin-bottom:5px;">${i + 1}. ${data.name}</div>
+                <div style="font-size:0.8rem; color:#666; margin-bottom:10px;">投稿者: ${data.uploader || '匿名'}</div>
+                <div style="display:flex; gap:10px;">
+                    <button class="btn" style="background:#0f0; color:#000;" onclick="previewAndApproveSong('${doc.id}', ${i})">👀 預覽</button>
+                </div>
+            </div>
+        `;
+        i++;
+    });
+    
+    html += `
+            </div>
+            <button class="btn" style="margin-top:15px;" onclick="showAdminPanel()">返回</button>
+        </div>
+    `;
+    
+    modal.innerHTML = html;
+    window.pendingSongsList = pendingSongs;
+}
+
+// 預覽並批准歌曲
+function previewAndApproveSong(docId, index) {
+    const selected = window.pendingSongsList[index];
+    if (selected) {
+        songData = selected.data;
+        songData.meta = {
+            name: selected.name,
+            uploader: selected.uploader || "未知"
+        };
+        index = 0;
+        updateUI();
+        closeModal();
+        
+        // 顯示審核工具列
+        showAuditBar(docId, selected.name);
     }
 }
 function showAuditBar(docId, songName) {
@@ -1904,8 +2007,8 @@ function showCreateSetlistForm() {
                     <div style="display:flex; align-items:center; gap:8px;">
                         <span style="color:#0f0; min-width:25px;">${i + 1}.</span>
                         <div>
-                            <div style="font-weight:bold;">${escapeHtml(song.name)}</div>
-                            <div style="font-size:0.7rem; color:#666;">${escapeHtml(song.uploader || '匿名')}</div>
+                            <div style="font-weight:bold; text-align="left";>${escapeHtml(song.name)}</div>
+                            <div style="font-size:0.7rem; color:#666; text-align="left";>${escapeHtml(song.uploader || '匿名')}</div>
                         </div>
                     </div>
                     <div style="display:flex; gap:5px;">
