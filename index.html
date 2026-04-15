@@ -1512,8 +1512,20 @@ async function showAdminPanel() {
         // 顯示管理員選單
         showAdminMenu(pendingSongsCount, pendingSetlistsCount, songSnapshot, setlistSnapshot);
         
-    } catch (e) {
-        alert("讀取失敗。");
+    }  catch (err) {
+        console.error("讀取失敗，詳細錯誤:", err);
+        
+        // ✅ 顯示更詳細嘅錯誤訊息
+        let errorMsg = "讀取失敗";
+        if (err.code === "permission-denied") {
+            errorMsg = "❌ 權限不足！請檢查 Firestore 安全規則。";
+        } else if (err.code === "not-found") {
+            errorMsg = "❌ Collection 'setlists' 不存在！請先建立。";
+        } else if (err.message) {
+            errorMsg = `❌ ${err.message}`;
+        }
+        
+        alert(errorMsg);
     }
 }
 
