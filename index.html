@@ -1911,9 +1911,8 @@ function renderSetlistItem(setlist) {
     return `
         <div style="background:#1a1a1a; border-radius:10px; padding:15px; margin-bottom:10px; border-left:4px solid ${setlist.type === 'concert' ? '#ff6b6b' : setlist.type === 'album' ? '#6b9fff' : '#9f6bff'};">
             <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-                <div style="flex:1; cursor:pointer;" onclick="viewSetlistDetail('${setlist.id}')">
+                <div style="flex:1; cursor:pointer; text-align:left;" onclick="viewSetlistDetail('${setlist.id}')">
                     <div style="display:flex; align-items:center; gap:8px; margin-bottom:5px;">
-                        <span>${typeIcon}</span>
                         <span style="font-weight:bold; font-size:1.1rem;">${setlist.name}</span>
                     </div>
                     <div style="font-size:0.8rem; color:#888; margin-bottom:5px;">
@@ -2139,7 +2138,7 @@ function importFromCollection() {
                             <input type="checkbox" id="song-${i}" value="${i}" 
                                    ${isChecked ? 'checked' : ''}
                                    style="width:18px; height:18px;">
-                            <label for="song-${i}" style="flex:1; cursor:pointer;">
+                            <label for="song-${i}" style="flex:1; cursor:pointer; text-align:left;">
                                 <div style="font-weight:bold;">${escapeHtml(song.name)}</div>
                                 <div style="font-size:0.7rem; color:#666;">${escapeHtml(song.uploader || '匿名')}</div>
                                 ${song.fromSetlist ? `<div style="font-size:0.6rem; color:#0f0;">📦 ${escapeHtml(song.fromSetlist)}</div>` : ''}
@@ -2299,7 +2298,7 @@ async function performSongSearch() {
                         <input type="checkbox" id="search-song-${i}" value="${i}" 
                                ${isChecked ? 'checked' : ''}
                                style="width:18px; height:18px;">
-                        <label for="search-song-${i}" style="flex:1; cursor:pointer;">
+                        <label for="search-song-${i}" style="flex:1; cursor:pointer; text-align:left;">
                             <div style="font-weight:bold;">${escapeHtml(song.name)}</div>
                             <div style="font-size:0.7rem; color:#666;">${escapeHtml(song.uploader || '匿名')}</div>
                         </label>
@@ -2553,7 +2552,7 @@ async function viewSetlistDetail(setlistId) {
                 html += `
                     <div style="padding:12px; border-bottom:1px solid #333; display:flex; align-items:center; gap:10px;">
                         <span style="color:#0f0; width:30px; text-align:right;">${i + 1}.</span>
-                        <div style="flex:1;">
+                        <div style="flex:1; text-align:left;">
                             <div style="font-weight:bold;">${song.name}</div>
                             <div style="font-size:0.7rem; color:#666;">${song.uploader || '匿名'}</div>
                         </div>
