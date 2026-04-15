@@ -2487,7 +2487,7 @@ async function sendSetlistDiscordNotification(name, creator, id, songCount) {
     }
 }
 
-// 查看歌單詳情
+// 查看歌單詳情（修正版：檢查歌曲是否存在）
 async function viewSetlistDetail(setlistId) {
     const modal = document.getElementById('public-songs-modal');
     
@@ -2516,6 +2516,43 @@ async function viewSetlistDetail(setlistId) {
         currentSetlistData = setlist;
         currentSetlistId = setlistId;
         
+        // ✅ 檢查每首歌係咪仍然存在
+        const validSongs = [];
+        const invalidSongIds = [];
+        
+        if (setlist.songs && setlist.songs.length > 0) {
+            for (const song of setlist.songs) {
+                if (song.songId) {
+                    try {
+                        const songDoc = await db.collection("songs").doc(song.songId).get();
+                        if (songDoc.exists) {
+                            // 歌曲存在，保留
+                            validSongs.push(song);
+                        } else {
+                            // 歌曲已被刪除，標記為無效
+                            invalidSongIds.push(song.songId);
+                            // ✅ 仍然保留歌曲資訊，但標記為已刪除（不可播放）
+                            validSongs.push({
+                                ...song,
+                                isDeleted: true
+                            });
+                        }
+                    } catch (err) {
+                        console.warn(`檢查歌曲 ${song.songId} 失敗:`, err);
+                        // 檢查失敗當作存在處理
+                        validSongs.push(song);
+                    }
+                } else {
+                    // 本地版本，冇 songId，直接保留
+                    validSongs.push(song);
+                }
+            }
+        }
+        
+        // ✅ 更新有效歌曲列表
+        const displaySongs = validSongs;
+        const deletedCount = invalidSongIds.length;
+        
         const typeIcon = setlist.type === 'concert' ? '🎤' : setlist.type === 'album' ? '💿' : '📝';
         const typeName = setlist.type === 'concert' ? '演唱會' : setlist.type === 'album' ? '專輯' : '自訂';
         const dateStr = setlist.createdAt ? new Date(setlist.createdAt.seconds * 1000).toLocaleDateString('zh-HK') : '';
@@ -2529,16 +2566,21 @@ async function viewSetlistDetail(setlistId) {
                 
                 <div style="text-align:center; margin-bottom:20px; padding-bottom:15px; border-bottom:1px solid #333;">
                     <div style="font-size:1rem; color:#888; margin-bottom:5px;">${typeIcon} ${typeName}</div>
-                    <h2 style="margin:5px 0; color:#fff;">${setlist.name}</h2>
-                    ${setlist.artist ? `<div style="font-size:1.1rem; color:#0f0; margin:5px 0;">${setlist.artist}</div>` : ''}
+                    <h2 style="margin:5px 0; color:#fff;">${escapeHtml(setlist.name)}</h2>
+                    ${setlist.artist ? `<div style="font-size:1.1rem; color:#0f0; margin:5px 0;">${escapeHtml(setlist.artist)}</div>` : ''}
                     <div style="font-size:0.8rem; color:#666; margin-top:10px; display:flex; justify-content:center; gap:20px;">
-                        <span>📊 ${setlist.songCount || 0} 首歌</span>
-                        <span>👤 ${setlist.creator || '匿名'}</span>
+                        <span>📊 ${displaySongs.length} 首歌</span>
+                        <span>👤 ${escapeHtml(setlist.creator || '匿名')}</span>
                         ${dateStr ? `<span>📅 ${dateStr}</span>` : ''}
                     </div>
+                    ${deletedCount > 0 ? `
+                        <div style="margin-top:10px; padding:8px; background:#3a1a1a; border-radius:8px; color:#ff6666; font-size:0.8rem;">
+                            ⚠️ 有 ${deletedCount} 首歌已被刪除，無法播放
+                        </div>
+                    ` : ''}
                     ${setlist.description ? `
                         <div style="margin-top:15px; padding:10px; background:#1a1a1a; border-radius:8px; font-style:italic; color:#aaa;">
-                            "${setlist.description}"
+                            "${escapeHtml(setlist.description)}"
                         </div>
                     ` : ''}
                 </div>
@@ -2547,23 +2589,33 @@ async function viewSetlistDetail(setlistId) {
                     <h4 style="color:#888; margin-bottom:10px;">📜 歌曲列表</h4>
         `;
         
-        if (setlist.songs && setlist.songs.length > 0) {
-            setlist.songs.forEach((song, i) => {
+        if (displaySongs.length > 0) {
+            displaySongs.forEach((song, i) => {
+                const isDeleted = song.isDeleted || false;
+                const canPlay = song.songId && !isDeleted;
+                
                 html += `
-                    <div style="padding:12px; border-bottom:1px solid #333; display:flex; align-items:center; gap:10px;">
-                        <span style="color:#0f0; width:30px; text-align:right;">${i + 1}.</span>
+                    <div style="padding:12px; border-bottom:1px solid #333; display:flex; align-items:center; gap:10px; ${isDeleted ? 'opacity:0.5;' : ''}">
+                        <span style="color:${isDeleted ? '#666' : '#0f0'}; width:30px; text-align:right;">${i + 1}.</span>
                         <div style="flex:1; text-align:left;">
-                            <div style="font-weight:bold;">${song.name}</div>
-                            <div style="font-size:0.7rem; color:#666;">${song.uploader || '匿名'}</div>
+                            <div style="font-weight:bold; ${isDeleted ? 'color:#888; text-decoration:line-through;' : ''}">
+                                ${escapeHtml(song.name)}
+                                ${isDeleted ? ' <span style="color:#f00; font-size:0.7rem;">[已刪除]</span>' : ''}
+                            </div>
+                            <div style="font-size:0.7rem; color:#666;">${escapeHtml(song.uploader || '匿名')}</div>
                         </div>
-                        ${song.songId ? `
+                        ${canPlay ? `
                             <button class="btn" style="padding:5px 10px; font-size:0.7rem;" onclick="loadSongFromSetlist('${song.songId}')">🎵 播放</button>
                         ` : `
-                            <span style="color:#666; font-size:0.7rem;">本地版本</span>
+                            <span style="color:#666; font-size:0.7rem;">
+                                ${isDeleted ? '🚫 已刪除' : '📦 本地版本'}
+                            </span>
                         `}
                     </div>
                 `;
             });
+        } else {
+            html += `<p style="color:#666; text-align:center; padding:30px;">😿 呢個歌單冇歌曲</p>`;
         }
         
         html += `
@@ -2571,13 +2623,33 @@ async function viewSetlistDetail(setlistId) {
                 
                 <div style="display:flex; gap:10px; margin-top:15px;">
                     <button class="btn" style="flex:1; background:#444;" onclick="fetchPublicSetlists()">返回</button>
+        `;
+        
+        // ✅ 只有當存在可播放歌曲時先顯示播放按鈕
+        const hasPlayableSongs = displaySongs.some(s => s.songId && !s.isDeleted);
+        if (hasPlayableSongs) {
+            html += `
                     <button class="btn" style="flex:1; background:#0f0; color:#000;" onclick="playEntireSetlist()">▶️ 播放整個歌單</button>
+            `;
+        } else {
+            html += `
+                    <button class="btn" style="flex:1; background:#444; color:#888;" disabled>▶️ 冇可播放歌曲</button>
+            `;
+        }
+        
+        html += `
                     <button class="btn" style="flex:1; background:#cc9900; color:#000;" onclick="addSetlistToCollection()">⭐ 收藏歌單</button>
                 </div>
             </div>
         `;
         
         modal.innerHTML = html;
+        
+        // ✅ 更新當前歌單數據（只保留有效歌曲供播放）
+        currentSetlistData = {
+            ...setlist,
+            validSongs: displaySongs.filter(s => s.songId && !s.isDeleted)
+        };
         
     } catch (err) {
         console.error("載入歌單失敗", err);
@@ -2586,55 +2658,73 @@ async function viewSetlistDetail(setlistId) {
     }
 }
 
-// 從歌單載入單首歌曲
+// ✅ 修正播放整個歌單（只播放有效歌曲）
+async function playEntireSetlist() {
+    if (!currentSetlistData) {
+        alert("冇歌單數據");
+        return;
+    }
+    
+    // 使用已檢查過嘅有效歌曲
+    const validSongs = currentSetlistData.validSongs || 
+                       (currentSetlistData.songs || []).filter(s => s.songId);
+    
+    if (validSongs.length === 0) {
+        alert("呢個歌單冇可播放的歌曲");
+        return;
+    }
+    
+    // 將歌單儲存到播放隊列
+    window.playQueue = validSongs;
+    window.playQueueIndex = 0;
+    
+    // 載入第一首歌
+    await loadSongFromSetlist(validSongs[0].songId);
+    
+    alert(`🎵 開始播放歌單「${currentSetlistData.name}」\n共 ${validSongs.length} 首歌`);
+}
+
+// ✅ 修正從歌單載入歌曲（加入錯誤處理）
 async function loadSongFromSetlist(songId) {
     try {
         const doc = await db.collection("songs").doc(songId).get();
-        if (doc.exists) {
-            const data = doc.data();
+        
+        if (!doc.exists) {
+            alert("❌ 呢首歌已被刪除");
             
-            songData = data.data || [];
-            songData.meta = {
-                name: data.name,
-                uploader: data.uploader || "匿名",
-                link: data.data?.[0]?.link || "",
-                video: data.data?.[0]?.video || "",
-                photo: data.data?.[0]?.photo || ""
-            };
-            
-            window.currentDocId = songId;
-            window.currentSubmittingData = { name: data.name };
-            
-            index = 0;
-            updateUI();
-            closeModal();
+            // 嘗試播放下一首
+            if (window.playQueue && window.playQueueIndex < window.playQueue.length - 1) {
+                window.playQueueIndex++;
+                const nextSong = window.playQueue[window.playQueueIndex];
+                if (nextSong && nextSong.songId) {
+                    await loadSongFromSetlist(nextSong.songId);
+                }
+            }
+            return;
         }
+        
+        const data = doc.data();
+        
+        songData = data.data || [];
+        songData.meta = {
+            name: data.name,
+            uploader: data.uploader || "匿名",
+            link: data.data?.[0]?.link || "",
+            video: data.data?.[0]?.video || "",
+            photo: data.data?.[0]?.photo || ""
+        };
+        
+        window.currentDocId = songId;
+        window.currentSubmittingData = { name: data.name };
+        
+        index = 0;
+        updateUI();
+        closeModal();
+        
     } catch (err) {
         console.error("載入失敗", err);
         alert("載入歌曲失敗");
     }
-}
-
-// 播放整個歌單
-async function playEntireSetlist() {
-    if (!currentSetlistData || !currentSetlistData.songs || currentSetlistData.songs.length === 0) {
-        alert("歌單冇歌曲");
-        return;
-    }
-    
-    // 將歌單儲存到一個播放隊列
-    window.playQueue = currentSetlistData.songs.filter(s => s.songId);
-    window.playQueueIndex = 0;
-    
-    if (window.playQueue.length === 0) {
-        alert("呢個歌單冇可播放的歌曲（全部都係本地版本）");
-        return;
-    }
-    
-    // 載入第一首歌
-    await loadSongFromSetlist(window.playQueue[0].songId);
-    
-    alert(`🎵 開始播放歌單「${currentSetlistData.name}」\n共 ${window.playQueue.length} 首歌`);
 }
 
 // 播放下一首（在 updateUI 或其他地方呼叫）
@@ -2858,7 +2948,17 @@ function updateUI() {
             </div>
         `;
     }).join('');
-
+    
+    // ✅ 檢測係咪播放到最後一行
+    if (index >= songData.length - 1) {
+        // 如果有播放隊列，自動播放下一首
+        if (window.playQueue && window.playQueue.length > 0) {
+            // 延遲少少等用戶睇完最後一句
+            setTimeout(() => {
+                playNextInQueue();
+            }, 1000);
+        }
+    }
     // --- 以下捲動、Footer、儲存邏輯完全保留你原本的樣子 ---
     const editorOverlay = document.getElementById('editor-overlay');
     const isEditing = editorOverlay && (editorOverlay.style.display === 'block');
