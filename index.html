@@ -3314,7 +3314,17 @@ function updateRomanButtonState() {
         btn.style.color = '#fff';
     }
 }
-
+// 手動編輯單行羅馬音
+function editRomanization(index) {
+    const line = songData[index];
+    if (!line) return;
+    
+    const newRoman = prompt(`編輯羅馬音：\n原文：${line.l}`, line.r || '');
+    if (newRoman !== null) {
+        line.r = newRoman;
+        updateUI();
+    }
+}
 // 韓文羅馬音轉換表
 const romanMap = {
     // 初聲
@@ -3339,6 +3349,12 @@ const romanMap = {
     'ㅍ_': 'p', 'ㅎ_': 't'
 };
 
+// 特殊發音規則
+const pronunciationRules = {
+    // 連音規則：終聲 + 初聲 'ㅇ' 時，終聲移到下一個音節
+    // 呢個比較複雜，基本轉換暫時唔處理
+};
+
 // 韓文分解
 function decomposeHangul(char) {
     const code = char.charCodeAt(0);
@@ -3360,7 +3376,7 @@ function decomposeHangul(char) {
     };
 }
 
-// 將韓文轉換為羅馬音
+// ✅ 修正版：將韓文轉換為羅馬音（保留所有符號、空格、英文、數字）
 function hangulToRoman(text) {
     if (!text) return '';
     
@@ -3371,7 +3387,7 @@ function hangulToRoman(text) {
         const decomposed = decomposeHangul(char);
         
         if (decomposed) {
-            // 韓文字
+            // 韓文字 → 轉換為羅馬音
             let roman = '';
             roman += romanMap[decomposed.initial] || '';
             roman += romanMap[decomposed.medial] || '';
@@ -3380,7 +3396,7 @@ function hangulToRoman(text) {
             }
             result += roman;
         } else {
-            // 非韓文字（數字、符號、空格等）
+            // ✅ 非韓文字（符號、空格、英文、數字等）→ 直接保留
             result += char;
         }
     }
@@ -3388,16 +3404,67 @@ function hangulToRoman(text) {
     return result;
 }
 
-// 手動編輯單行羅馬音
-function editRomanization(index) {
-    const line = songData[index];
-    if (!line) return;
+// ✅ 進階版：處理韓文發音規則（可選）
+function hangulToRomanAdvanced(text) {
+    if (!text) return '';
     
-    const newRoman = prompt(`編輯羅馬音：\n原文：${line.l}`, line.r || '');
-    if (newRoman !== null) {
-        line.r = newRoman;
-        updateUI();
+    // 先將所有韓文轉成拼音組件
+    const syllables = [];
+    for (let i = 0; i < text.length; i++) {
+        const char = text[i];
+        const decomposed = decomposeHangul(char);
+        
+        if (decomposed) {
+            syllables.push({
+                type: 'hangul',
+                initial: decomposed.initial,
+                medial: decomposed.medial,
+                final: decomposed.final
+            });
+        } else {
+            syllables.push({
+                type: 'symbol',
+                char: char
+            });
+        }
     }
+    
+    // 處理連音規則
+    let result = '';
+    for (let i = 0; i < syllables.length; i++) {
+        const curr = syllables[i];
+        
+        if (curr.type === 'symbol') {
+            result += curr.char;
+            continue;
+        }
+        
+        // 檢查下一個音節係咪以 'ㅇ' 開頭（連音規則）
+        const next = syllables[i + 1];
+        let finalSound = curr.final ? romanMap[curr.final + '_'] || '' : '';
+        
+        if (curr.final && next && next.type === 'hangul' && next.initial === 'ㅇ') {
+            // 連音：終聲移到下一個音節嘅初聲位置
+            const linkedInitial = curr.final;
+            finalSound = '';  // 當前音節冇終聲
+            
+            // 更新下一個音節嘅羅馬音
+            const nextRoman = romanMap[linkedInitial] + romanMap[next.medial] + (next.final ? romanMap[next.final + '_'] : '');
+            syllables[i + 1].overrideRoman = nextRoman;
+        }
+        
+        // 生成當前音節嘅羅馬音
+        let roman = '';
+        if (curr.overrideRoman) {
+            roman = curr.overrideRoman;
+        } else {
+            roman = romanMap[curr.initial] + romanMap[curr.medial] + finalSound;
+        }
+        
+        result += roman;
+    }
+    
+    return result;
 }
     // --- 管理員審核功能 ---
     // 搵返你 HTML 顯示歌詞標題或某個地方，加個 counter
