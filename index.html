@@ -395,10 +395,13 @@ function showMainPhoto(e) {
     if (isEdit) {
         title.innerText = "✏️ 編輯現有歌詞";
         // 載入歌詞內容
+        // ✅ 匯出時包含歌詞同應援詞嘅羅馬音
         input.value = songData.map(item => {
             let line = "";
-            if (item.l && item.l !== "...") line += item.l + " ";
-            if (item.f) line += item.f; 
+            if (item.l && item.l !== "...") line += item.l;
+            if (item.f) line += " | " + item.f;
+            if (item.r) line += " | " + item.r;
+            if (item.fr) line += " | " + item.fr;  // ✅ 加入應援詞羅馬音
             return line.trim();
         }).join('\n');
 
@@ -415,6 +418,7 @@ function showMainPhoto(e) {
         linkInput.value = "";
         videoLinkInput.value = "";
         tempPhotoData = "";
+        input.placeholder = "格式：歌詞 | 應援詞 | 歌詞羅馬音 | 應援詞羅馬音\n例子：사랑해 | 사랑해 | saranghae | saranghae";
     }
 
     // --- ✨ 呢度就係分屏功能嘅靈魂 ---
@@ -599,19 +603,50 @@ function startManualMarking(text) {
     }
 
     const lines = text.split('\n');
-    let html = "";
+   let html = "";
+    
+    // ✅ 加入自動生成按鈕同說明
     html += `
-        <div style="margin-bottom:20px; display:flex; gap:10px; justify-content:center;">
+        <div style="margin-bottom:20px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
             <button class="btn" style="background:#444;" onclick="generateRomanInEditor()">🪄 自動生成羅馬音</button>
-            <span style="color:#888; font-size:0.8rem; padding:8px;">格式：歌詞 | 應援詞 | 羅馬音</span>
+            <span style="color:#888; font-size:0.8rem; padding:8px;">格式：歌詞 | 應援詞 | 歌詞羅馬音 | 應援詞羅馬音</span>
         </div>
     `;
 
+    const lines = text.split('\n');
+
     lines.forEach((line, rowIdx) => {
         if (line.trim() === "") return;
-        html += `<div class="line-row" data-row="${rowIdx}" style="margin-bottom:15px; border-bottom:1px solid #222;">`;
         
-        const words = line.split(/\s+/).filter(w => w !== "");
+        // ✅ 解析格式：歌詞 | 應援詞 | 歌詞羅馬音 | 應援詞羅馬音
+        const parts = line.split('|').map(p => p.trim());
+        const lyricText = parts[0] || "";
+        const fanchantText = parts[1] || "";
+        const romanText = parts[2] || "";
+        const fanchantRomanText = parts[3] || "";
+        
+        html += `<div class="line-row" data-row="${rowIdx}" style="margin-bottom:20px; border-bottom:1px solid #333; padding-bottom:15px;">`;
+        
+        // ✅ 顯示羅馬音輸入框（歌詞 + 應援詞）
+        html += `
+            <div style="margin-bottom:10px; display:flex; gap:10px;">
+                <input type="text" 
+                       class="roman-input" 
+                       data-row="${rowIdx}" 
+                       placeholder="歌詞羅馬音" 
+                       value="${escapeHtml(romanText)}"
+                       style="flex:1; padding:8px; background:#1a1a1a; border:1px solid #444; border-radius:5px; color:#ff0; font-size:0.9rem;">
+                <input type="text" 
+                       class="fanchant-roman-input" 
+                       data-row="${rowIdx}" 
+                       placeholder="應援詞羅馬音" 
+                       value="${escapeHtml(fanchantRomanText)}"
+                       style="flex:1; padding:8px; background:#1a1a1a; border:1px solid #0f0; border-radius:5px; color:#0f0; font-size:0.9rem;">
+            </div>
+        `;
+        
+        // 歌詞部分
+        const words = lyricText.split(/\s+/).filter(w => w !== "");
         const originalFanchant = (isEditMode && typeof songData !== 'undefined' && songData[rowIdx] && songData[rowIdx].f) 
                                  ? songData[rowIdx].f.split(/\s+/) : [];
         
@@ -621,15 +656,13 @@ function startManualMarking(text) {
         words.forEach(w => {
             let isMarked = false;
 
-            // --- 邏輯 A：用戶揀 OK (執行原本的自動標示) ---
             if (isAutoRun) {
                 const hasStart = /[\(\（\[]/.test(w);
                 const hasEnd = /[\)\）\]]/.test(w);
 
                 if (hasStart) inBracketScope = true;
-                if (inBracketScope) isMarked = true; // ✨ 跟返你原本嘅邏輯 A
+                if (inBracketScope) isMarked = true;
                 
-                // 補償邏輯：如果括號內冇著燈但係編輯模式原本有 mark 嗰粒字
                 if (!isMarked && isEditMode && originalFanchant.length > 0) {
                     if (fanchantPointer < originalFanchant.length && w === originalFanchant[fanchantPointer]) {
                         isMarked = true;
@@ -638,11 +671,8 @@ function startManualMarking(text) {
                 }
                 
                 if (hasEnd) inBracketScope = false;
-            } 
-            // --- 邏輯 B：用戶揀 Cancel (只對比舊數據，唔睇括號) ---
-            else {
+            } else {
                 if (isEditMode && originalFanchant.length > 0) {
-                    // ✨ 直接用原字 w 比對 originalFanchant，保證括號唔會被 del 走
                     if (fanchantPointer < originalFanchant.length && w === originalFanchant[fanchantPointer]) {
                         isMarked = true;
                         fanchantPointer++;
@@ -652,6 +682,12 @@ function startManualMarking(text) {
             
             html += `<span onclick="toggleChip(this, event)" class="word-chip ${isMarked ? 'is-fc' : ''}">${w}</span>`;
         });
+        
+        // ✅ 顯示應援詞預覽
+        if (fanchantText) {
+            html += `<div style="margin-top:10px; color:#0f0; font-size:0.9rem;">應援詞：${escapeHtml(fanchantText)}</div>`;
+        }
+        
         html += `</div>`;
     });
     
@@ -671,25 +707,42 @@ function toggleChip(el, event) {
     
     el.classList.toggle('is-fc');
 }
-// 編輯器內自動生成羅馬音
+// 編輯器內自動生成羅馬音（包含應援詞）
 function generateRomanInEditor() {
     const rows = document.querySelectorAll('.line-row');
     
     rows.forEach(row => {
         const chips = row.querySelectorAll('.word-chip');
         const romanInput = row.querySelector('.roman-input');
+        const fanchantRomanInput = row.querySelector('.fanchant-roman-input');
         
-        if (romanInput && !romanInput.value) {
-            // 收集歌詞
-            let lyrics = '';
-            chips.forEach(chip => {
+        // 收集歌詞
+        let lyrics = '';
+        let fanchant = '';
+        
+        chips.forEach(chip => {
+            if (chip.classList.contains('is-fc')) {
+                fanchant += chip.innerText + ' ';
+            } else {
                 lyrics += chip.innerText + ' ';
-            });
-            
-            // 生成羅馬音
+            }
+        });
+        
+        // ✅ 生成歌詞羅馬音
+        if (romanInput && !romanInput.value) {
             const cleanText = lyrics.replace(/[\(\（\[\<].*?[\)\）\]\>]/g, '').trim();
             if (cleanText && /[\uAC00-\uD7A3]/.test(cleanText)) {
                 romanInput.value = hangulToRoman(cleanText);
+            }
+        }
+        
+        // ✅ 生成應援詞羅馬音
+        if (fanchantRomanInput && !fanchantRomanInput.value) {
+            const cleanFanchant = fanchant.trim();
+            if (cleanFanchant && /[\uAC00-\uD7A3]/.test(cleanFanchant)) {
+                fanchantRomanInput.value = hangulToRoman(cleanFanchant);
+            } else if (cleanFanchant) {
+                fanchantRomanInput.value = cleanFanchant;  // 英文/數字直接複製
             }
         }
     });
@@ -698,54 +751,72 @@ function generateRomanInEditor() {
 }
 function saveMarkedData() {
     const rows = document.querySelectorAll('.line-row');
-    const tempPhotoData = document.getElementById('reference-img').src;
-    const sourceLink = document.getElementById('sourceLinkInput').value.trim(); 
-    const videoLink = document.getElementById('videoLinkInput').value.trim(); 
+    const tempPhotoData = document.getElementById('reference-img')?.src || '';
+    const sourceLink = document.getElementById('sourceLinkInput')?.value.trim() || ''; 
+    const videoLink = document.getElementById('videoLinkInput')?.value.trim() || ''; 
     let newData = [];
 
     rows.forEach(row => {
         const chips = row.querySelectorAll('.word-chip');
-        let currentL = ""; let pendingF = [];
+        const romanInput = row.querySelector('.roman-input');  // 歌詞羅馬音
+        const fanchantRomanInput = row.querySelector('.fanchant-roman-input');  // ✅ 應援詞羅馬音
+        
+        const romanText = romanInput ? romanInput.value.trim() : '';
+        const fanchantRomanText = fanchantRomanInput ? fanchantRomanInput.value.trim() : '';
+        
+        let currentL = ""; 
+        let pendingF = [];
+        
         chips.forEach(chip => {
-            if (chip.classList.contains('is-fc')) { pendingF.push(chip.innerText); }
-            else {
+            if (chip.classList.contains('is-fc')) { 
+                pendingF.push(chip.innerText); 
+            } else {
                 if (pendingF.length > 0) {
-                    newData.push({ l: currentL.trim() || "...", f: pendingF.join(' ') });
-                    currentL = ""; pendingF = [];
+                    newData.push({ 
+                        l: currentL.trim() || "...", 
+                        f: pendingF.join(' '),
+                        r: romanText || "",
+                        fr: fanchantRomanText || ""  // ✅ 儲存應援詞羅馬音
+                    });
+                    currentL = ""; 
+                    pendingF = [];
                 }
                 currentL += chip.innerText + " ";
             }
         });
-        if (pendingF.length > 0 || currentL.trim()) newData.push({ l: currentL.trim() || "...", f: pendingF.join(' ') });
+        
+        if (pendingF.length > 0 || currentL.trim()) {
+            newData.push({ 
+                l: currentL.trim() || "...", 
+                f: pendingF.join(' '),
+                r: romanText || "",
+                fr: fanchantRomanText || ""  // ✅ 儲存應援詞羅馬音
+            });
+        }
     });
 
     if (newData.length > 0) {
         if (tempPhotoData) newData[0].photo = tempPhotoData;
         if (sourceLink) newData[0].link = sourceLink; 
-        if (sourceLink) newData[0].video = videoLink; 
+        if (videoLink) newData[0].video = videoLink; 
     }
 
-    // --- ✨ 核心改動：更新 meta 數據 ---
     const info = window.currentSubmittingData || {};
     
-    // 1. 強制將作者設定為「本地編輯者」，不再保留舊作者
     newData.meta = {
         name: info.name || "未命名歌曲",
         uploader: "本地編輯者"
     };
 
-    // 2. 更新全局變數
     songData = newData;
     index = 0;
+    
+    displayMode = 'normal';
 
-    // 3. 關閉視窗
     document.getElementById('editor-overlay').style.display = 'none';
     closeImporter();
 
-    // 4. ✨ 呼叫 updateUI，由佢統一處理畫面顯示同埋 localStorage 儲存
     updateUI();
-
-    console.log("本地預覽已更新：作者已變更為本地編輯者");
 }
     async function sendDiscordNotification(name, source, id) {
     try {
@@ -3055,9 +3126,20 @@ function updateUI() {
         
         // ✅ 根據顯示模式決定顯示內容（完全切換）
         let displayText = line.l || '';
+        let displayFanchant = line.f || '';
         
-        if (displayMode === 'roman' && line.r) {
-            displayText = line.r;  // 完全換成羅馬音
+        if (displayMode === 'roman') {
+            // 羅馬音模式：歌詞同應援詞都轉換
+            if (line.r) {
+                displayText = line.r;  // 歌詞羅馬音
+            }
+            if (line.fr) {
+                displayFanchant = line.fr;  // 應援詞羅馬音
+            } else if (line.f && line.r) {
+                // 如果冇獨立應援詞羅馬音，嘗試用歌詞羅馬音嘅比例推算
+                // 或者直接用韓文轉換
+                displayFanchant = convertFanchantToRoman(line.f);
+            }
         }
         
         return `
@@ -3070,7 +3152,7 @@ function updateUI() {
                     <div style="font-size: 1.35rem; font-weight: bold; color: ${isCurrent ? '#fff' : '#aaa'};">
                         ${displayText}
                     </div>
-                    ${line.f ? `<div style="font-size: 1.6rem; font-weight: 900; color: var(--fc-color); margin-top: 6px;">${line.f}</div>` : ''}
+                    ${displayFanchant ? `<div style="font-size: 1.6rem; font-weight: 900; color: var(--fc-color); margin-top: 6px;">${displayFanchant}</div>` : ''}
                 </div>
             </div>
         `;
@@ -3121,6 +3203,79 @@ function updateUI() {
     
     if (typeof updateMainViewBtn === 'function') updateMainViewBtn();
     if (typeof updateFavoriteButton === 'function') updateFavoriteButton();
+}
+    
+// ✅ 將應援詞轉換為羅馬音
+function convertFanchantToRoman(fanchant) {
+    if (!fanchant) return '';
+    
+    // 如果應援詞包含韓文，直接轉換
+    if (/[\uAC00-\uD7A3]/.test(fanchant)) {
+        return hangulToRoman(fanchant);
+    }
+    
+    // 如果應援詞係英文/數字，直接返回
+    return fanchant;
+}
+// 自動生成羅馬音（包含應援詞）
+async function generateRomanization() {
+    const hasKorean = songData.some(line => {
+        const text = (line.l || '') + (line.f || '');
+        return /[\uAC00-\uD7A3]/.test(text);  // 檢查歌詞或應援詞是否有韓文
+    });
+    
+    if (!hasKorean) {
+        alert("呢首歌冇韓文歌詞，無法自動生成羅馬音");
+        return;
+    }
+    
+    if (!confirm("確定要自動生成羅馬音嗎？\n現有嘅羅馬音會被覆蓋。")) {
+        return;
+    }
+    
+    // 顯示生成中
+    const btn = document.getElementById('romanToggleBtn');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '⏳';
+    
+    // 用 setTimeout 避免阻塞 UI
+    setTimeout(() => {
+        let generatedCount = 0;
+        
+        songData.forEach(line => {
+            // ✅ 生成歌詞羅馬音
+            if (line.l) {
+                const cleanText = line.l.replace(/[\(\（\[\<].*?[\)\）\]\>]/g, '').trim();
+                if (cleanText && /[\uAC00-\uD7A3]/.test(cleanText)) {
+                    line.r = hangulToRoman(cleanText);
+                    generatedCount++;
+                }
+            }
+            
+            // ✅ 生成應援詞羅馬音
+            if (line.f) {
+                const cleanFanchant = line.f.replace(/[\(\（\[\<].*?[\)\）\]\>]/g, '').trim();
+                if (cleanFanchant && /[\uAC00-\uD7A3]/.test(cleanFanchant)) {
+                    line.fr = hangulToRoman(cleanFanchant);
+                } else {
+                    // 應援詞可能係英文/數字，直接複製
+                    line.fr = line.f;
+                }
+            }
+        });
+        
+        // 更新 UI
+        displayMode = 'roman';
+        updateUI();
+        
+        btn.innerHTML = originalText;
+        
+        if (generatedCount > 0) {
+            alert(`✅ 已為 ${generatedCount} 行歌詞同應援詞生成羅馬音！`);
+        } else {
+            alert("❌ 未能生成羅馬音");
+        }
+    }, 100);
 }
 
 // 切換羅馬音顯示（完全切換）
@@ -3232,56 +3387,6 @@ function hangulToRoman(text) {
     }
     
     return result;
-}
-
-// 自動生成羅馬音
-async function generateRomanization() {
-    const hasKorean = songData.some(line => {
-        const text = line.l || '';
-        return /[\uAC00-\uD7A3]/.test(text);  // 檢查是否有韓文
-    });
-    
-    if (!hasKorean) {
-        alert("呢首歌冇韓文歌詞，無法自動生成羅馬音");
-        return;
-    }
-    
-    if (!confirm("確定要自動生成羅馬音嗎？\n現有嘅羅馬音會被覆蓋。")) {
-        return;
-    }
-    
-    // 顯示生成中
-    const btn = document.getElementById('romanToggleBtn');
-    const originalText = btn.innerHTML;
-    btn.innerHTML = '⏳';
-    
-    // 用 setTimeout 避免阻塞 UI
-    setTimeout(() => {
-        let generatedCount = 0;
-        
-        songData.forEach(line => {
-            if (line.l) {
-                // 移除括號內容再轉換（括號內通常係韓文應援詞標記）
-                const cleanText = line.l.replace(/[\(\（\[\<].*?[\)\）\]\>]/g, '').trim();
-                if (cleanText && /[\uAC00-\uD7A3]/.test(cleanText)) {
-                    line.r = hangulToRoman(cleanText);
-                    generatedCount++;
-                }
-            }
-        });
-        
-        // 更新 UI
-        displayMode = 'roman';
-        updateUI();
-        
-        btn.innerHTML = originalText;
-        
-        if (generatedCount > 0) {
-            alert(`✅ 已為 ${generatedCount} 行歌詞生成羅馬音！\n你可以手動修改唔準確嘅地方。`);
-        } else {
-            alert("❌ 未能生成羅馬音");
-        }
-    }, 100);
 }
 
 // 手動編輯單行羅馬音
