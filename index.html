@@ -511,8 +511,15 @@ function startManualMarking(text) {
     document.getElementById('editor-overlay').style.display = 'block';
 }
 function cancelMarking() {
-    // 直接隱藏標記畫面，唔執行 saveMarkedData，所以原本嘅數據唔會被覆蓋
+    if (!confirm("確定要返回歌詞編輯畫面嗎？")) {
+        return;
+    }
+    
+    // 隱藏標記畫面
     document.getElementById('editor-overlay').style.display = 'none';
+    
+    // 重新顯示歌詞編輯畫面
+    document.getElementById('import-modal').style.display = 'block';
 }
 function toggleChip(el, event) {
     if (event) {
