@@ -583,10 +583,29 @@ function handleManualSubmit() {
     startManualMarking(lyricsText); 
 }
 
-    // --- 標記與儲存 ---
 function startManualMarking(text) {
+    // ✅ 確保 editor-overlay 有正確嘅結構
+    const overlay = document.getElementById('editor-overlay');
+    
+    // 重新設置 editor-overlay 嘅基本結構
+    overlay.innerHTML = `
+        <div style="position: sticky; top: 0; background: #111; z-index: 1000; padding: 10px 0; border-bottom: 1px solid #333; margin-bottom: 20px;">
+            <h2 style="text-align:center; margin: 0 0 10px 0; font-size: 1.2rem;">點擊【應援詞】使其變色</h2>
+            <div style="text-align:center;">
+                <button id="editorPhotoBtn" class="btn" style="background:#444; display:none; padding: 10px 20px;" onclick="showMainPhoto(event)">🖼️ 睇參考圖</button>
+            </div>
+        </div>
+        
+        <div id="chips-container" style="text-align:center;"></div>
+        
+        <div style="text-align:center; margin-top:30px; padding-bottom:50px;">
+            <button class="btn" style="font-size: 1.2rem; padding: 15px 30px; background:#0f0; color:#000;" onclick="saveMarkedData()">✅ 完成生成</button>
+            <button class="btn" style="font-size: 1.2rem; padding: 15px 30px; background:#444;" onclick="cancelMarking()">❌ 取消</button>
+        </div>
+    `;
+    
     const container = document.getElementById('chips-container');
-    const modalTitle = document.getElementById('modal-title').innerText;
+    const modalTitle = document.getElementById('modal-title')?.innerText || '';
     const isEditMode = modalTitle.includes("編輯");
 
     const isAutoRun = confirm("是否需要根據括號 () 自動標示應援詞？\n(按「取消」將完全依照你上次手動標記的結果)");
@@ -604,7 +623,6 @@ function startManualMarking(text) {
     const lines = text.split('\n');
     let html = "";
     
-    // ✅ 簡潔提示
     html += `
         <div style="margin-bottom:20px; color:#888; font-size:0.9rem; text-align:center;">
             <p>點擊文字切換應援詞標記 <span style="color:var(--fc-color);">（綠色 = 應援詞）</span></p>
@@ -658,25 +676,16 @@ function startManualMarking(text) {
     
     container.innerHTML = html;
     container.dataset.meta = JSON.stringify(newMeta); 
-    document.getElementById('editor-overlay').style.display = 'block';
+    overlay.style.display = 'block';
 }
     
 function cancelMarking() {
     if (window.tempSongData) {
-        // 如果喺羅馬音編輯頁面，問清楚
         if (!confirm("確定要取消？所有未儲存嘅修改會遺失。")) return;
     }
     
     document.getElementById('editor-overlay').style.display = 'none';
     window.tempSongData = null;
-}
-function toggleChip(el, event) {
-    if (event) {
-        // 剩係阻止冒泡就好，唔好阻止 Default，咁樣先轆到畫面
-        event.stopPropagation(); 
-    }
-    
-    el.classList.toggle('is-fc');
 }
 // ✅ 修正版：編輯器內自動生成羅馬音
 function generateRomanInEditor() {
@@ -783,14 +792,12 @@ function generateRomanInEditor() {
     document.getElementById('editor-overlay').style.display = 'none';
     showRomanEditor();
 }
-// 顯示羅馬音編輯頁面（使用獨立容器）
+// 顯示羅馬音編輯頁面
 function showRomanEditor() {
-    // ✅ 隱藏原有嘅 editor-overlay 內容，但保留結構
     const overlay = document.getElementById('editor-overlay');
-    const originalContent = overlay.innerHTML;  // 備份原有內容
     
-    // 儲存原有內容以便返回
-    window.editorOriginalContent = originalContent;
+    // ✅ 儲存當前內容（雖然之後會被覆蓋）
+    // 但因為 startManualMarking 會重新構建，所以唔需要備份
     
     const data = window.tempSongData || [];
     
@@ -858,7 +865,7 @@ function showRomanEditor() {
         </div>
         
         <div style="position: sticky; bottom: 0; background: #111; padding: 15px 0; border-top: 1px solid #333; display:flex; gap:10px;">
-            <button class="btn" style="flex:1; padding:15px; background:#444;" onclick="restoreMarkingEditor()">⬅️ 返回標記</button>
+            <button class="btn" style="flex:1; padding:15px; background:#444;" onclick="cancelMarking()">❌ 取消</button>
             <button class="btn" style="flex:1; padding:15px; background:#0f0; color:#000; font-weight:bold;" onclick="finalizeWithRoman()">✅ 完成並儲存</button>
         </div>
     `;
