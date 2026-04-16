@@ -3742,34 +3742,41 @@ async function adminLogin() {
 
     // --- 修改 window.onload：統一讀取 myConcertData ---
     window.onload = function() {
-        // 1. ✨ 讀取上次儲存的數據 (支援新舊格式)
-        const savedDataRaw = localStorage.getItem('myConcertData');
-        if (savedDataRaw) { 
-            const parsed = JSON.parse(savedDataRaw);
-            
-            // 檢查係咪新格式 (含有 version 2.0 或者 meta 屬性)
-            if (parsed.version === "2.0" || parsed.meta) {
-                // 新格式：從 lines 攞歌詞，從 meta 攞名
-                songData = parsed.lines || [];
-                songData.meta = parsed.meta;
-            } else {
-                // 舊格式：直接就是陣列
-                songData = parsed;
-            }
-    
-            index = 0;
-            updateUI(); // 入面會處理相片按鈕同埋底端文字
-        } else {
-            // 如果冇數據，初始化介面
-            updateMainViewBtn();
-        }
+    // 1. ✨ 讀取上次儲存的數據 (支援新舊格式)
+    const savedDataRaw = localStorage.getItem('myConcertData');
+    if (savedDataRaw) { 
+        const parsed = JSON.parse(savedDataRaw);
         
-        // 2. 讀取上次設定的應援顏色 (呢度唔使改)
-        const savedColor = localStorage.getItem('fanchantColor');
-        if (savedColor) {
-            document.documentElement.style.setProperty('--fc-color', savedColor);
+        // 檢查係咪新格式 (含有 version 2.0 或者 meta 屬性)
+        if (parsed.version === "2.0" || parsed.meta) {
+            // 新格式：從 lines 攞歌詞，從 meta 攞名
+            songData = parsed.lines || [];
+            songData.meta = parsed.meta;
+        } else {
+            // 舊格式：直接就是陣列
+            songData = parsed;
         }
-    };
+    }
+    // ✅ 唔理有冇儲存數據，都要更新 UI
+    // 因為 songData 已經有預設值（歡迎使用應援貓紙...）
+    
+    index = 0;
+    updateUI(); // 入面會處理相片按鈕同埋底端文字
+    
+    // 2. 讀取上次設定的應援顏色
+    const savedColor = localStorage.getItem('fanchantColor');
+    if (savedColor) {
+        document.documentElement.style.setProperty('--fc-color', savedColor);
+    }
+    
+    // ✅ 確保第一行正確顯示同捲動
+    setTimeout(() => {
+        const activeLine = document.getElementById('line-0');
+        if (activeLine) {
+            activeLine.scrollIntoView({ behavior: 'auto', block: 'center' });
+        }
+    }, 100);
+};
 </script>
 <div id="song-list-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:4000; padding:20px; box-sizing:border-box; overflow-y:auto;">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
