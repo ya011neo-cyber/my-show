@@ -785,12 +785,19 @@ function generateRomanInEditor() {
         uploader: "本地編輯者"
     };
 
-    // ✅ 暫存到全域變數，然後進入羅馬音編輯頁面
-    window.tempSongData = newData;
-    
-    // 隱藏標記頁面，顯示羅馬音編輯頁面
+    // ✅ 直接儲存，唔跳轉去羅馬音編輯器
+    songData = newData;
+    index = 0;
+    displayMode = 'normal';
+
     document.getElementById('editor-overlay').style.display = 'none';
-    showRomanEditor();
+    closeImporter();
+
+    updateUI();
+    
+    // ❌ Comment 咗呢兩行
+    // window.tempSongData = newData;
+    // showRomanEditor();
 }
 // 顯示羅馬音編輯頁面
 function showRomanEditor() {
