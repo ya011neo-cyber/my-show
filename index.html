@@ -783,9 +783,15 @@ function generateRomanInEditor() {
     document.getElementById('editor-overlay').style.display = 'none';
     showRomanEditor();
 }
-    // 顯示羅馬音編輯頁面
+// 顯示羅馬音編輯頁面（使用獨立容器）
 function showRomanEditor() {
-    const modal = document.getElementById('editor-overlay');
+    // ✅ 隱藏原有嘅 editor-overlay 內容，但保留結構
+    const overlay = document.getElementById('editor-overlay');
+    const originalContent = overlay.innerHTML;  // 備份原有內容
+    
+    // 儲存原有內容以便返回
+    window.editorOriginalContent = originalContent;
+    
     const data = window.tempSongData || [];
     
     let html = `
@@ -812,7 +818,6 @@ function showRomanEditor() {
         html += `
             <div class="roman-line" data-index="${i}" style="margin-bottom: 25px; padding: 15px; background: #1a1a1a; border-radius: 10px; border-left: 3px solid #0f0;">
                 
-                <!-- 歌詞原文 -->
                 <div style="margin-bottom: 10px;">
                     <div style="color:#fff; font-size:1.1rem; font-weight:bold; margin-bottom:5px;">
                         ${escapeHtml(lyrics)}
@@ -820,33 +825,28 @@ function showRomanEditor() {
                     ${fanchant ? `<div style="color:var(--fc-color); font-size:1rem; margin-bottom:8px;">應援：${escapeHtml(fanchant)}</div>` : ''}
                 </div>
                 
-                <!-- 歌詞羅馬音輸入 -->
                 <div style="margin-bottom: 10px;">
                     <label style="color:#888; font-size:0.8rem; display:block; margin-bottom:3px;">📝 歌詞羅馬音</label>
                     <input type="text" 
                            class="roman-lyrics-input" 
                            data-index="${i}" 
-                           data-type="lyrics"
                            placeholder="歌詞羅馬音（可選）" 
                            value="${escapeHtml(roman)}"
                            style="width:100%; padding:10px; background:#111; border:1px solid #444; border-radius:5px; color:#ff0; font-size:0.95rem;">
                 </div>
                 
                 ${fanchant ? `
-                <!-- 應援詞羅馬音輸入 -->
                 <div>
                     <label style="color:#888; font-size:0.8rem; display:block; margin-bottom:3px;">🎤 應援詞羅馬音</label>
                     <input type="text" 
                            class="roman-fanchant-input" 
                            data-index="${i}" 
-                           data-type="fanchant"
                            placeholder="應援詞羅馬音（可選）" 
                            value="${escapeHtml(fanchantRoman)}"
                            style="width:100%; padding:10px; background:#111; border:1px solid #0f0; border-radius:5px; color:#0f0; font-size:0.95rem;">
                 </div>
                 ` : ''}
                 
-                <!-- 單行生成按鈕 -->
                 <div style="margin-top:10px; text-align:right;">
                     <button class="btn" style="padding:5px 15px; font-size:0.75rem;" onclick="generateSingleRoman(${i})">🪄 生成呢行</button>
                 </div>
@@ -858,13 +858,58 @@ function showRomanEditor() {
         </div>
         
         <div style="position: sticky; bottom: 0; background: #111; padding: 15px 0; border-top: 1px solid #333; display:flex; gap:10px;">
-            <button class="btn" style="flex:1; padding:15px; background:#444;" onclick="backToMarking()">⬅️ 返回標記</button>
+            <button class="btn" style="flex:1; padding:15px; background:#444;" onclick="restoreMarkingEditor()">⬅️ 返回標記</button>
             <button class="btn" style="flex:1; padding:15px; background:#0f0; color:#000; font-weight:bold;" onclick="finalizeWithRoman()">✅ 完成並儲存</button>
         </div>
     `;
     
-    modal.innerHTML = html;
-    modal.style.display = 'block';
+    overlay.innerHTML = html;
+    overlay.style.display = 'block';
+}
+
+// ✅ 恢復標記編輯器
+function restoreMarkingEditor() {
+    if (!confirm("返回標記頁面會失去目前嘅羅馬音修改，確定嗎？")) return;
+    
+    const overlay = document.getElementById('editor-overlay');
+    
+    // 恢復原有內容
+    if (window.editorOriginalContent) {
+        overlay.innerHTML = window.editorOriginalContent;
+        
+        // 重新綁定資料（如果需要）
+        const lyricsText = window.tempSongData.map(line => {
+            let text = line.l || '';
+            if (line.f) text += ' ' + line.f;
+            return text.trim();
+        }).join('\n');
+        
+        // 重新填充 chips
+        const container = document.getElementById('chips-container');
+        if (container) {
+            const lines = lyricsText.split('\n');
+            let html = "";
+            
+            lines.forEach((line, rowIdx) => {
+                if (line.trim() === "") return;
+                
+                html += `<div class="line-row" data-row="${rowIdx}" style="margin-bottom:15px; border-bottom:1px solid #222; padding-bottom:10px;">`;
+                
+                const words = line.split(/\s+/).filter(w => w !== "");
+                
+                words.forEach(w => {
+                    const isMarked = window.tempSongData[rowIdx]?.f?.includes(w) || false;
+                    html += `<span onclick="toggleChip(this, event)" class="word-chip ${isMarked ? 'is-fc' : ''}">${w}</span>`;
+                });
+                
+                html += `</div>`;
+            });
+            
+            container.innerHTML = html;
+        }
+    }
+    
+    window.editorOriginalContent = null;
 }
 
 // 返回標記頁面
