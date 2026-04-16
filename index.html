@@ -436,79 +436,142 @@ function showMainPhoto(e) {
     modal.style.display = 'block';
 }
 
+    // --- 標記與儲存 ---
+function startManualMarking(text) {
+    const container = document.getElementById('chips-container');
+    const modalTitle = document.getElementById('modal-title').innerText;
+    const isEditMode = modalTitle.includes("編輯");
+
+    // 彈窗詢問
+    const isAutoRun = confirm("是否需要根據括號 () 自動標示應援詞？\n(按「取消」將完全依照你上次手動標記的結果)");
+
+    const currentName = window.currentSubmittingData ? window.currentSubmittingData.name : "";
+    const newMeta = { name: currentName, uploader: "本地編輯者" };
+
+    const editorBtn = document.getElementById('editorPhotoBtn');
+    if (typeof tempPhotoData !== 'undefined' && tempPhotoData && editorBtn) {
+        editorBtn.style.display = 'inline-block';
+    } else if (editorBtn) {
+        editorBtn.style.display = 'none';
+    }
+
+    const lines = text.split('\n');
+    let html = "";
+
+    lines.forEach((line, rowIdx) => {
+        if (line.trim() === "") return;
+        html += `<div class="line-row" data-row="${rowIdx}" style="margin-bottom:15px; border-bottom:1px solid #222;">`;
+        
+        const words = line.split(/\s+/).filter(w => w !== "");
+        const originalFanchant = (isEditMode && typeof songData !== 'undefined' && songData[rowIdx] && songData[rowIdx].f) 
+                                 ? songData[rowIdx].f.split(/\s+/) : [];
+        
+        let fanchantPointer = 0; 
+        let inBracketScope = false; 
+
+        words.forEach(w => {
+            let isMarked = false;
+
+            // --- 邏輯 A：用戶揀 OK (執行原本的自動標示) ---
+            if (isAutoRun) {
+                const hasStart = /[\(\（\[]/.test(w);
+                const hasEnd = /[\)\）\]]/.test(w);
+
+                if (hasStart) inBracketScope = true;
+                if (inBracketScope) isMarked = true; // ✨ 跟返你原本嘅邏輯 A
+                
+                // 補償邏輯：如果括號內冇著燈但係編輯模式原本有 mark 嗰粒字
+                if (!isMarked && isEditMode && originalFanchant.length > 0) {
+                    if (fanchantPointer < originalFanchant.length && w === originalFanchant[fanchantPointer]) {
+                        isMarked = true;
+                        fanchantPointer++;
+                    }
+                }
+                
+                if (hasEnd) inBracketScope = false;
+            } 
+            // --- 邏輯 B：用戶揀 Cancel (只對比舊數據，唔睇括號) ---
+            else {
+                if (isEditMode && originalFanchant.length > 0) {
+                    // ✨ 直接用原字 w 比對 originalFanchant，保證括號唔會被 del 走
+                    if (fanchantPointer < originalFanchant.length && w === originalFanchant[fanchantPointer]) {
+                        isMarked = true;
+                        fanchantPointer++;
+                    }
+                }
+            }
+            
+            html += `<span onclick="toggleChip(this, event)" class="word-chip ${isMarked ? 'is-fc' : ''}">${w}</span>`;
+        });
+        html += `</div>`;
+    });
+    
+    container.innerHTML = html;
+    container.dataset.meta = JSON.stringify(newMeta); 
+    document.getElementById('editor-overlay').style.display = 'block';
+}
+function cancelMarking() {
+    // 直接隱藏標記畫面，唔執行 saveMarkedData，所以原本嘅數據唔會被覆蓋
+    document.getElementById('editor-overlay').style.display = 'none';
+}
+function toggleChip(el, event) {
+    if (event) {
+        // 剩係阻止冒泡就好，唔好阻止 Default，咁樣先轆到畫面
+        event.stopPropagation(); 
+    }
+    
+    el.classList.toggle('is-fc');
+}
 function saveMarkedData() {
     const rows = document.querySelectorAll('.line-row');
-    const tempPhotoData = document.getElementById('reference-img')?.src || '';
-    const sourceLink = document.getElementById('sourceLinkInput')?.value.trim() || ''; 
-    const videoLink = document.getElementById('videoLinkInput')?.value.trim() || ''; 
+    const tempPhotoData = document.getElementById('reference-img').src;
+    const sourceLink = document.getElementById('sourceLinkInput').value.trim(); 
+    const videoLink = document.getElementById('videoLinkInput').value.trim(); 
     let newData = [];
 
     rows.forEach(row => {
         const chips = row.querySelectorAll('.word-chip');
-        
-        let currentL = ""; 
-        let pendingF = [];
-        
+        let currentL = ""; let pendingF = [];
         chips.forEach(chip => {
-            if (chip.classList.contains('is-fc')) { 
-                pendingF.push(chip.innerText); 
-            } else {
+            if (chip.classList.contains('is-fc')) { pendingF.push(chip.innerText); }
+            else {
                 if (pendingF.length > 0) {
-                    // ✅ 簡化儲存，唔要羅馬音欄位
-                    newData.push({ 
-                        l: currentL.trim() || "...", 
-                        f: pendingF.join(' ')
-                        // ❌ 暫時唔要羅馬音
-                        // r: existingLine?.r || "",
-                        // fr: existingLine?.fr || ""
-                    });
-                    currentL = ""; 
-                    pendingF = [];
+                    newData.push({ l: currentL.trim() || "...", f: pendingF.join(' ') });
+                    currentL = ""; pendingF = [];
                 }
                 currentL += chip.innerText + " ";
             }
         });
-        
-        if (pendingF.length > 0 || currentL.trim()) {
-            // ✅ 簡化儲存，唔要羅馬音欄位
-            newData.push({ 
-                l: currentL.trim() || "...", 
-                f: pendingF.join(' ')
-                // ❌ 暫時唔要羅馬音
-                // r: existingLine?.r || "",
-                // fr: existingLine?.fr || ""
-            });
-        }
+        if (pendingF.length > 0 || currentL.trim()) newData.push({ l: currentL.trim() || "...", f: pendingF.join(' ') });
     });
 
-    // 加入 meta 資料
     if (newData.length > 0) {
         if (tempPhotoData) newData[0].photo = tempPhotoData;
         if (sourceLink) newData[0].link = sourceLink; 
-        if (videoLink) newData[0].video = videoLink; 
+        if (sourceLink) newData[0].video = videoLink; 
     }
 
+    // --- ✨ 核心改動：更新 meta 數據 ---
     const info = window.currentSubmittingData || {};
     
+    // 1. 強制將作者設定為「本地編輯者」，不再保留舊作者
     newData.meta = {
         name: info.name || "未命名歌曲",
         uploader: "本地編輯者"
     };
 
-    // ✅ 直接儲存
+    // 2. 更新全局變數
     songData = newData;
     index = 0;
-    // ❌ 暫時唔要羅馬音模式
-    // displayMode = 'normal';
 
+    // 3. 關閉視窗
     document.getElementById('editor-overlay').style.display = 'none';
     closeImporter();
 
+    // 4. ✨ 呼叫 updateUI，由佢統一處理畫面顯示同埋 localStorage 儲存
     updateUI();
-    
-    // ❌ Comment 咗羅馬音編輯器跳轉
-    // window.tempSongData = newData;
-    // showRomanEditor();
+
+    console.log("本地預覽已更新：作者已變更為本地編輯者");
 }
     function editCurrentSong(e) {
         if (e) e.stopPropagation();
@@ -661,110 +724,6 @@ function handleManualSubmit() {
     startManualMarking(lyricsText); 
 }
 
-function startManualMarking(text) {
-    // ✅ 確保 editor-overlay 有正確嘅結構
-    const overlay = document.getElementById('editor-overlay');
-    
-    // 重新設置 editor-overlay 嘅基本結構
-    overlay.innerHTML = `
-        <div style="position: sticky; top: 0; background: #111; z-index: 1000; padding: 10px 0; border-bottom: 1px solid #333; margin-bottom: 20px;">
-            <h2 style="text-align:center; margin: 0 0 10px 0; font-size: 1.2rem;">點擊【應援詞】使其變色</h2>
-            <div style="text-align:center;">
-                <button id="editorPhotoBtn" class="btn" style="background:#444; display:none; padding: 10px 20px;" onclick="showMainPhoto(event)">🖼️ 睇參考圖</button>
-            </div>
-        </div>
-        
-        <div id="chips-container" style="text-align:center;"></div>
-        
-        <div style="text-align:center; margin-top:30px; padding-bottom:50px;">
-            <button class="btn" style="font-size: 1.2rem; padding: 15px 30px; background:#0f0; color:#000;" onclick="saveMarkedData()">✅ 完成生成</button>
-            <button class="btn" style="font-size: 1.2rem; padding: 15px 30px; background:#444;" onclick="cancelMarking()">❌ 取消</button>
-        </div>
-    `;
-    
-    const container = document.getElementById('chips-container');
-    const modalTitle = document.getElementById('modal-title')?.innerText || '';
-    const isEditMode = modalTitle.includes("編輯");
-
-    const isAutoRun = confirm("是否需要根據括號 () 自動標示應援詞？\n(按「取消」將完全依照你上次手動標記的結果)");
-
-    const currentName = window.currentSubmittingData ? window.currentSubmittingData.name : "";
-    const newMeta = { name: currentName, uploader: "本地編輯者" };
-
-    const editorBtn = document.getElementById('editorPhotoBtn');
-    if (typeof tempPhotoData !== 'undefined' && tempPhotoData && editorBtn) {
-        editorBtn.style.display = 'inline-block';
-    } else if (editorBtn) {
-        editorBtn.style.display = 'none';
-    }
-
-    const lines = text.split('\n');
-    let html = "";
-    
-    html += `
-        <div style="margin-bottom:20px; color:#888; font-size:0.9rem; text-align:center;">
-            <p>點擊文字切換應援詞標記 <span style="color:var(--fc-color);">（綠色 = 應援詞）</span></p>
-        </div>
-    `;
-
-    lines.forEach((line, rowIdx) => {
-        if (line.trim() === "") return;
-        
-        html += `<div class="line-row" data-row="${rowIdx}" style="margin-bottom:15px; border-bottom:1px solid #222; padding-bottom:10px;">`;
-        
-        const words = line.split(/\s+/).filter(w => w !== "");
-        const originalFanchant = (isEditMode && typeof songData !== 'undefined' && songData[rowIdx] && songData[rowIdx].f) 
-                                 ? songData[rowIdx].f.split(/\s+/) : [];
-        
-        let fanchantPointer = 0; 
-        let inBracketScope = false; 
-
-        words.forEach(w => {
-            let isMarked = false;
-
-            if (isAutoRun) {
-                const hasStart = /[\(\（\[]/.test(w);
-                const hasEnd = /[\)\）\]]/.test(w);
-
-                if (hasStart) inBracketScope = true;
-                if (inBracketScope) isMarked = true;
-                
-                if (!isMarked && isEditMode && originalFanchant.length > 0) {
-                    if (fanchantPointer < originalFanchant.length && w === originalFanchant[fanchantPointer]) {
-                        isMarked = true;
-                        fanchantPointer++;
-                    }
-                }
-                
-                if (hasEnd) inBracketScope = false;
-            } else {
-                if (isEditMode && originalFanchant.length > 0) {
-                    if (fanchantPointer < originalFanchant.length && w === originalFanchant[fanchantPointer]) {
-                        isMarked = true;
-                        fanchantPointer++;
-                    }
-                }
-            }
-            
-            html += `<span onclick="toggleChip(this, event)" class="word-chip ${isMarked ? 'is-fc' : ''}">${w}</span>`;
-        });
-        
-        html += `</div>`;
-    });
-    
-    container.innerHTML = html;
-    container.dataset.meta = JSON.stringify(newMeta); 
-    overlay.style.display = 'block';
-}
-    
-function cancelMarking() {
-    if (window.tempSongData) {
-        if (!confirm("確定要取消？所有未儲存嘅修改會遺失。")) return;
-    }
-    
-    document.getElementById('editor-overlay').style.display = 'none';
-    window.tempSongData = null;
-}
 // ✅ 修正版：編輯器內自動生成羅馬音
 function generateRomanInEditor() {
     const rows = document.querySelectorAll('.line-row');
@@ -3338,7 +3297,7 @@ function handleLineClick(targetIndex) {
 let displayMode = 'normal'; // 'normal' 或 'roman'
 
 function updateUI() {
-        const list = document.getElementById('lyrics-list');
+    const list = document.getElementById('lyrics-list');
     if (!list) return;
 
     list.innerHTML = songData.map((line, i) => {
@@ -3380,11 +3339,23 @@ function updateUI() {
             </div>
         `;
     }).join('');
+    
+    // ✅ 檢測係咪播放到最後一行（播放隊列自動下一首）
+    if (index >= songData.length - 1) {
+        if (window.playQueue && window.playQueue.length > 0) {
+            setTimeout(() => {
+                playNextInQueue();
+            }, 1000);
+        }
+    }
+    
     // 捲動
     const editorOverlay = document.getElementById('editor-overlay');
     const isEditing = editorOverlay && (editorOverlay.style.display === 'block');
 
-    if (!isEditing) {
+    if (isEditing) {
+        console.log("正在編輯，已阻斷背景捲動");
+    } else {
         setTimeout(() => {
             const activeLine = document.getElementById(`line-${index}`);
             if (activeLine) activeLine.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -3410,8 +3381,8 @@ function updateUI() {
         footerUpload.innerText = currentUploader ? `Uploaded by: ${currentUploader}` : "";
     }
     
-    // 更新按鈕狀態
-    updateRomanButtonState();
+    // ✅ 更新羅馬音按鈕狀態
+    if (typeof updateRomanButtonState === 'function') updateRomanButtonState();
 
     // 儲存
     try {
