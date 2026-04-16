@@ -381,7 +381,7 @@ function showMainPhoto(e) {
     overlay.addEventListener('touchend', (e) => { isDragging = false; const currentTime = new Date().getTime(); const tapLength = currentTime - (window.lastTap || 0); if (tapLength < 300 && tapLength > 0) { scale = (scale === 1) ? 2.5 : 1; if (scale === 1) { posX = 0; posY = 0; } document.getElementById('main-photo-img').style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`; e.preventDefault(); } window.lastTap = currentTime; });
 
     // --- 編輯與圖片處理 ---
-   function openImporter(isEdit = false) {
+ function openImporter(isEdit = false) {
     const modal = document.getElementById('import-modal');
     const title = document.getElementById('modal-title');
     const input = document.getElementById('manualInput');
@@ -395,17 +395,17 @@ function showMainPhoto(e) {
     if (isEdit) {
         title.innerText = "✏️ 編輯現有歌詞";
         // 載入歌詞內容
-        // ✅ 匯出時包含歌詞同應援詞嘅羅馬音
         input.value = songData.map(item => {
             let line = "";
             if (item.l && item.l !== "...") line += item.l;
-            if (item.f) line += " | " + item.f;
-            if (item.r) line += " | " + item.r;
-            if (item.fr) line += " | " + item.fr;  // ✅ 加入應援詞羅馬音
+            if (item.f) line += " " + item.f;  // ✅ 只用空格分隔，唔用 |
+            // ❌ 暫時唔要羅馬音
+            // if (item.r) line += " | " + item.r;
+            // if (item.fr) line += " | " + item.fr;
             return line.trim();
         }).join('\n');
 
-        // 載入 Link (對應你原本嘅邏輯)
+        // 載入 Link
         const currSong = (typeof getFirstLineData === 'function') ? getFirstLineData() : {};
         if (linkInput) linkInput.value = currSong.link || "";
         if (videoLinkInput) videoLinkInput.value = currSong.video || "";
@@ -418,19 +418,97 @@ function showMainPhoto(e) {
         linkInput.value = "";
         videoLinkInput.value = "";
         tempPhotoData = "";
-        input.placeholder = "格式：歌詞 | 應援詞 | 歌詞羅馬音 | 應援詞羅馬音\n例子：사랑해 | 사랑해 | saranghae | saranghae";
+        // ✅ 簡化提示
+        input.placeholder = "直接貼上歌詞，括號 () 內文字會自動變應援色...";
+        // ❌ 暫時唔要羅馬音格式提示
+        // input.placeholder = "格式：歌詞 | 應援詞 | 歌詞羅馬音 | 應援詞羅馬音\n例子：사랑해 | 사랑해 | saranghae | saranghae";
     }
 
-    // --- ✨ 呢度就係分屏功能嘅靈魂 ---
+    // 分屏功能
     const photoToShow = isEdit ? tempPhotoData : localStorage.getItem('myConcertPhoto');
     if (photoToShow && refContainer && refImg) {
         refImg.src = photoToShow;
-        refContainer.style.display = 'block'; // 顯示左邊分屏
+        refContainer.style.display = 'block';
     } else if (refContainer) {
-        refContainer.style.display = 'none';  // 冇相就收埋左邊
+        refContainer.style.display = 'none';
     }
 
     modal.style.display = 'block';
+}
+
+function saveMarkedData() {
+    const rows = document.querySelectorAll('.line-row');
+    const tempPhotoData = document.getElementById('reference-img')?.src || '';
+    const sourceLink = document.getElementById('sourceLinkInput')?.value.trim() || ''; 
+    const videoLink = document.getElementById('videoLinkInput')?.value.trim() || ''; 
+    let newData = [];
+
+    rows.forEach(row => {
+        const chips = row.querySelectorAll('.word-chip');
+        
+        let currentL = ""; 
+        let pendingF = [];
+        
+        chips.forEach(chip => {
+            if (chip.classList.contains('is-fc')) { 
+                pendingF.push(chip.innerText); 
+            } else {
+                if (pendingF.length > 0) {
+                    // ✅ 簡化儲存，唔要羅馬音欄位
+                    newData.push({ 
+                        l: currentL.trim() || "...", 
+                        f: pendingF.join(' ')
+                        // ❌ 暫時唔要羅馬音
+                        // r: existingLine?.r || "",
+                        // fr: existingLine?.fr || ""
+                    });
+                    currentL = ""; 
+                    pendingF = [];
+                }
+                currentL += chip.innerText + " ";
+            }
+        });
+        
+        if (pendingF.length > 0 || currentL.trim()) {
+            // ✅ 簡化儲存，唔要羅馬音欄位
+            newData.push({ 
+                l: currentL.trim() || "...", 
+                f: pendingF.join(' ')
+                // ❌ 暫時唔要羅馬音
+                // r: existingLine?.r || "",
+                // fr: existingLine?.fr || ""
+            });
+        }
+    });
+
+    // 加入 meta 資料
+    if (newData.length > 0) {
+        if (tempPhotoData) newData[0].photo = tempPhotoData;
+        if (sourceLink) newData[0].link = sourceLink; 
+        if (videoLink) newData[0].video = videoLink; 
+    }
+
+    const info = window.currentSubmittingData || {};
+    
+    newData.meta = {
+        name: info.name || "未命名歌曲",
+        uploader: "本地編輯者"
+    };
+
+    // ✅ 直接儲存
+    songData = newData;
+    index = 0;
+    // ❌ 暫時唔要羅馬音模式
+    // displayMode = 'normal';
+
+    document.getElementById('editor-overlay').style.display = 'none';
+    closeImporter();
+
+    updateUI();
+    
+    // ❌ Comment 咗羅馬音編輯器跳轉
+    // window.tempSongData = newData;
+    // showRomanEditor();
 }
     function editCurrentSong(e) {
         if (e) e.stopPropagation();
@@ -728,77 +806,6 @@ function generateRomanInEditor() {
     alert("✅ 已為空白欄位生成羅馬音！");
 }
 
-   function saveMarkedData() {
-    const rows = document.querySelectorAll('.line-row');
-    const tempPhotoData = document.getElementById('reference-img')?.src || '';
-    const sourceLink = document.getElementById('sourceLinkInput')?.value.trim() || ''; 
-    const videoLink = document.getElementById('videoLinkInput')?.value.trim() || ''; 
-    let newData = [];
-
-    rows.forEach(row => {
-        const chips = row.querySelectorAll('.word-chip');
-        
-        let currentL = ""; 
-        let pendingF = [];
-        
-        chips.forEach(chip => {
-            if (chip.classList.contains('is-fc')) { 
-                pendingF.push(chip.innerText); 
-            } else {
-                if (pendingF.length > 0) {
-                    const existingLine = songData[newData.length];
-                    newData.push({ 
-                        l: currentL.trim() || "...", 
-                        f: pendingF.join(' '),
-                        r: existingLine?.r || "",
-                        fr: existingLine?.fr || ""
-                    });
-                    currentL = ""; 
-                    pendingF = [];
-                }
-                currentL += chip.innerText + " ";
-            }
-        });
-        
-        if (pendingF.length > 0 || currentL.trim()) {
-            const existingLine = songData[newData.length];
-            newData.push({ 
-                l: currentL.trim() || "...", 
-                f: pendingF.join(' '),
-                r: existingLine?.r || "",
-                fr: existingLine?.fr || ""
-            });
-        }
-    });
-
-    // ✅ 加入 meta 資料
-    if (newData.length > 0) {
-        if (tempPhotoData) newData[0].photo = tempPhotoData;
-        if (sourceLink) newData[0].link = sourceLink; 
-        if (videoLink) newData[0].video = videoLink; 
-    }
-
-    const info = window.currentSubmittingData || {};
-    
-    newData.meta = {
-        name: info.name || "未命名歌曲",
-        uploader: "本地編輯者"
-    };
-
-    // ✅ 直接儲存，唔跳轉去羅馬音編輯器
-    songData = newData;
-    index = 0;
-    displayMode = 'normal';
-
-    document.getElementById('editor-overlay').style.display = 'none';
-    closeImporter();
-
-    updateUI();
-    
-    // ❌ Comment 咗呢兩行
-    // window.tempSongData = newData;
-    // showRomanEditor();
-}
 // 顯示羅馬音編輯頁面
 function showRomanEditor() {
     const overlay = document.getElementById('editor-overlay');
