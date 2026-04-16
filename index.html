@@ -3462,7 +3462,6 @@ async function generateRomanization() {
 
 // ✅ 新函數：轉換混合文本（韓文轉羅馬音，其他保留）
 function convertMixedText(text) {
-    console.log(text);
     if (!text) return '';
     
     let result = '';
@@ -3470,7 +3469,6 @@ function convertMixedText(text) {
     for (let i = 0; i < text.length; i++) {
         const char = text[i];
         const decomposed = decomposeHangul(char);
-        console.log(decomposed);
         if (decomposed) {
             // 韓文字 → 轉換為羅馬音
             let roman = '';
@@ -3485,7 +3483,6 @@ function convertMixedText(text) {
             result += char;
         }
     }
-    console.log(result);
     return result;
 }
 // 切換羅馬音顯示（完全切換）
