@@ -3287,16 +3287,6 @@ async function rejectSetlist(setlistId) {
     //     updateUI();
     // }
 function handleTap(e) {
-    // ✅ 如果點擊嘅係按鈕、連結或者有 onclick 嘅元素，唔處理歌詞切換
-    const target = e.target;
-    if (target.closest('.btn') || 
-        target.closest('button') || 
-        target.closest('[onclick]') ||
-        target.closest('#main-photo-overlay') ||
-        target.closest('.close-photo-btn')) {
-        return;  // 唔執行歌詞切換邏輯
-    }
-    
     if (isLocked) return;
 
     const x = e.clientX || (e.touches && e.touches[0].clientX);
@@ -3304,13 +3294,14 @@ function handleTap(e) {
     const w = window.innerWidth;
     const h = window.innerHeight;
 
-    const isInLeftSide = (x < w * 0.3);
-    const isInRightSide = (x > w * 0.7);
-    const isInCenterWidth = (!isInLeftSide && !isInRightSide);
-    const isUpperHalf = (y < h * 0.5);
-    const isLowerHalf = (y >= h * 0.5);
+    // 區域定義
+    const isInLeftSide = (x < w * 0.3);          // 左側 30%
+    const isInRightSide = (x > w * 0.7);         // 右側 30%
+    const isInCenterWidth = (!isInLeftSide && !isInRightSide); // 中間 40%
+    const isUpperHalf = (y < h * 0.5);           // 上半截 50%
+    const isLowerHalf = (y >= h * 0.5);          // 下半截 50%
 
-    // 1. 點擊中間文字跳轉
+    // 1. 【優先判定】如果點中中間 40% 嘅「文字內容」 -> 跳轉歌詞
     const contentBtn = e.target.closest('.lyric-content');
     if (contentBtn && isInCenterWidth) {
         const lineEl = contentBtn.parentElement;
@@ -3322,16 +3313,18 @@ function handleTap(e) {
         }
     }
 
-    // 2. 兩側判定
-    if (isUpperHalf) {
-        if (index > 0) index--;
-    } else {
-        if (index < songData.length - 1) index++; 
-        else index = 0;
+    // 2. 【兩側判定】只要喺左右 30% 區域，或者點中中間但冇點中字
+    if (isInLeftSide || isInRightSide || isInCenterWidth) {
+        // 如果係點擊兩側，直接跟「上半截/下半截」行
+        if (isUpperHalf) {
+            if (index > 0) index--;
+        } else {
+            if (index < songData.length - 1) index++; 
+            else index = 0;
+        }
+        updateUI();
     }
-    updateUI();
 }
-    
 function handleLineClick(targetIndex) {
     if (isLocked) return;
     
