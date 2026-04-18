@@ -1163,25 +1163,16 @@ function showVersionSelector(versions) {
     let html = `<div style="padding:20px;"><h3>選擇版本</h3><h2>${versions[0].name}</h2><ul style="list-style:none; padding:0;">`;
     
     versions.forEach(v => {
-        const date = v.createdAt ? new Date(v.createdAt.seconds * 1000).toLocaleDateString() : "未知日期";
-        const songNameClean = v.name.replace(/'/g, "\\'"); // 處理單引號防止 JS error
-
+        const escapedSongName = v.name.replace(/'/g, "\\'");
+        
         html += `
-            <li onclick="loadSpecificSong('${v.id}')" 
-                style="padding:15px; border-bottom:1px solid #444; cursor:pointer; display:flex; justify-content:space-between; align-items:center;">
-                
-                <div style="text-align: left;">
-                    <div style="color:#0f0;">作者: ${v.uploader || '匿名'}</div>
-                    <div style="font-size:0.7rem; color:#666;">上傳日期: ${date}</div>
-                </div>
-
-                <div onclick="event.stopPropagation(); adminDeletePublic('${v.id}', '${songNameClean}')" 
-                     style="padding: 10px; cursor: pointer; opacity: 0.6;" 
-                     onmouseover="this.style.opacity='1'" 
-                     onmouseout="this.style.opacity='0.6'">
+            <li onclick="loadSpecificSong('${v.id}')" ...>
+                ...
+                <div onclick="event.stopPropagation(); adminDeletePublic('${v.id}', '${escapedSongName}')" ...>
                     🗑️
                 </div>
-            </li>`;
+            </li>
+        `;
     });
     
     html += `</ul><button class="btn" onclick="fetchPublicSongs()"> < 返回歌曲列表</button></div>`;
@@ -1941,7 +1932,9 @@ function showAuditBar(docId, songName) {
     const bar = document.createElement('div');
     bar.id = 'audit-bar';
     
-    // 設定初始樣式，加入 cursor: move
+    // ✅ 轉義單引號，防止 JavaScript 語法錯誤
+    const escapedSongName = songName.replace(/'/g, "\\'");
+    
     bar.style = `
         position: fixed; top: 10px; left: 10px; right: 10px;
         background: rgba(0, 50, 0, 0.95); color: white; 
@@ -1954,50 +1947,45 @@ function showAuditBar(docId, songName) {
     
     bar.innerHTML = `
         <div style="font-size:0.8rem; margin-left:10px; flex-grow:1; text-align:left; pointer-events:none;">
-            ⣿ 審核：<b>${songName}</b>
+            ⣿ 審核：<b>${songName.replace(/'/g, "&#39;")}</b>
         </div>
         <div style="display:flex; gap:8px;">
-            <button class="btn" style="background:#0f0; color:#000; padding:5px 12px; font-size:0.75rem;" onclick="finalizeApproval('${docId}', '${songName}')">公開</button>
-            <button class="btn" style="background:#f00; color:#fff; padding:5px 12px; font-size:0.75rem;" onclick="deletePending('${docId}', '${songName}')">刪除</button>
+            <button class="btn" style="background:#0f0; color:#000; padding:5px 12px; font-size:0.75rem;" onclick="finalizeApproval('${docId}', '${escapedSongName}')">公開</button>
+            <button class="btn" style="background:#f00; color:#fff; padding:5px 12px; font-size:0.75rem;" onclick="deletePending('${docId}', '${escapedSongName}')">刪除</button>
             <button class="btn" style="background:#444; color:#fff; padding:5px 10px; font-size:0.75rem;" onclick="document.getElementById('audit-bar').remove()">❌</button>
         </div>
     `;
 
     document.body.appendChild(bar);
 
-    // --- ✨ 加入簡易拖動邏輯 ✨ ---
+    // 拖動邏輯（保持原本嘅 code）
     let isDragging = false;
     let offsetTop = 0;
 
     const startDrag = (e) => {
-        // 如果撳中按鈕就唔好觸發拖動
         if (e.target.tagName === 'BUTTON') return;
         isDragging = true;
         const clientY = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
         offsetTop = clientY - bar.getBoundingClientRect().top;
-        bar.style.transition = 'none'; // 拖動時關閉動畫，避免延遲
+        bar.style.transition = 'none';
     };
 
     const onDrag = (e) => {
         if (!isDragging) return;
         const clientY = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY;
         let newTop = clientY - offsetTop;
-        
-        // 限制唔好拖出畫面頂部同底部
         newTop = Math.max(0, Math.min(window.innerHeight - bar.offsetHeight, newTop));
         bar.style.top = newTop + 'px';
     };
 
     const stopDrag = () => {
         isDragging = false;
-        bar.style.transition = 'top 0.2s'; // 放手後加返少少彈性
+        bar.style.transition = 'top 0.2s';
     };
 
-    // 支援滑鼠同手指觸控
     bar.addEventListener('mousedown', startDrag);
     window.addEventListener('mousemove', onDrag);
     window.addEventListener('mouseup', stopDrag);
-
     bar.addEventListener('touchstart', startDrag);
     window.addEventListener('touchmove', onDrag);
     window.addEventListener('touchend', stopDrag);
