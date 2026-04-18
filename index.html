@@ -1160,26 +1160,46 @@ function closeModal() {
     if (modal) modal.style.display = 'none';
 }    
 function showVersionSelector(versions) {
-    let html = `<div style="padding:20px;"><h3>選擇版本</h3><h2>${versions[0].name}</h2><ul style="list-style:none; padding:0;">`;
+    const modal = document.getElementById('public-songs-modal');
+    
+    let html = `
+        <div style="padding:20px; color:#fff; height:80vh; display:flex; flex-direction:column;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <span onclick="fetchPublicSongs()" style="cursor:pointer; color:#cc9900;">⬅️ 返回</span>
+                <h3 style="margin:0; text-align:center;">${versions[0].name}</h3>
+                <span onclick="closeModal()" style="cursor:pointer; font-size:1.2rem;">✕</span>
+            </div>
+            
+            <div style="flex:1; overflow-y:auto;">
+    `;
     
     versions.forEach(v => {
         const escapedSongName = v.name.replace(/'/g, "\\'");
+        const date = v.createdAt ? new Date(v.createdAt.seconds * 1000).toLocaleDateString('zh-HK') : "未知日期";
         
         html += `
-            <li onclick="loadSpecificSong('${v.id}')" ...>
-                ...
-                <div onclick="event.stopPropagation(); adminDeletePublic('${v.id}', '${escapedSongName}')" ...>
+            <div style="background:#1a1a1a; padding:12px; margin-bottom:8px; border-radius:8px; display:flex; justify-content:space-between; align-items:center;">
+                <div style="flex:1; text-align:left; cursor:pointer;" onclick="loadSpecificSong('${v.id}')">
+                    <div style="color:#0f0; font-weight:bold;">${v.uploader || '匿名'}</div>
+                    <div style="font-size:0.7rem; color:#666;">📅 ${date}</div>
+                </div>
+                <div onclick="event.stopPropagation(); adminDeletePublic('${v.id}', '${escapedSongName}')" 
+                     style="padding:8px 12px; cursor:pointer; color:#ff6666; font-size:1.2rem;">
                     🗑️
                 </div>
-            </li>
+            </div>
         `;
     });
     
-    html += `</ul><button class="btn" onclick="fetchPublicSongs()"> < 返回歌曲列表</button></div>`;
+    html += `
+            </div>
+            
+            <button class="btn" style="margin-top:15px; width:100%;" onclick="fetchPublicSongs()">⬅️ 返回歌曲列表</button>
+        </div>
+    `;
     
-    document.getElementById('public-songs-modal').innerHTML = html;
+    modal.innerHTML = html;
 }
-    
 async function loadSpecificSong(docId) {
     try {
         const doc = await db.collection("songs").doc(docId).get();
