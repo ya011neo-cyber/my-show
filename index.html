@@ -1861,23 +1861,57 @@ function showAdminMenu(songCount, setlistCount, songSnapshot, setlistSnapshot) {
     window.pendingSongsSnapshot = songSnapshot;
     window.pendingSetlistsSnapshot = setlistSnapshot;
 }
+// ✅ 統一嘅刷新函數
+async function refreshPendingSongs() {
+    try {
+        const snapshot = await db.collection("songs")
+            .where("status", "==", "pending")
+            .get();
+        
+        // 更新全域變數
+        window.pendingSongsSnapshot = snapshot;
+        
+        // 重建 pendingSongsList
+        window.pendingSongsList = [];
+        snapshot.forEach((doc) => {
+            window.pendingSongsList.push({
+                id: doc.id,
+                name: doc.data().name,
+                data: doc.data().data,
+                uploader: doc.data().uploader
+            });
+        });
+        
+        // 重新顯示列表
+        renderPendingSongsList();
+        
+    } catch (err) {
+        console.error("刷新待審核列表失敗", err);
+        alert("無法刷新列表，請手動重新整理");
+    }
+}
 
-// 顯示待審核歌曲列表（原有功能）
-function showPendingSongs() {
+// ✅ 專門負責顯示待審核列表嘅函數（唔再自己做 fetch）
+function renderPendingSongsList() {
     const snapshot = window.pendingSongsSnapshot;
+    const modal = document.getElementById('public-songs-modal');
+    
     if (!snapshot || snapshot.empty) {
-        alert("暫時冇待審核嘅歌。");
+        modal.innerHTML = `
+            <div style="padding:20px; color:#fff; text-align:center;">
+                <h3>✅ 所有歌曲已審核完成</h3>
+                <button class="btn" onclick="showAdminPanel()">返回</button>
+                <button class="btn" onclick="closeModal()">關閉</button>
+            </div>
+        `;
         return;
     }
 
-    const modal = document.getElementById('public-songs-modal');
-    let pendingSongs = [];
-    
     let html = `
         <div style="padding:20px; color:#fff; height:80vh; display:flex; flex-direction:column;">
             <div style="display:flex; align-items:center; gap:10px; margin-bottom:15px;">
                 <span onclick="showAdminPanel()" style="cursor:pointer; color:#cc9900;">⬅️ 返回</span>
-                <h3 style="margin:0;">🎵 待審核歌曲</h3>
+                <h3 style="margin:0;">🎵 待審核歌曲 (${snapshot.size})</h3>
             </div>
             <div style="flex:1; overflow-y:auto;">
     `;
@@ -1885,7 +1919,7 @@ function showPendingSongs() {
     let i = 0;
     snapshot.forEach((doc) => {
         const data = doc.data();
-        pendingSongs.push({ id: doc.id, name: data.name, data: data.data, uploader: data.uploader });
+        const escapedName = data.name.replace(/'/g, "\\'");
         html += `
             <div style="background:#1a1a1a; padding:15px; margin-bottom:10px; border-radius:8px;">
                 <div style="font-weight:bold; margin-bottom:5px;">${i + 1}. ${data.name}</div>
@@ -1905,7 +1939,11 @@ function showPendingSongs() {
     `;
     
     modal.innerHTML = html;
-    window.pendingSongsList = pendingSongs;
+}
+// 顯示待審核歌曲列表（原有功能）
+function showPendingSongs() {
+    // ✅ 直接 call 刷新函數
+    refreshPendingSongs();
 }
 
 // 預覽並批准歌曲
@@ -1921,7 +1959,7 @@ function previewAndApproveSong(docId, index) {
         updateUI();
         closeModal();
         
-        // 顯示審核工具列
+        // 顯示審核工具列（唔使刷新，因為仲係同一首歌）
         showAuditBar(docId, selected.name);
     }
 }
@@ -1994,20 +2032,36 @@ function showAuditBar(docId, songName) {
 // 執行公開
 async function finalizeApproval(docId, songName) {
     if (confirm(`確定公開「${songName}」？`)) {
-        await db.collection("songs").doc(docId).update({ status: "public" });
-        alert("已公開！");
-        document.getElementById('audit-bar').remove();
-        showPendingSongs();
+        try {
+            await db.collection("songs").doc(docId).update({ status: "public" });
+            alert("已公開！");
+            document.getElementById('audit-bar').remove();
+            
+            // ✅ 統一刷新
+            await refreshPendingSongs();
+            
+        } catch (err) {
+            console.error("公開失敗", err);
+            alert("公開失敗：" + err.message);
+        }
     }
 }
 
 // 執行刪除 (可選：如果係垃圾投稿可以直接刪)
 async function deletePending(docId, songName) {
     if (confirm(`確定要刪除「${songName}」？此動作不能撤銷。`)) {
-        await db.collection("songs").doc(docId).delete();
-        alert("已刪除！");
-        document.getElementById('audit-bar').remove();
-        showPendingSongs();
+        try {
+            await db.collection("songs").doc(docId).delete();
+            alert("已刪除！");
+            document.getElementById('audit-bar').remove();
+            
+            // ✅ 統一刷新
+            await refreshPendingSongs();
+            
+        } catch (err) {
+            console.error("刪除失敗", err);
+            alert("刪除失敗：" + err.message);
+        }
     }
 }
     // 獨立出來的批准 function
