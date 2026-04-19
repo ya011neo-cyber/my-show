@@ -579,7 +579,7 @@ function saveMarkedData() {
     // 4. ✨ 呼叫 updateUI，由佢統一處理畫面顯示同埋 localStorage 儲存
     updateUI();
 
-    console.log("本地預覽已更新：作者已變更為本地編輯者");
+    // console.log("本地預覽已更新：作者已變更為本地編輯者");
 }
     function editCurrentSong(e) {
         if (e) e.stopPropagation();
@@ -3411,7 +3411,7 @@ function updateUI() {
     const isEditing = editorOverlay && (editorOverlay.style.display === 'block');
 
     if (isEditing) {
-        console.log("正在編輯，已阻斷背景捲動");
+        // console.log("正在編輯，已阻斷背景捲動");
     } else {
         setTimeout(() => {
             const activeLine = document.getElementById(`line-${index}`);
