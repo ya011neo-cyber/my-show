@@ -3076,18 +3076,7 @@ html += `
                 </div>
             </div>
         `;
-        } else {
-            html += `
-                    <button class="btn" style="flex:1; background:#444; color:#888;" disabled>▶️ 冇可播放歌曲</button>
-            `;
         }
-        
-        html += `
-                    <button class="btn" style="flex:1; background:#cc9900; color:#000;" onclick="addSetlistToCollection()">⭐ 收藏歌單</button>
-                </div>
-            </div>
-        `;
-        
         modal.innerHTML = html;
         
         // ✅ 更新當前歌單數據（只保留有效歌曲供播放）
