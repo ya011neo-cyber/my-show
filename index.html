@@ -3641,7 +3641,18 @@ async function loadSongFromSetlist(songId) {
 }
 
 // 播放下一首（在 updateUI 或其他地方呼叫）
+// 播放下一首（雲端歌單隊列）
 async function playNextInQueue() {
+    // ✅ 如果離線歌單正在播放，優先使用離線隊列
+    if (window.offlinePlayQueue && window.offlinePlayQueue.songs.length > 0) {
+        const nextIndex = window.offlinePlayQueue.currentIndex + 1;
+        if (nextIndex < window.offlinePlayQueue.songs.length) {
+            loadOfflineSong(nextIndex);
+        }
+        return;
+    }
+    
+    // 雲端歌單隊列
     if (window.playQueue && window.playQueueIndex < window.playQueue.length - 1) {
         window.playQueueIndex++;
         await loadSongFromSetlist(window.playQueue[window.playQueueIndex].songId);
@@ -3801,13 +3812,13 @@ function handleTap(e) {
     const h = window.innerHeight;
 
     // 區域定義
-    const isInLeftSide = (x < w * 0.3);          // 左側 30%
-    const isInRightSide = (x > w * 0.7);         // 右側 30%
-    const isInCenterWidth = (!isInLeftSide && !isInRightSide); // 中間 40%
-    const isUpperHalf = (y < h * 0.5);           // 上半截 50%
-    const isLowerHalf = (y >= h * 0.5);          // 下半截 50%
+    const isInLeftSide = (x < w * 0.3);
+    const isInRightSide = (x > w * 0.7);
+    const isInCenterWidth = (!isInLeftSide && !isInRightSide);
+    const isUpperHalf = (y < h * 0.5);
+    const isLowerHalf = (y >= h * 0.5);
 
-    // 1. 【優先判定】如果點中中間 40% 嘅「文字內容」 -> 跳轉歌詞
+    // 1. 點擊中間文字內容 -> 跳轉到該行歌詞
     const contentBtn = e.target.closest('.lyric-content');
     if (contentBtn && isInCenterWidth) {
         const lineEl = contentBtn.parentElement;
@@ -3819,14 +3830,43 @@ function handleTap(e) {
         }
     }
 
-    // 2. 【兩側判定】只要喺左右 30% 區域，或者點中中間但冇點中字
+    // 2. 兩側點擊 -> 上一行 / 下一行
     if (isInLeftSide || isInRightSide || isInCenterWidth) {
-        // 如果係點擊兩側，直接跟「上半截/下半截」行
         if (isUpperHalf) {
-            if (index > 0) index--;
+            // 上半截：上一行
+            if (index > 0) {
+                index--;
+            }
+            // ✅ 如果已經係第一行，唔做任何嘢（唔循環）
         } else {
-            if (index < songData.length - 1) index++; 
-            else index = 0;
+            // 下半截：下一行
+            if (index < songData.length - 1) {
+                index++;
+            } else {
+                // ✅ 已經係最後一行 → 檢查係咪離線歌單播放中
+                if (window.offlinePlayQueue && window.offlinePlayQueue.songs.length > 0) {
+                    const nextSongIndex = window.offlinePlayQueue.currentIndex + 1;
+                    if (nextSongIndex < window.offlinePlayQueue.songs.length) {
+                        // 有下一首歌 → 載入下一首
+                        loadOfflineSong(nextSongIndex);
+                        return; // ✅ 直接 return，唔好再行 updateUI
+                    } else {
+                        // 已經係最後一首歌嘅最後一行 → 提示完畢
+                        alert("🎉 離線歌單播放完畢！");
+                        window.offlinePlayQueue = null;
+                        // 唔循環，留喺最後一行
+                        return;
+                    }
+                }
+                // ✅ 如果係雲端歌單隊列
+                else if (window.playQueue && window.playQueue.length > 0) {
+                    // 雲端隊列由 updateUI 入面嘅邏輯處理
+                    // 呢度唔做任何嘢，等 updateUI 觸發 playNextInQueue
+                }
+                // ✅ 普通單曲模式：唔循環返第一行，留喺最後一行
+                // 如果你想循環，可以取消下面呢行嘅註釋：
+                // else { index = 0; }
+            }
         }
         updateUI();
     }
@@ -3888,13 +3928,29 @@ function updateUI() {
     }).join('');
     
     // ✅ 檢測係咪播放到最後一行（播放隊列自動下一首）
-    if (index >= songData.length - 1) {
-        if (window.playQueue && window.playQueue.length > 0) {
+// ✅ 檢測係咪播放到最後一行（支援雲端隊列同離線隊列）
+if (index >= songData.length - 1) {
+    // 優先：離線歌單隊列
+    if (window.offlinePlayQueue && window.offlinePlayQueue.songs.length > 0) {
+        const nextIndex = window.offlinePlayQueue.currentIndex + 1;
+        if (nextIndex < window.offlinePlayQueue.songs.length) {
             setTimeout(() => {
-                playNextInQueue();
-            }, 1000);
+                loadOfflineSong(nextIndex);
+            }, 1500); // 畀 1.5 秒緩衝，等用家睇完最後一行
+        } else {
+            setTimeout(() => {
+                alert("🎉 離線歌單播放完畢！");
+                window.offlinePlayQueue = null;
+            }, 1500);
         }
     }
+    // 其次：雲端歌單隊列
+    else if (window.playQueue && window.playQueue.length > 0) {
+        setTimeout(() => {
+            playNextInQueue();
+        }, 1500);
+    }
+}
     
     // 捲動
     const editorOverlay = document.getElementById('editor-overlay');
