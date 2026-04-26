@@ -3056,43 +3056,26 @@ async function viewSetlistDetail(setlistId) {
         } else {
             html += `<p style="color:#666; text-align:center; padding:30px;">😿 呢個歌單冇歌曲</p>`;
         }
-        
         html += `
-                </div>
-                
-                <div style="display:flex; gap:10px; margin-top:15px;">
-                    <button class="btn" style="flex:1; background:#444;" onclick="fetchPublicSetlists()">返回</button>
-        `;
-        
-        // ✅ 只有當存在可播放歌曲時先顯示播放按鈕
-        const hasPlayableSongs = displaySongs.some(s => s.songId && !s.isDeleted);
-        if (hasPlayableSongs) {
-            html += `
-                    <button class="btn" style="flex:1; background:#0f0; color:#000;" onclick="playEntireSetlist()">▶️ 播放整個歌單</button>
-                    html += `
                 <div style="display:flex; gap:10px; margin-top:15px; flex-wrap:wrap;">
-                    <button class="btn" style="flex:1; background:#444;" onclick="fetchPublicSetlists()">返回</button>
-        `;
+                    <button class="btn" style="flex:1; background:#444; min-width:60px;" onclick="fetchPublicSetlists()">返回</button>`;
 
-        // ✅ 只有當存在可播放歌曲時先顯示相關按鈕
-        const hasPlayableSongs = displaySongs.some(s => s.songId && !s.isDeleted);
-        if (hasPlayableSongs) {
-            html += `
-                    <button class="btn" style="flex:1; background:#0f0; color:#000;" onclick="playEntireSetlist()">▶️ 播放整個歌單</button>
-                    <button class="btn" style="flex:1; background:#0066cc; color:#fff;" onclick="downloadEntireSetlistDirect()">📥 離線下載</button>
-            `;
-        } else {
-            html += `
-                    <button class="btn" style="flex:1; background:#444; color:#888;" disabled>▶️ 冇可播放歌曲</button>
-            `;
-        }
-        
-        html += `
-                    <button class="btn" style="flex:1; background:#cc9900; color:#000;" onclick="addSetlistToCollection()">⭐ 收藏歌單</button>
+// ✅ 只有當存在可播放歌曲時先顯示相關按鈕
+const hasPlayableSongs = displaySongs.some(s => s.songId && !s.isDeleted);
+if (hasPlayableSongs) {
+    html += `
+                    <button class="btn" style="flex:1; background:#0f0; color:#000; min-width:80px;" onclick="playEntireSetlist()">▶️ 播放</button>
+                    <button class="btn" style="flex:1; background:#0066cc; color:#fff; min-width:80px;" onclick="downloadEntireSetlistDirect()">📥 離線下載</button>`;
+} else {
+    html += `
+                    <button class="btn" style="flex:1; background:#444; color:#888; min-width:80px;" disabled>▶️ 冇可播放歌曲</button>`;
+}
+
+html += `
+                    <button class="btn" style="flex:1; background:#cc9900; color:#000; min-width:80px;" onclick="addSetlistToCollection()">⭐ 收藏</button>
                 </div>
             </div>
         `;
-            `;
         } else {
             html += `
                     <button class="btn" style="flex:1; background:#444; color:#888;" disabled>▶️ 冇可播放歌曲</button>
