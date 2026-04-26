@@ -215,6 +215,7 @@ body.focus-mode #display-upload-info {
         <div class="btn" onclick="uploadSong(event)">☁️</div>
         <div class="btn" onclick="openImporter(false)">➕</div>
         <div class="btn" onclick="openLibraryMenu(event)">⭐</div>
+        <div class="btn" onclick="showOfflineSetlists()">📥</div>
         <div class="btn" onclick="toggleFavorite(event)">🤍</div>
         <!-- <div id="lockBtn" class="btn" onclick="toggleLock(event)">🔓</div> -->
     </div>
@@ -2262,7 +2263,7 @@ function renderSetlistItemSimple(setlist) {
     const typeIcon = setlist.type === 'concert' ? '🎤' : setlist.type === 'album' ? '💿' : '📝';
     const dateStr = setlist.createdAt ? new Date(setlist.createdAt.seconds * 1000).toLocaleDateString() : "未知日期";
     const setlistNameClean = setlist.name.replace(/'/g, "\\'");
-    
+
     return `
         <li onclick="viewSetlistDetail('${setlist.id}')" 
             style="padding:15px; border-bottom:1px solid #444; cursor:pointer; display:flex; justify-content:space-between; align-items:center; background:#1a1a1a; margin-bottom:5px; border-radius:8px;">
@@ -3128,11 +3129,13 @@ async function playEntireSetlist() {
     }
 }
     // ✅ 批量下載整個 Setlist 到 localStorage（入場前必做！）
+// ✅ 批量下載整個 Setlist 到 localStorage，保持歌單順序
 async function downloadEntireSetlist(validSongs, setlistName) {
     const total = validSongs.length;
     let downloaded = 0;
     let failed = 0;
     const failedList = [];
+    const downloadedSongs = []; // 儲存已下載歌曲嘅順序資訊
     
     // 顯示進度
     const modal = document.getElementById('public-songs-modal');
@@ -3183,33 +3186,22 @@ async function downloadEntireSetlist(validSongs, setlistName) {
                         link: data.data?.[0]?.link || "",
                         video: data.data?.[0]?.video || "",
                         photo: data.data?.[0]?.photo || "",
-                        fromSetlist: setlistName
+                        fromSetlist: setlistName,
+                        songId: song.songId
                     },
                     lines: Array.from(data.data || [])
                 };
                 
                 localStorage.setItem(`song_${uniqueId}`, JSON.stringify(saveObj));
                 
-                // ✅ 同時更新收藏列表（標記為離線可用）
-                let collection = JSON.parse(localStorage.getItem('mySetlist') || '[]');
-                const exists = collection.find(s => s.uniqueId === uniqueId);
-                if (!exists) {
-                    collection.push({
-                        uniqueId: uniqueId,
-                        id: song.songId,
-                        name: data.name,
-                        uploader: data.uploader || "匿名",
-                        isLocal: true,
-                        isOfflineReady: true,
-                        fromSetlist: setlistName,
-                        savedAt: new Date().toISOString()
-                    });
-                } else {
-                    // 更新標記
-                    exists.isOfflineReady = true;
-                    exists.fromSetlist = setlistName;
-                }
-                localStorage.setItem('mySetlist', JSON.stringify(collection));
+                // ✅ 記錄已下載歌曲嘅順序資訊
+                downloadedSongs.push({
+                    uniqueId: uniqueId,
+                    songId: song.songId,
+                    name: data.name,
+                    uploader: data.uploader || "匿名",
+                    order: i // 歌單入面嘅順序
+                });
                 
                 downloaded++;
             } else {
@@ -3226,7 +3218,37 @@ async function downloadEntireSetlist(validSongs, setlistName) {
         await new Promise(resolve => setTimeout(resolve, 200));
     }
     
-    // 完成
+    // ✅ 儲存完整歌單結構（包含順序）
+    const setlistSaveData = {
+        name: setlistName,
+        downloadedAt: new Date().toISOString(),
+        songCount: downloaded,
+        currentIndex: 0, // 目前播放位置
+        songs: downloadedSongs // 已按順序排列
+    };
+    
+    // 用歌單名做 key，方便之後讀取
+    const setlistKey = `offline_setlist_${setlistName.replace(/\s+/g, '_')}`;
+    localStorage.setItem(setlistKey, JSON.stringify(setlistSaveData));
+    
+    // ✅ 同時更新「我的離線歌單」列表
+    let offlineSetlists = JSON.parse(localStorage.getItem('offlineSetlists') || '[]');
+    const existingIndex = offlineSetlists.findIndex(s => s.name === setlistName);
+    const setlistEntry = {
+        name: setlistName,
+        key: setlistKey,
+        songCount: downloaded,
+        downloadedAt: new Date().toISOString()
+    };
+    
+    if (existingIndex > -1) {
+        offlineSetlists[existingIndex] = setlistEntry;
+    } else {
+        offlineSetlists.push(setlistEntry);
+    }
+    localStorage.setItem('offlineSetlists', JSON.stringify(offlineSetlists));
+    
+    // ✅ 完成畫面
     const progressBar = document.getElementById('download-progress-bar');
     if (progressBar) progressBar.style.width = '100%';
     
@@ -3238,8 +3260,8 @@ async function downloadEntireSetlist(validSongs, setlistName) {
                 <div>📥 成功下載：<span style="color:#0f0; font-weight:bold;">${downloaded}</span> 首</div>
                 ${failed > 0 ? `<div>❌ 失敗：<span style="color:#f00;">${failed}</span> 首</div>` : ''}
                 <div style="margin-top:10px; font-size:0.8rem; color:#888;">
-                    📦 已儲存到「我的收藏」<br>
-                    🚫 離線模式下仍可使用
+                    📦 已儲存離線歌單「${setlistName}」<br>
+                    ▶️ 支援連續播放，唔使逐首揀！
                 </div>
             </div>
             ${failedList.length > 0 ? `
@@ -3252,25 +3274,307 @@ async function downloadEntireSetlist(validSongs, setlistName) {
             ` : ''}
             <div style="display:flex; gap:10px; margin-top:20px; width:100%;">
                 <button class="btn" style="flex:1;" onclick="closeModal()">關閉</button>
-                <button class="btn" style="flex:1; background:#0f0; color:#000;" onclick="openMyCollection()">📂 查看離線歌單</button>
+                <button class="btn" style="flex:1; background:#0f0; color:#000;" onclick="showOfflineSetlists()">📂 查看離線歌單</button>
             </div>
         </div>
     `;
+}
+    // ✅ 顯示所有已下載嘅離線歌單
+function showOfflineSetlists() {
+    const modal = document.getElementById('public-songs-modal');
+    const offlineSetlists = JSON.parse(localStorage.getItem('offlineSetlists') || '[]');
     
-    // ✅ 同時將整個 Setlist 資訊儲存到 localStorage
-    const setlistSaveData = {
-        name: setlistName,
-        downloadedAt: new Date().toISOString(),
-        songCount: downloaded,
-        songs: validSongs.map(s => ({
-            songId: s.songId,
-            uniqueId: `setlist_offline_${s.songId}`,
-            name: s.name
-        }))
+    if (offlineSetlists.length === 0) {
+        modal.innerHTML = `
+            <div style="padding:20px; color:#fff; height:80vh; display:flex; flex-direction:column; justify-content:center; align-items:center;">
+                <div style="font-size:3rem; margin-bottom:20px;">📭</div>
+                <p style="color:#666; margin-bottom:30px;">未有離線歌單</p>
+                <p style="color:#888; font-size:0.8rem;">請先連接網絡下載歌單</p>
+                <button class="btn" style="margin-top:20px;" onclick="closeModal()">關閉</button>
+            </div>
+        `;
+        modal.style.display = 'block';
+        return;
+    }
+    
+    let html = `
+        <div style="padding:20px; color:#fff; height:80vh; display:flex; flex-direction:column;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <h3 style="margin:0;">📥 離線歌單 (${offlineSetlists.length})</h3>
+                <span onclick="closeModal()" style="cursor:pointer; font-size:1.5rem;">✕</span>
+            </div>
+            <p style="color:#888; font-size:0.75rem; margin-bottom:15px;">✅ 支援連續播放，演唱會必備！</p>
+            <div style="flex:1; overflow-y:auto;">
+    `;
+    
+    offlineSetlists.forEach((setlist, index) => {
+        const dateStr = new Date(setlist.downloadedAt).toLocaleDateString('zh-HK');
+        html += `
+            <div style="background:#1a1a1a; border:2px solid #0f0; border-radius:10px; padding:15px; margin-bottom:10px;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div style="flex:1; cursor:pointer; text-align:left;" onclick="playOfflineSetlist('${setlist.key}')">
+                        <div style="font-weight:bold; font-size:1.1rem; color:#0f0;">📋 ${setlist.name}</div>
+                        <div style="font-size:0.8rem; color:#888; margin-top:5px;">
+                            📊 ${setlist.songCount} 首歌 | 📅 ${dateStr}
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:5px;">
+                        <button class="btn" style="background:#0f0; color:#000; padding:8px 12px;" onclick="playOfflineSetlist('${setlist.key}')">▶️ 播放</button>
+                        <button class="btn" style="background:#800; padding:8px 12px;" onclick="deleteOfflineSetlist('${setlist.key}', '${setlist.name}')">🗑️</button>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += `
+            </div>
+            <button class="btn" style="margin-top:15px;" onclick="closeModal()">關閉</button>
+        </div>
+    `;
+    
+    modal.innerHTML = html;
+    modal.style.display = 'block';
+}
+    // ✅ 播放離線歌單（支援連續播放）
+function playOfflineSetlist(setlistKey) {
+    const setlistData = localStorage.getItem(setlistKey);
+    if (!setlistData) {
+        alert("❌ 歌單數據遺失，請重新下載");
+        return;
+    }
+    
+    const setlist = JSON.parse(setlistData);
+    
+    if (!setlist.songs || setlist.songs.length === 0) {
+        alert("❌ 歌單冇歌曲");
+        return;
+    }
+    
+    // ✅ 設定播放隊列
+    window.offlinePlayQueue = {
+        key: setlistKey,
+        name: setlist.name,
+        songs: setlist.songs,
+        currentIndex: 0
     };
-    localStorage.setItem(`offline_setlist_${setlistName.replace(/\s+/g, '_')}`, JSON.stringify(setlistSaveData));
+    
+    // 載入第一首歌
+    loadOfflineSong(0);
+    closeModal();
+    
+    alert(`🎵 開始播放離線歌單「${setlist.name}」\n共 ${setlist.songs.length} 首歌\n✅ 支援自動下一首`);
+}
+
+// ✅ 載入離線歌單入面嘅指定歌曲
+function loadOfflineSong(queueIndex) {
+    if (!window.offlinePlayQueue) return;
+    
+    const queue = window.offlinePlayQueue;
+    if (queueIndex >= queue.songs.length) {
+        // 播完晒
+        alert("🎉 歌單播放完畢！");
+        window.offlinePlayQueue = null;
+        return;
+    }
+    
+    const song = queue.songs[queueIndex];
+    const savedData = localStorage.getItem(`song_${song.uniqueId}`);
+    
+    if (!savedData) {
+        alert(`❌ 找不到歌曲「${song.name}」嘅離線數據`);
+        // 跳去下一首
+        loadOfflineSong(queueIndex + 1);
+        return;
+    }
+    
+    const parsed = JSON.parse(savedData);
+    
+    // ✅ 載入歌詞數據
+    songData = parsed.lines || [];
+    songData.meta = parsed.meta || {
+        name: song.name,
+        uploader: song.uploader || "匿名"
+    };
+    
+    // 更新播放位置
+    queue.currentIndex = queueIndex;
+    window.offlinePlayQueue = queue;
+    
+    // ✅ 更新 localStorage 入面嘅播放位置
+    const setlistData = JSON.parse(localStorage.getItem(queue.key));
+    if (setlistData) {
+        setlistData.currentIndex = queueIndex;
+        localStorage.setItem(queue.key, JSON.stringify(setlistData));
+    }
+    
+    window.currentDocId = null;
+    window.currentSubmittingData = { name: song.name };
+    
+    index = 0;
+    updateUI();
+}
+
+// ✅ 自動播放下一首（喺 updateUI 入面觸發）
+// 修改 updateUI 函數，喺最後加入：
+// (你現有嘅 updateUI 入面已經有播放隊列檢查，只需要確保離線隊列都被檢查)
+
+// ✅ 修改 updateUI 函數入面嘅自動下一首邏輯
+// 搵返你 updateUI 入面呢段：
+// if (index >= songData.length - 1) {
+//     if (window.playQueue && window.playQueue.length > 0) {
+//         setTimeout(() => { playNextInQueue(); }, 1000);
+//     }
+// }
+
+// 替換成：
+function updateUI() {
+    const list = document.getElementById('lyrics-list');
+    if (!list) return;
+
+    list.innerHTML = songData.map((line, i) => {
+        const isCurrent = (i === index);
+        
+        let displayText = line.l || '';
+        let displayFanchant = line.f || '';
+        
+        if (displayMode === 'roman') {
+            if (line.r) {
+                displayText = line.r;
+            } else {
+                displayText = convertMixedText(line.l);
+            }
+            
+            if (line.fr) {
+                displayFanchant = line.fr;
+            } else if (line.f) {
+                displayFanchant = convertMixedText(line.f);
+            }
+        }
+        
+        return `
+            <div id="line-${i}" class="lyric-line" 
+                 style="width: 100%; padding: 15px 0; transition: all 0.3s; 
+                        opacity: ${isCurrent ? 1 : 0.3}; 
+                        transform: scale(${isCurrent ? 1.1 : 0.95});
+                        pointer-events: none;">
+                <div class="lyric-content" style="display: inline-block; width: 90%; pointer-events: auto;">
+                    <div style="font-size: 1.35rem; font-weight: bold; color: ${isCurrent ? '#fff' : '#aaa'};">
+                        ${displayText}
+                    </div>
+                    ${displayFanchant ? `<div style="font-size: 1.6rem; font-weight: 900; color: var(--fc-color); margin-top: 6px;">${displayFanchant}</div>` : ''}
+                </div>
+            </div>
+        `;
+    }).join('');
+    
+    // ✅ 檢測係咪播放到最後一行（支援雲端隊列同離線隊列）
+    if (index >= songData.length - 1) {
+        // 優先：離線歌單隊列
+        if (window.offlinePlayQueue && window.offlinePlayQueue.songs.length > 0) {
+            const nextIndex = window.offlinePlayQueue.currentIndex + 1;
+            if (nextIndex < window.offlinePlayQueue.songs.length) {
+                setTimeout(() => {
+                    loadOfflineSong(nextIndex);
+                }, 1000);
+            } else {
+                setTimeout(() => {
+                    alert("🎉 離線歌單播放完畢！");
+                    window.offlinePlayQueue = null;
+                }, 1000);
+            }
+        }
+        // 其次：雲端歌單隊列
+        else if (window.playQueue && window.playQueue.length > 0) {
+            setTimeout(() => {
+                playNextInQueue();
+            }, 1000);
+        }
+    }
+    
+    // 捲動
+    const editorOverlay = document.getElementById('editor-overlay');
+    const isEditing = editorOverlay && (editorOverlay.style.display === 'block');
+
+    if (!isEditing) {
+        setTimeout(() => {
+            const activeLine = document.getElementById(`line-${index}`);
+            if (activeLine) activeLine.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 50);
+    }
+
+    // Footer 更新
+    const footerName = document.getElementById('display-song-name');
+    const footerUpload = document.getElementById('display-upload-info');
+    let currentName = "";
+    let currentUploader = "";
+
+    if (songData.meta) {
+        currentName = songData.meta.name;
+        currentUploader = songData.meta.uploader;
+        
+        // ✅ 顯示離線歌單資訊
+        if (window.offlinePlayQueue) {
+            currentUploader = `離線歌單: ${window.offlinePlayQueue.name} | ${window.offlinePlayQueue.songs[window.offlinePlayQueue.currentIndex]?.uploader || ''}`;
+        }
+    } else if (window.currentSubmittingData && window.currentSubmittingData.name) {
+        currentName = window.currentSubmittingData.name;
+        currentUploader = "本地編輯者";
+    }
+
+    if (footerName && footerUpload) {
+        footerName.innerText = currentName || "應援貓紙 Fanchant Cheatsheet";
+        footerUpload.innerText = currentUploader ? `Uploaded by: ${currentUploader}` : "";
+    }
+    
+    if (typeof updateRomanButtonState === 'function') updateRomanButtonState();
+
+    // 儲存
+    try {
+        const saveObj = {
+            version: "2.0",
+            meta: songData.meta || (currentName ? { name: currentName, uploader: currentUploader } : null),
+            lines: Array.from(songData)
+        };
+        localStorage.setItem('myConcertData', JSON.stringify(saveObj));
+    } catch (e) { console.error("Save Error", e); }
+    
+    if (typeof updateMainViewBtn === 'function') updateMainViewBtn();
+    if (typeof updateFavoriteButton === 'function') updateFavoriteButton();
+}
+    // ✅ 刪除離線歌單
+function deleteOfflineSetlist(setlistKey, setlistName) {
+    if (!confirm(`確定要刪除離線歌單「${setlistName}」嗎？\n所有已下載嘅歌曲數據都會被清除。`)) {
+        return;
+    }
+    
+    // 讀取歌單數據
+    const setlistData = localStorage.getItem(setlistKey);
+    if (setlistData) {
+        const setlist = JSON.parse(setlistData);
+        
+        // 刪除每首歌嘅離線數據
+        if (setlist.songs) {
+            setlist.songs.forEach(song => {
+                localStorage.removeItem(`song_${song.uniqueId}`);
+            });
+        }
+    }
+    
+    // 刪除歌單本身
+    localStorage.removeItem(setlistKey);
+    
+    // 更新離線歌單列表
+    let offlineSetlists = JSON.parse(localStorage.getItem('offlineSetlists') || '[]');
+    offlineSetlists = offlineSetlists.filter(s => s.key !== setlistKey);
+    localStorage.setItem('offlineSetlists', JSON.stringify(offlineSetlists));
+    
+    // 重新整理顯示
+    showOfflineSetlists();
+    alert(`✅ 已刪除離線歌單「${setlistName}」`);
 }
     // ✅ 直接從詳情頁觸發離線下載
+// ✅ 直接從詳情頁觸發離線下載
 async function downloadEntireSetlistDirect() {
     if (!currentSetlistData) {
         alert("冇歌單數據");
@@ -3285,7 +3589,7 @@ async function downloadEntireSetlistDirect() {
         return;
     }
     
-    if (!confirm(`確定要離線下載「${currentSetlistData.name}」全部 ${validSongs.length} 首歌嗎？\n\n下載後可於冇網絡時使用。`)) {
+    if (!confirm(`確定要離線下載「${currentSetlistData.name}」全部 ${validSongs.length} 首歌嗎？\n\n✅ 下載後可於冇網絡時連續播放\n📱 數據會儲存喺手機瀏覽器`)) {
         return;
     }
     
