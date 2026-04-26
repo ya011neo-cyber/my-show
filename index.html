@@ -3280,6 +3280,7 @@ async function downloadEntireSetlist(validSongs, setlistName) {
     `;
 }
     // ✅ 顯示所有已下載嘅離線歌單
+// ✅ 顯示所有已下載嘅離線歌單
 function showOfflineSetlists() {
     const modal = document.getElementById('public-songs-modal');
     const offlineSetlists = JSON.parse(localStorage.getItem('offlineSetlists') || '[]');
@@ -3307,20 +3308,21 @@ function showOfflineSetlists() {
             <div style="flex:1; overflow-y:auto;">
     `;
     
+    // ✅ 修正：用 data 屬性儲存 key，避免 onclick 入面有特殊字符
     offlineSetlists.forEach((setlist, index) => {
         const dateStr = new Date(setlist.downloadedAt).toLocaleDateString('zh-HK');
         html += `
             <div style="background:#1a1a1a; border:2px solid #0f0; border-radius:10px; padding:15px; margin-bottom:10px;">
                 <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <div style="flex:1; cursor:pointer; text-align:left;" onclick="playOfflineSetlist('${setlist.key}')">
-                        <div style="font-weight:bold; font-size:1.1rem; color:#0f0;">📋 ${setlist.name}</div>
+                    <div style="flex:1; cursor:pointer; text-align:left;" data-setlist-key="${escapeHtml(setlist.key)}" onclick="playOfflineSetlist(this.dataset.setlistKey)">
+                        <div style="font-weight:bold; font-size:1.1rem; color:#0f0;">📋 ${escapeHtml(setlist.name)}</div>
                         <div style="font-size:0.8rem; color:#888; margin-top:5px;">
                             📊 ${setlist.songCount} 首歌 | 📅 ${dateStr}
                         </div>
                     </div>
                     <div style="display:flex; gap:5px;">
-                        <button class="btn" style="background:#0f0; color:#000; padding:8px 12px;" onclick="playOfflineSetlist('${setlist.key}')">▶️ 播放</button>
-                        <button class="btn" style="background:#800; padding:8px 12px;" onclick="deleteOfflineSetlist('${setlist.key}', '${setlist.name}')">🗑️</button>
+                        <button class="btn" style="background:#0f0; color:#000; padding:8px 12px;" data-setlist-key="${escapeHtml(setlist.key)}" onclick="playOfflineSetlist(this.dataset.setlistKey)">▶️ 播放</button>
+                        <button class="btn" style="background:#800; padding:8px 12px;" data-setlist-key="${escapeHtml(setlist.key)}" data-setlist-name="${escapeHtml(setlist.name)}" onclick="deleteOfflineSetlist(this.dataset.setlistKey, this.dataset.setlistName)">🗑️</button>
                     </div>
                 </div>
             </div>
