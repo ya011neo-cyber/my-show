@@ -1659,10 +1659,11 @@ function clearAllCollection() {
 }
 
 // 載入收藏的歌曲 - 支援本地儲存版本
+// 載入收藏的歌曲 - 支援本地儲存版本（已強化離線支援）
 async function loadCollectedSong(songMeta) {
     try {
-        // ✅ 優先：如果係本地版本，直接從 localStorage 載入
-        if (songMeta.isLocal || songMeta.uniqueId?.startsWith('local_')) {
+        // ✅ 優先：如果係本地版本或已離線下載，直接從 localStorage 載入
+        if (songMeta.isLocal || songMeta.isOfflineReady || songMeta.uniqueId?.startsWith('setlist_offline_') || songMeta.uniqueId?.startsWith('local_')) {
             const localData = loadSongFromLocalStorage(songMeta.uniqueId);
             if (localData) {
                 songData = localData;
@@ -1684,8 +1685,8 @@ async function loadCollectedSong(songMeta) {
             }
         }
         
-        // 如果有 Firebase ID，就從雲端載入
-        if (songMeta.id) {
+        // 如果有 Firebase ID 而且有網絡，就從雲端載入
+        if (songMeta.id && navigator.onLine) {
             const doc = await db.collection("songs").doc(songMeta.id).get();
             if (doc.exists) {
                 const data = doc.data();
@@ -1709,14 +1710,29 @@ async function loadCollectedSong(songMeta) {
             }
         }
         
-        alert("載入失敗！無法找到呢個版本嘅完整資料。");
+        // ✅ 如果冇網絡，提示用戶
+        if (!navigator.onLine && !songMeta.isOfflineReady) {
+            alert("❌ 離線模式：呢首歌未預先下載，請在有網絡時使用「離線下載」功能。");
+        } else {
+            alert("載入失敗！無法找到呢個版本嘅完整資料。");
+        }
         
     } catch (err) {
         console.error("載入收藏失敗", err);
-        alert("載入失敗！");
+        // ✅ 離線情況下 Firebase 會報錯，改用 localStorage
+        if (!navigator.onLine && songMeta.uniqueId) {
+            const localData = loadSongFromLocalStorage(songMeta.uniqueId);
+            if (localData) {
+                songData = localData;
+                index = 0;
+                updateUI();
+                closeModal();
+                return;
+            }
+        }
+        alert("載入失敗！請檢查網絡或是否已預先下載。");
     }
 }
-
 // ✅ 更新收藏按鈕狀態 (支援多版本檢查)
 function updateFavoriteButton() {
     const meta = songData.meta || {};
@@ -3053,6 +3069,29 @@ async function viewSetlistDetail(setlistId) {
         if (hasPlayableSongs) {
             html += `
                     <button class="btn" style="flex:1; background:#0f0; color:#000;" onclick="playEntireSetlist()">▶️ 播放整個歌單</button>
+                    html += `
+                <div style="display:flex; gap:10px; margin-top:15px; flex-wrap:wrap;">
+                    <button class="btn" style="flex:1; background:#444;" onclick="fetchPublicSetlists()">返回</button>
+        `;
+
+        // ✅ 只有當存在可播放歌曲時先顯示相關按鈕
+        const hasPlayableSongs = displaySongs.some(s => s.songId && !s.isDeleted);
+        if (hasPlayableSongs) {
+            html += `
+                    <button class="btn" style="flex:1; background:#0f0; color:#000;" onclick="playEntireSetlist()">▶️ 播放整個歌單</button>
+                    <button class="btn" style="flex:1; background:#0066cc; color:#fff;" onclick="downloadEntireSetlistDirect()">📥 離線下載</button>
+            `;
+        } else {
+            html += `
+                    <button class="btn" style="flex:1; background:#444; color:#888;" disabled>▶️ 冇可播放歌曲</button>
+            `;
+        }
+        
+        html += `
+                    <button class="btn" style="flex:1; background:#cc9900; color:#000;" onclick="addSetlistToCollection()">⭐ 收藏歌單</button>
+                </div>
+            </div>
+        `;
             `;
         } else {
             html += `
@@ -3082,6 +3121,7 @@ async function viewSetlistDetail(setlistId) {
 }
 
 // ✅ 修正播放整個歌單（只播放有效歌曲）
+// ✅ 修正播放整個歌單（支援離線批量下載）
 async function playEntireSetlist() {
     if (!currentSetlistData) {
         alert("冇歌單數據");
@@ -3097,16 +3137,188 @@ async function playEntireSetlist() {
         return;
     }
     
-    // 將歌單儲存到播放隊列
-    window.playQueue = validSongs;
-    window.playQueueIndex = 0;
+    // ✅ 彈出選項：即時播放 或 離線下載
+    const choice = confirm(
+        `🎵 歌單「${currentSetlistData.name}」共有 ${validSongs.length} 首歌\n\n` +
+        `按「確定」→ 即時播放（需要網絡）\n` +
+        `按「取消」→ 離線下載全部歌曲（建議入場前做）`
+    );
     
-    // 載入第一首歌
-    await loadSongFromSetlist(validSongs[0].songId);
-    
-    alert(`🎵 開始播放歌單「${currentSetlistData.name}」\n共 ${validSongs.length} 首歌`);
+    if (choice) {
+        // ========== 即時播放模式（原有邏輯）==========
+        window.playQueue = validSongs;
+        window.playQueueIndex = 0;
+        await loadSongFromSetlist(validSongs[0].songId);
+        alert(`🎵 開始播放歌單「${currentSetlistData.name}」\n共 ${validSongs.length} 首歌`);
+    } else {
+        // ========== 離線下載模式（新增）==========
+        await downloadEntireSetlist(validSongs, currentSetlistData.name);
+    }
 }
-
+    // ✅ 批量下載整個 Setlist 到 localStorage（入場前必做！）
+async function downloadEntireSetlist(validSongs, setlistName) {
+    const total = validSongs.length;
+    let downloaded = 0;
+    let failed = 0;
+    const failedList = [];
+    
+    // 顯示進度
+    const modal = document.getElementById('public-songs-modal');
+    const updateProgress = (msg) => {
+        modal.innerHTML = `
+            <div style="padding:20px; color:#fff; height:80vh; display:flex; flex-direction:column; justify-content:center; align-items:center;">
+                <div style="font-size:2rem; margin-bottom:15px;">📥</div>
+                <h3 style="margin:10px 0;">離線下載中...</h3>
+                <div style="font-size:0.9rem; color:#888; margin-bottom:10px;">${setlistName}</div>
+                <div style="width:80%; background:#333; border-radius:10px; height:20px; margin:15px 0; overflow:hidden;">
+                    <div id="download-progress-bar" style="width:0%; background:#0f0; height:100%; transition: width 0.3s;"></div>
+                </div>
+                <div id="download-status" style="color:#aaa; font-size:0.85rem;">準備中...</div>
+                <div style="margin-top:20px; color:#666; font-size:0.75rem;">請勿關閉此視窗</div>
+            </div>
+        `;
+    };
+    
+    updateProgress('開始下載...');
+    
+    for (let i = 0; i < total; i++) {
+        const song = validSongs[i];
+        const songName = song.name || '未知歌曲';
+        
+        // 更新進度
+        const statusDiv = document.getElementById('download-status');
+        const progressBar = document.getElementById('download-progress-bar');
+        if (statusDiv) statusDiv.textContent = `(${i + 1}/${total}) ${songName}...`;
+        if (progressBar) progressBar.style.width = `${Math.round((i / total) * 100)}%`;
+        
+        try {
+            // 從 Firebase 下載完整歌曲數據
+            const doc = await db.collection("songs").doc(song.songId).get();
+            
+            if (doc.exists) {
+                const data = doc.data();
+                
+                // ✅ 生成唯一識別碼
+                const uniqueId = `setlist_offline_${song.songId}`;
+                
+                // ✅ 儲存完整歌詞到 localStorage
+                const saveObj = {
+                    version: "2.0",
+                    uniqueId: uniqueId,
+                    meta: {
+                        name: data.name,
+                        uploader: data.uploader || "匿名",
+                        link: data.data?.[0]?.link || "",
+                        video: data.data?.[0]?.video || "",
+                        photo: data.data?.[0]?.photo || "",
+                        fromSetlist: setlistName
+                    },
+                    lines: Array.from(data.data || [])
+                };
+                
+                localStorage.setItem(`song_${uniqueId}`, JSON.stringify(saveObj));
+                
+                // ✅ 同時更新收藏列表（標記為離線可用）
+                let collection = JSON.parse(localStorage.getItem('mySetlist') || '[]');
+                const exists = collection.find(s => s.uniqueId === uniqueId);
+                if (!exists) {
+                    collection.push({
+                        uniqueId: uniqueId,
+                        id: song.songId,
+                        name: data.name,
+                        uploader: data.uploader || "匿名",
+                        isLocal: true,
+                        isOfflineReady: true,
+                        fromSetlist: setlistName,
+                        savedAt: new Date().toISOString()
+                    });
+                } else {
+                    // 更新標記
+                    exists.isOfflineReady = true;
+                    exists.fromSetlist = setlistName;
+                }
+                localStorage.setItem('mySetlist', JSON.stringify(collection));
+                
+                downloaded++;
+            } else {
+                failed++;
+                failedList.push(songName);
+            }
+        } catch (err) {
+            console.error(`下載失敗: ${songName}`, err);
+            failed++;
+            failedList.push(songName);
+        }
+        
+        // 短暫延遲，避免 Firebase 請求過於頻繁
+        await new Promise(resolve => setTimeout(resolve, 200));
+    }
+    
+    // 完成
+    const progressBar = document.getElementById('download-progress-bar');
+    if (progressBar) progressBar.style.width = '100%';
+    
+    modal.innerHTML = `
+        <div style="padding:20px; color:#fff; height:80vh; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center;">
+            <div style="font-size:3rem; margin-bottom:15px;">✅</div>
+            <h3 style="margin:10px 0; color:#0f0;">下載完成！</h3>
+            <div style="margin:15px 0; line-height:1.8;">
+                <div>📥 成功下載：<span style="color:#0f0; font-weight:bold;">${downloaded}</span> 首</div>
+                ${failed > 0 ? `<div>❌ 失敗：<span style="color:#f00;">${failed}</span> 首</div>` : ''}
+                <div style="margin-top:10px; font-size:0.8rem; color:#888;">
+                    📦 已儲存到「我的收藏」<br>
+                    🚫 離線模式下仍可使用
+                </div>
+            </div>
+            ${failedList.length > 0 ? `
+                <details style="margin-top:15px; text-align:left; width:100%;">
+                    <summary style="color:#f00; cursor:pointer;">查看失敗列表</summary>
+                    <ul style="color:#888; font-size:0.8rem; padding-left:20px;">
+                        ${failedList.map(n => `<li>${n}</li>`).join('')}
+                    </ul>
+                </details>
+            ` : ''}
+            <div style="display:flex; gap:10px; margin-top:20px; width:100%;">
+                <button class="btn" style="flex:1;" onclick="closeModal()">關閉</button>
+                <button class="btn" style="flex:1; background:#0f0; color:#000;" onclick="openMyCollection()">📂 查看離線歌單</button>
+            </div>
+        </div>
+    `;
+    
+    // ✅ 同時將整個 Setlist 資訊儲存到 localStorage
+    const setlistSaveData = {
+        name: setlistName,
+        downloadedAt: new Date().toISOString(),
+        songCount: downloaded,
+        songs: validSongs.map(s => ({
+            songId: s.songId,
+            uniqueId: `setlist_offline_${s.songId}`,
+            name: s.name
+        }))
+    };
+    localStorage.setItem(`offline_setlist_${setlistName.replace(/\s+/g, '_')}`, JSON.stringify(setlistSaveData));
+}
+    // ✅ 直接從詳情頁觸發離線下載
+async function downloadEntireSetlistDirect() {
+    if (!currentSetlistData) {
+        alert("冇歌單數據");
+        return;
+    }
+    
+    const validSongs = currentSetlistData.validSongs || 
+                       (currentSetlistData.songs || []).filter(s => s.songId && !s.isDeleted);
+    
+    if (validSongs.length === 0) {
+        alert("呢個歌單冇可下載的歌曲");
+        return;
+    }
+    
+    if (!confirm(`確定要離線下載「${currentSetlistData.name}」全部 ${validSongs.length} 首歌嗎？\n\n下載後可於冇網絡時使用。`)) {
+        return;
+    }
+    
+    await downloadEntireSetlist(validSongs, currentSetlistData.name);
+}
 // ✅ 修正從歌單載入歌曲（加入錯誤處理）
 async function loadSongFromSetlist(songId) {
     try {
